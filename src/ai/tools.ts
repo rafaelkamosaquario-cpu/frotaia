@@ -168,6 +168,21 @@ export const TOOLS = [
       required: ["custoAtualPeriodo", "custoPropostoPeriodo"],
     },
   },
+  {
+    name: "simular_operacao_mensal",
+    description:
+      "Simula um mes de operacao combinando receita total, custos fixos, custos variaveis e quilometragem, retornando resultado (lucro/prejuizo), margem percentual, CPK e quantos km sao necessarios para cobrir os custos fixos (ponto de equilibrio). Use para simulacoes operacionais gerais, ex: 'e se eu rodar X km e faturar Y, qual seria meu resultado'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        receitaTotal: { type: "number", description: "Receita total prevista no periodo, em reais." },
+        custosFixos: { type: "number", description: "Soma dos custos fixos no periodo (parcelas, salarios, seguros, etc.), em reais." },
+        custosVariaveis: { type: "number", description: "Soma dos custos variaveis no periodo (combustivel, pedagio, manutencao proporcional, etc.), em reais." },
+        quilometragemTotal: { type: "number", description: "Quilometragem total prevista no periodo." },
+      },
+      required: ["receitaTotal", "custosFixos", "custosVariaveis", "quilometragemTotal"],
+    },
+  },
 ];
 
 function round2(value: number): number {
@@ -353,6 +368,41 @@ export function executeTool(name: string, input: Record<string, unknown>): unkno
         economiaPercentual,
         cpkAtual,
         cpkProposto,
+        classificacao,
+      };
+    }
+
+    case "simular_operacao_mensal": {
+      const { receitaTotal, custosFixos, custosVariaveis, quilometragemTotal } = input as {
+        receitaTotal: number;
+        custosFixos: number;
+        custosVariaveis: number;
+        quilometragemTotal: number;
+      };
+      const custoTotal = custosFixos + custosVariaveis;
+      const resultado = receitaTotal - custoTotal;
+      const margemPercentual = receitaTotal > 0 ? round2((resultado / receitaTotal) * 100) : null;
+      const cpk = quilometragemTotal > 0 ? round2(custoTotal / quilometragemTotal) : null;
+      const margemContribuicaoPorKm =
+        quilometragemTotal > 0 && receitaTotal > 0
+          ? (receitaTotal - custosVariaveis) / quilometragemTotal
+          : null;
+      const kmPontoEquilibrio =
+        margemContribuicaoPorKm && margemContribuicaoPorKm > 0
+          ? round2(custosFixos / margemContribuicaoPorKm)
+          : null;
+
+      let classificacao: string;
+      if (resultado < 0) classificacao = "prejuizo";
+      else if (margemPercentual !== null && margemPercentual < 10) classificacao = "margem_baixa";
+      else classificacao = "lucrativo";
+
+      return {
+        custoTotal: round2(custoTotal),
+        resultado: round2(resultado),
+        margemPercentual,
+        cpk,
+        kmPontoEquilibrio,
         classificacao,
       };
     }
