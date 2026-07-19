@@ -5,7 +5,7 @@ import { useChat } from "@/hooks/useChat";
 import { MessageList } from "./MessageList";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { ChatInput } from "./ChatInput";
-import type { ChatMessage, Conversation } from "@/types";
+import type { ChatImage, ChatMessage, Conversation } from "@/types";
 
 interface ChatWindowProps {
   conversation: Conversation | null;
@@ -14,12 +14,14 @@ interface ChatWindowProps {
 
 export function ChatWindow({ conversation, onPersist }: ChatWindowProps) {
   const [draft, setDraft] = useState("");
+  const [image, setImage] = useState<ChatImage | null>(null);
   const { messages, isTyping, sendMessage } = useChat({ conversation, onPersist });
 
   const handleSend = () => {
-    if (!draft.trim()) return;
-    sendMessage(draft);
+    if (!draft.trim() && !image) return;
+    sendMessage(draft, image ?? undefined);
     setDraft("");
+    setImage(null);
   };
 
   const handleSelectSuggestion = (prompt: string) => {
@@ -35,7 +37,14 @@ export function ChatWindow({ conversation, onPersist }: ChatWindowProps) {
       ) : (
         <MessageList messages={messages} isTyping={isTyping} />
       )}
-      <ChatInput value={draft} onChange={setDraft} onSend={handleSend} disabled={isTyping} />
+      <ChatInput
+        value={draft}
+        onChange={setDraft}
+        image={image}
+        onImageChange={setImage}
+        onSend={handleSend}
+        disabled={isTyping}
+      />
     </div>
   );
 }
