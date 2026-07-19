@@ -26,7 +26,7 @@ export const FOOTER_DISCLAIMER =
   "As análises são baseadas nas informações fornecidas. Sempre valide decisões operacionais importantes antes da execução.";
 
 export const ERROR_RESPONSE =
-  "Não foi possível obter uma resposta agora. Verifique sua conexão e tente novamente em instantes.";
+  "Não foi possível concluir sua análise agora. Tente novamente em alguns instantes.";
 
 export const SUGGESTION_PROMPTS: SuggestionPrompt[] = [
   {

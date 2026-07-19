@@ -26,9 +26,9 @@ export async function requestAICompletion(
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? "Falha ao consultar o assistente de IA.");
+    throw new Error("Falha ao consultar o assistente de IA.");
   }
 
-  return (await response.json()) as AICompletionResponse;
+  const data = (await response.json()) as { response: string };
+  return { content: data.response };
 }
