@@ -5,7 +5,7 @@ import { createMessage } from "@/services/messageService";
 import { requestAICompletion } from "@/services/aiService";
 import { generateId } from "@/lib/utils";
 import { ERROR_RESPONSE } from "@/lib/constants";
-import type { ChatMessage, Conversation } from "@/types";
+import type { ChatImage, ChatMessage, Conversation } from "@/types";
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
@@ -15,8 +15,8 @@ interface UseChatOptions {
 }
 
 /**
- * Controla o envio de mensagens de uma conversa. As mensagens vêm sempre da
- * conversa ativa (fonte única de verdade); este hook só adiciona o estado
+ * Controla o envio de mensagens de uma conversa. As mensagens vem sempre da
+ * conversa ativa (fonte unica de verdade); este hook so adiciona o estado
  * de "digitando" e a chamada ao assistente de IA (via aiService).
  */
 export function useChat({ conversation, onPersist }: UseChatOptions) {
@@ -25,15 +25,15 @@ export function useChat({ conversation, onPersist }: UseChatOptions) {
   const messages = conversation?.messages ?? EMPTY_MESSAGES;
 
   const sendMessage = useCallback(
-    (content: string) => {
+    (content: string, image?: ChatImage) => {
       const trimmed = content.trim();
-      if (!trimmed || isTyping) return;
+      if ((!trimmed && !image) || isTyping) return;
 
       const conversationId = conversation?.id ?? generateId();
-      const userMessage = createMessage("user", trimmed);
+      const userMessage = createMessage("user", trimmed, image);
       const messagesWithUser = [...messages, userMessage];
 
-      onPersist(conversationId, messagesWithUser, trimmed);
+      onPersist(conversationId, messagesWithUser, trimmed || "Imagem enviada");
       setIsTyping(true);
 
       requestAICompletion({ messages: messagesWithUser })
