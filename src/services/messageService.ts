@@ -1,18 +1,23 @@
-import type { ChatMessage, MessageRole } from "@/types";
+import type { ChatImage, ChatMessage, MessageRole } from "@/types";
 import { generateId } from "@/lib/utils";
 
 /**
- * Fábrica e utilitários de mensagens. Fase 1: geração local apenas,
- * sem persistência remota — preparado para ser trocado por chamadas
+ * Fabrica e utilitarios de mensagens. Fase 1: geracao local apenas,
+ * sem persistencia remota — preparado para ser trocado por chamadas
  * de API na Fase 2.
  */
 
-export function createMessage(role: MessageRole, content: string): ChatMessage {
-  return {
-    id: generateId(),
-    role,
-    content,
-    createdAt: new Date().toISOString(),
-    status: "sent",
-  };
+export function createMessage(
+    role: MessageRole,
+    content: string,
+    image?: ChatImage
+  ): ChatMessage {
+    return {
+          id: generateId(),
+          role,
+          content,
+          createdAt: new Date().toISOString(),
+          status: "sent",
+          ...(image ? { image } : {}),
+    };
 }
