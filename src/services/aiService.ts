@@ -14,16 +14,29 @@ export interface AICompletionResponse {
   content: string;
 }
 
+const REQUEST_TIMEOUT_MS = 50_000;
+
 export async function requestAICompletion(
   request: AICompletionRequest
 ): Promise<AICompletionResponse> {
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messages: request.messages.map(({ role, content }) => ({ role, content })),
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: request.messages.map(({ role, content }) => ({ role, content })),
+      }),
+      signal: controller.signal,
+    });
+  } catch {
+    throw new Error("Falha ao consultar o assistente de IA.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     throw new Error("Falha ao consultar o assistente de IA.");

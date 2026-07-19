@@ -20,19 +20,27 @@ function isValidMessage(value: unknown): value is ClaudeChatMessage {
 }
 
 export async function POST(request: Request) {
-  let messages: ClaudeChatMessage[];
+  let rawMessages: unknown[];
 
   try {
     const body = (await request.json()) as { messages?: unknown };
-    const rawMessages = Array.isArray(body.messages) ? body.messages : [];
-    messages = rawMessages.filter(isValidMessage);
+    rawMessages = Array.isArray(body.messages) ? body.messages : [];
   } catch {
     return NextResponse.json({ error: "Requisição inválida." }, { status: 400 });
   }
 
-  if (messages.length === 0) {
-    return NextResponse.json({ error: "Nenhuma mensagem válida enviada." }, { status: 400 });
+  if (rawMessages.length === 0) {
+    return NextResponse.json({ error: "Nenhuma mensagem enviada." }, { status: 400 });
   }
+
+  // Rejeita a requisição inteira se qualquer mensagem for inválida — nunca
+  // descarta mensagens silenciosamente, o que enviaria à Claude um histórico
+  // incompleto sem a pergunta atual do usuário.
+  if (!rawMessages.every(isValidMessage)) {
+    return NextResponse.json({ error: "Mensagens em formato inválido." }, { status: 400 });
+  }
+
+  const messages = rawMessages as ClaudeChatMessage[];
 
   try {
     const response = await getChatResponse(messages);

@@ -12,6 +12,7 @@ import { PROMPT_MESTRE } from "./prompt-mestre";
 
 const MODEL = "claude-sonnet-5";
 const MAX_TOKENS = 1024;
+const REQUEST_TIMEOUT_MS = 45_000;
 
 export interface ClaudeChatMessage {
   role: "user" | "assistant";
@@ -80,12 +81,15 @@ export async function getChatResponse(messages: ClaudeChatMessage[]): Promise<st
   const client = getClient();
 
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: getSystemPrompt(),
-      messages: messages.map(({ role, content }) => ({ role, content })),
-    });
+    const response = await client.messages.create(
+      {
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: getSystemPrompt(),
+        messages: messages.map(({ role, content }) => ({ role, content })),
+      },
+      { timeout: REQUEST_TIMEOUT_MS }
+    );
 
     const textBlock = response.content.find(
       (block): block is Anthropic.TextBlock => block.type === "text"
