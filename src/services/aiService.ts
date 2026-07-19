@@ -1,9 +1,9 @@
 import type { ChatMessage } from "@/types";
 
 /**
- * Camada de integração com o provedor de IA (Claude API).
- * A chamada real acontece no servidor (rota `/api/chat`), que é a única
- * peça com acesso à ANTHROPIC_API_KEY — o cliente nunca vê a chave.
+ * Camada de integracao com o provedor de IA (Claude API).
+ * A chamada real acontece no servidor (rota `/api/chat`), que e a unica
+ * peca com acesso a ANTHROPIC_API_KEY — o cliente nunca ve a chave.
  */
 
 export interface AICompletionRequest {
@@ -28,7 +28,11 @@ export async function requestAICompletion(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        messages: request.messages.map(({ role, content }) => ({ role, content })),
+        messages: request.messages.map(({ role, content, image }) => ({
+          role,
+          content,
+          ...(image ? { image: { mediaType: image.mediaType, data: image.data } } : {}),
+        })),
       }),
       signal: controller.signal,
     });
