@@ -4,6 +4,7 @@ import { useEffect, useRef, type KeyboardEvent } from "react";
 import { ArrowUp } from "lucide-react";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { FOOTER_DISCLAIMER, INPUT_PLACEHOLDER } from "@/lib/constants";
 
 const MAX_HEIGHT_PX = 200;
 
@@ -39,7 +40,7 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Pergunte algo sobre sua frota…"
+          placeholder={INPUT_PLACEHOLDER}
           rows={1}
           className="max-h-[200px] flex-1 border-0 bg-transparent px-2 py-1.5 shadow-none focus-visible:ring-0"
         />
@@ -54,8 +55,8 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
           <ArrowUp className="size-4.5" aria-hidden />
         </Button>
       </div>
-      <p className="mx-auto mt-2 max-w-2xl text-center text-xs text-muted-foreground">
-        O Frota IA Assistente pode cometer erros. Verifique informações importantes.
+      <p className="mx-auto mt-2.5 max-w-lg text-center text-[11px] leading-relaxed tracking-wide text-muted-foreground/80">
+        {FOOTER_DISCLAIMER}
       </p>
     </div>
   );

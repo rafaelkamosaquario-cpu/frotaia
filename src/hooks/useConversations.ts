@@ -50,6 +50,10 @@ export function useConversations() {
           );
         }
 
+        // Título do histórico: hoje é apenas a primeira mensagem do usuário
+        // truncada. Futuramente será gerado pela IA a partir do conteúdo da
+        // conversa (ex.: "📦 Frete Curitiba → São Paulo", "📊 CPK Volvo FH",
+        // "🛞 Comparação Michelin x Recapado", "⛽ Consumo Scania R450").
         const created: Conversation = {
           id,
           title: titleHint ? truncate(titleHint, 48) : "Nova conversa",

@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 
+// Favicon gerado como placeholder — substituir pelo ícone oficial do app
+// quando a identidade visual definitiva estiver pronta.
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 

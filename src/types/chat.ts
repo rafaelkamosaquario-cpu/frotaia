@@ -21,14 +21,15 @@ export interface Conversation {
 export interface SuggestionPrompt {
   id: string;
   label: string;
+  description: string;
   prompt: string;
   icon: SuggestionIconName;
 }
 
 export type SuggestionIconName =
   | "truck"
-  | "gauge"
-  | "calculator"
+  | "package"
+  | "fuel"
   | "circleDot"
-  | "trendingDown"
+  | "barChart3"
   | "wallet";
