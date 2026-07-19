@@ -25,8 +25,8 @@ export const INPUT_PLACEHOLDER =
 export const FOOTER_DISCLAIMER =
   "As análises são baseadas nas informações fornecidas. Sempre valide decisões operacionais importantes antes da execução.";
 
-export const PLACEHOLDER_RESPONSE =
-  "Em breve este assistente será conectado à inteligência artificial.";
+export const ERROR_RESPONSE =
+  "Não foi possível obter uma resposta agora. Verifique sua conexão e tente novamente em instantes.";
 
 export const SUGGESTION_PROMPTS: SuggestionPrompt[] = [
   {

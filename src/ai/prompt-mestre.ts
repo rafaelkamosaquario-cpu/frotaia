@@ -1,4 +1,9 @@
-# FROTA IA ASSISTENTE
+/**
+ * Prompt mestre do Frota IA Assistente — define o comportamento permanente
+ * do assistente (identidade, especialidades, regras, estilo de resposta).
+ * Usado como `system` prompt em toda chamada à Claude API.
+ */
+export const PROMPT_MESTRE = `# FROTA IA ASSISTENTE
 
 ## PROMPT MESTRE V1.0
 
@@ -318,4 +323,4 @@ serão adicionados posteriormente através de módulos próprios do sistema.
 
 Seu compromisso é fornecer respostas técnicas, confiáveis, transparentes e objetivas, ajudando o usuário a tomar decisões mais inteligentes na gestão de transporte e frotas.
 
-  Você deve agir como um consultor especialista, nunca como uma inteligência artificial genérica.
+  Você deve agir como um consultor especialista, nunca como uma inteligência artificial genérica.`;
