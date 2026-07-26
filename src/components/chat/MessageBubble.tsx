@@ -15,15 +15,27 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
       >
         {isUser ? <User className="size-4" aria-hidden /> : <Bot className="size-4" aria-hidden />}
       </div>
-      <div
-        className={cn(
-          "max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed sm:max-w-[75%]",
-          isUser
-            ? "rounded-tr-sm bg-primary text-primary-foreground"
-            : "rounded-tl-sm border border-border bg-surface text-foreground"
+      <div className={cn("flex max-w-[85%] flex-col gap-2 sm:max-w-[75%]", isUser && "items-end")}>
+        {message.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`data:${message.image.mediaType};base64,${message.image.data}`}
+            alt={message.image.name ?? "Imagem enviada"}
+            className="max-h-64 w-auto rounded-2xl border border-border object-contain"
+          />
         )}
-      >
-        {message.content}
+        {message.content && (
+          <div
+            className={cn(
+              "whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+              isUser
+                ? "rounded-tr-sm bg-primary text-primary-foreground"
+                : "rounded-tl-sm border border-border bg-surface text-foreground"
+            )}
+          >
+            {message.content}
+          </div>
+        )}
       </div>
     </div>
   );

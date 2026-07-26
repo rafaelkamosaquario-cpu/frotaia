@@ -14,7 +14,9 @@ export interface AICompletionResponse {
   content: string;
 }
 
-const REQUEST_TIMEOUT_MS = 50_000;
+// Precisa cobrir o pior caso do servidor: ate 5 chamadas a Claude API no
+// loop de uso de ferramentas (claude.ts), cada uma com ate 45s de timeout.
+const REQUEST_TIMEOUT_MS = 240_000;
 
 export async function requestAICompletion(
   request: AICompletionRequest
