@@ -35,6 +35,12 @@ const KNOWLEDGE_SECTIONS: { title: string; file: string }[] = [
   { title: "COMBUSTIVEL", file: "combustivel.md" },
   { title: "MANUTENCAO", file: "manutencao.md" },
   { title: "LEGISLACAO", file: "legislacao.md" },
+  { title: "JORNADA DO MOTORISTA", file: "jornada-motorista.md" },
+  { title: "GESTAO DE FROTA", file: "gestao-frota.md" },
+  { title: "CUSTOS OPERACIONAIS", file: "custos-operacionais.md" },
+  { title: "GESTAO DE VIAGENS E OPERACAO", file: "gestao-viagens-operacao.md" },
+  { title: "DOCUMENTACAO DO TRANSPORTE", file: "documentacao-transporte.md" },
+  { title: "NEGOCIACAO DE FRETES E ATENDIMENTO", file: "negociacao-fretes-atendimento.md" },
 ];
 
 function readKnowledgeFile(filename: string): string {
