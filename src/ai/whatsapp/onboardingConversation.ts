@@ -103,15 +103,17 @@ function askRegion(): OnboardingReply {
   return textReply("Qual região você mais atua? (ex.: Sul, Sudeste, Centro-Oeste, ou os estados/rotas principais)");
 }
 
+/**
+ * Texto simples, não botões — botões nativos (kind "buttons",
+ * sendWhatsappButtons/send-button-actions) não estavam sendo entregues em
+ * teste real no WhatsApp (05/08/2026), travando o onboarding aqui sem
+ * nenhum erro visível nos logs (a chamada à Z-API não lançava exceção, só
+ * a mensagem nunca chegava no aparelho). parseFixedRoute já aceita
+ * "sim"/"não" em texto livre — trocar pra texto evita depender desse
+ * recurso até investigarmos a causa raiz do lado da Z-API.
+ */
 function askFixedRoute(): OnboardingReply {
-  return {
-    kind: "buttons",
-    text: "Você trabalha com rota fixa?",
-    options: [
-      { id: "sim", label: "Sim" },
-      { id: "nao", label: "Não" },
-    ],
-  };
+  return textReply('Você trabalha com rota fixa? Responda "sim" ou "não".');
 }
 
 function askPrimaryVehicle(): OnboardingReply {
