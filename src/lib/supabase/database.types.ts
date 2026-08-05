@@ -1502,6 +1502,7 @@ export type Database = {
         | "awaiting_fixed_route"
         | "awaiting_vehicle_count"
         | "awaiting_primary_vehicle"
+        | "awaiting_vehicle_configuration"
         | "completed"
         | "paused"
       route_data_source: "manual" | "google_routes" | "outro"
@@ -1739,6 +1740,7 @@ export const Constants = {
         "awaiting_fixed_route",
         "awaiting_vehicle_count",
         "awaiting_primary_vehicle",
+        "awaiting_vehicle_configuration",
         "completed",
         "paused",
       ],
@@ -1767,3 +1769,4 @@ export const Constants = {
     },
   },
 } as const
+

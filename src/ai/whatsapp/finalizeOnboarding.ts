@@ -12,9 +12,12 @@ import { truncate } from "@/lib/utils";
  * reaproveita os mesmos services já usados pelo onboarding web (Fase 2),
  * nenhuma lógica de criação de empresa/veículo foi duplicada.
  *
- * A quantidade de veículos informada não tem coluna própria no schema —
- * vira uma memória estruturada (ai_memories) em vez de uma tabela nova,
- * já que é só um dado de contexto, não uma entidade operacional.
+ * Camada 7: `vehicleType`/`axleCount` (resolvidos por
+ * vehicleConfigClassifier.ts, sempre presentes quando finalize=true — é
+ * pergunta obrigatória) vão direto pras colunas reais de `vehicles`, em
+ * vez de ficarem só como texto solto. `primaryVehicleRaw` (marca/modelo,
+ * opcional) continua indo pra `name`/`notes` em texto livre — sem parsing
+ * arriscado em campos separados.
  */
 export async function finalizeOnboarding(
   admin: SupabaseDbClient,
@@ -27,17 +30,6 @@ export async function finalizeOnboarding(
     city: collectedData.baseCity,
     state: collectedData.baseState,
   });
-
-  if (collectedData.vehicleCount && collectedData.vehicleCount > 0) {
-    await saveMemory(admin, company.id, userId, {
-      memoryType: "operational",
-      key: "fleet_vehicle_count",
-      valueJson: { count: collectedData.vehicleCount },
-      summary: `Frota informada no onboarding: ${collectedData.vehicleCount} veículo(s).`,
-      sourceType: "user_explicit",
-      confirmedByUser: true,
-    });
-  }
 
   if (collectedData.region) {
     await saveMemory(admin, company.id, userId, {
@@ -61,14 +53,18 @@ export async function finalizeOnboarding(
     });
   }
 
-  if (collectedData.primaryVehicleRaw && !collectedData.primaryVehicleSkipped) {
+  if (collectedData.vehicleType) {
+    const temMarcaModelo = collectedData.primaryVehicleRaw && !collectedData.primaryVehicleSkipped;
     await createVehicle(admin, company.id, userId, {
-      name: truncate(collectedData.primaryVehicleRaw, 120),
-      notes: collectedData.primaryVehicleRaw,
+      name: temMarcaModelo ? truncate(collectedData.primaryVehicleRaw!, 120) : undefined,
+      notes: temMarcaModelo ? collectedData.primaryVehicleRaw : undefined,
+      vehicleType: collectedData.vehicleType,
+      axleCount: collectedData.axleCount ?? undefined,
     }).catch(() => {
-      // Texto livre pode não passar no schema estrito (ex.: excede algum
-      // limite) — o onboarding já concluiu do ponto de vista do usuário,
-      // então não travamos por causa do veículo opcional.
+      // Onboarding já concluiu do ponto de vista do usuário — se a
+      // gravação do veículo falhar (ex.: texto livre não passa no schema
+      // estrito), não trava a conclusão. O cliente pode cadastrar o
+      // veículo depois via gerenciar_veiculo.
     });
   }
 

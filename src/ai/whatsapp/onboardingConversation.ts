@@ -1,5 +1,6 @@
-import type { OnboardingState } from "@/lib/supabase/tables";
+import type { OnboardingState, VehicleTypeEnum } from "@/lib/supabase/tables";
 import type { CompanyRow } from "@/lib/supabase/tables";
+import { classificarConfiguracaoVeiculo, resolverDesambiguacaoArticulado } from "./vehicleConfigClassifier";
 
 /**
  * Onboarding conversacional pelo WhatsApp (Camada 6, seções 3-6 do prompt
@@ -12,8 +13,15 @@ import type { CompanyRow } from "@/lib/supabase/tables";
  * Redesenho (identidade obrigatória e curta; detalhe de veículo/implemento
  * fica progressivo — perguntado pela IA só quando uma ferramenta precisar,
  * fora deste arquivo): nome → perfil (lista) → cidade → região → rota fixa
- * (botão) → quantidade de veículos → veículo principal (texto livre,
- * opcional) → concluído.
+ * (botão) → marca/modelo do veículo (texto livre, opcional) →
+ * configuração do veículo (obrigatória, ver vehicleConfigClassifier.ts) →
+ * concluído.
+ *
+ * Camada 7: a pergunta "quantos veículos" foi removida — o produto só
+ * permite 1 veículo ativo por conta (constraint no banco,
+ * vehicles_one_active_per_company_idx). O estado `awaiting_vehicle_count`
+ * segue existindo no enum do banco só por compatibilidade histórica, mas
+ * o código nunca mais atribui esse estado.
  */
 
 export type OnboardingCompanyType = CompanyRow["company_type"];
@@ -26,9 +34,12 @@ export interface OnboardingCollectedData {
   baseState?: string;
   region?: string;
   hasFixedRoute?: boolean;
-  vehicleCount?: number;
   primaryVehicleRaw?: string;
   primaryVehicleSkipped?: boolean;
+  vehicleType?: VehicleTypeEnum;
+  axleCount?: number | null;
+  /** true enquanto aguarda a resposta da lista de desambiguação (cavalo mecânico/carreta) — nunca persiste além do próximo turno. */
+  awaitingVehicleConfigChoice?: boolean;
 }
 
 export type OnboardingReply =
@@ -103,12 +114,12 @@ function askFixedRoute(): OnboardingReply {
   };
 }
 
-function askVehicleCount(): OnboardingReply {
-  return textReply("Quantos veículos você possui ou administra atualmente?");
+function askPrimaryVehicle(): OnboardingReply {
+  return textReply('Qual a marca e modelo do seu veículo? Pode incluir o ano. Caso não queira cadastrar agora, responda "depois".');
 }
 
-function askPrimaryVehicle(): OnboardingReply {
-  return textReply('Qual é o veículo que você utiliza com mais frequência? Pode informar marca, modelo e ano. Caso não queira cadastrar agora, responda "depois".');
+function askVehicleConfiguration(): OnboardingReply {
+  return textReply("Qual a configuração do seu veículo? (ex.: toco, truck, cavalo mecânico, carreta, bitrem, rodotrem...)");
 }
 
 /**
@@ -164,33 +175,6 @@ function parseFixedRoute(text: string): boolean | null {
   return null;
 }
 
-const NUMBER_WORDS: Record<string, number> = {
-  um: 1,
-  uma: 1,
-  dois: 2,
-  duas: 2,
-  três: 3,
-  tres: 3,
-  quatro: 4,
-  cinco: 5,
-  seis: 6,
-  sete: 7,
-  oito: 8,
-  nove: 9,
-  dez: 10,
-};
-
-function parseVehicleCount(text: string): number | null {
-  const digitMatch = text.match(/\d+/);
-  if (digitMatch) return Number(digitMatch[0]);
-
-  const t = norm(text);
-  for (const [word, value] of Object.entries(NUMBER_WORDS)) {
-    if (t.includes(word)) return value;
-  }
-  return null;
-}
-
 function parseBaseLocation(text: string): { city: string; state?: string } {
   const parts = text.split(/[-,/]/).map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) {
@@ -243,8 +227,10 @@ export function processOnboardingMessage(
     if (!collectedData.baseCity) return { nextState: "awaiting_base_location", reply: askBaseLocation(), collectedData, finalize: false };
     if (!collectedData.region) return { nextState: "awaiting_region", reply: askRegion(), collectedData, finalize: false };
     if (collectedData.hasFixedRoute === undefined) return { nextState: "awaiting_fixed_route", reply: askFixedRoute(), collectedData, finalize: false };
-    if (collectedData.vehicleCount === undefined) return { nextState: "awaiting_vehicle_count", reply: askVehicleCount(), collectedData, finalize: false };
-    return { nextState: "awaiting_primary_vehicle", reply: askPrimaryVehicle(), collectedData, finalize: false };
+    if (collectedData.primaryVehicleRaw === undefined && !collectedData.primaryVehicleSkipped) {
+      return { nextState: "awaiting_primary_vehicle", reply: askPrimaryVehicle(), collectedData, finalize: false };
+    }
+    return { nextState: "awaiting_vehicle_configuration", reply: askVehicleConfiguration(), collectedData, finalize: false };
   }
 
   switch (state) {
@@ -289,29 +275,55 @@ export function processOnboardingMessage(
         return { nextState: state, reply: askFixedRoute(), collectedData, finalize: false };
       }
       const updated = { ...collectedData, hasFixedRoute: parsed };
-      return { nextState: "awaiting_vehicle_count", reply: askVehicleCount(), collectedData: updated, finalize: false };
-    }
-
-    case "awaiting_vehicle_count": {
-      if (SKIP_WORDS.some((w) => t.includes(w))) {
-        const updated = { ...collectedData, vehicleCount: 1 };
-        return { nextState: "awaiting_primary_vehicle", reply: askPrimaryVehicle(), collectedData: updated, finalize: false };
-      }
-      const count = parseVehicleCount(incomingText);
-      if (count === null || count <= 0) {
-        return { nextState: state, reply: textReply("Pode me passar a quantidade de veículos em número? Ex.: 1, 3, 12."), collectedData, finalize: false };
-      }
-      const updated = { ...collectedData, vehicleCount: count };
       return { nextState: "awaiting_primary_vehicle", reply: askPrimaryVehicle(), collectedData: updated, finalize: false };
     }
 
     case "awaiting_primary_vehicle": {
       if (SKIP_WORDS.some((w) => t.includes(w))) {
         const updated = { ...collectedData, primaryVehicleSkipped: true };
-        return { nextState: "completed", reply: completionMessage(), collectedData: updated, finalize: true };
+        return { nextState: "awaiting_vehicle_configuration", reply: askVehicleConfiguration(), collectedData: updated, finalize: false };
       }
       const updated = { ...collectedData, primaryVehicleRaw: incomingText.trim() };
-      return { nextState: "completed", reply: completionMessage(), collectedData: updated, finalize: true };
+      return { nextState: "awaiting_vehicle_configuration", reply: askVehicleConfiguration(), collectedData: updated, finalize: false };
+    }
+
+    case "awaiting_vehicle_configuration": {
+      // Meio da desambiguação (cavalo mecânico/carreta): esta mensagem é a
+      // escolha da lista anterior, não uma nova descrição livre.
+      if (collectedData.awaitingVehicleConfigChoice) {
+        const resolvido = resolverDesambiguacaoArticulado(incomingText);
+        if (!resolvido) {
+          // Toque inválido/texto solto no meio da desambiguação: repete a
+          // mesma lista, sem sair do estado (nunca conclui sem os dois campos).
+          const classificacao = classificarConfiguracaoVeiculo("cavalo mecanico");
+          const reply = classificacao.status === "precisa_desambiguar" ? classificacao.reply : askVehicleConfiguration();
+          return { nextState: state, reply, collectedData, finalize: false };
+        }
+        const updated = {
+          ...collectedData,
+          vehicleType: resolvido.vehicleType,
+          axleCount: resolvido.axleCount,
+          awaitingVehicleConfigChoice: false,
+        };
+        return { nextState: "completed", reply: completionMessage(), collectedData: updated, finalize: true };
+      }
+
+      const classificacao = classificarConfiguracaoVeiculo(incomingText);
+
+      if (classificacao.status === "resolvido") {
+        const updated = { ...collectedData, vehicleType: classificacao.vehicleType, axleCount: classificacao.axleCount };
+        return { nextState: "completed", reply: completionMessage(), collectedData: updated, finalize: true };
+      }
+
+      if (classificacao.status === "precisa_desambiguar") {
+        const updated = { ...collectedData, awaitingVehicleConfigChoice: true };
+        return { nextState: state, reply: classificacao.reply, collectedData: updated, finalize: false };
+      }
+
+      // "nao_reconhecido": pergunta obrigatória, nunca pula — repete
+      // reformulada até classificar (ver decisão de produto: configuração
+      // do veículo é essencial demais pra deixar sem preencher).
+      return { nextState: state, reply: classificacao.reply, collectedData, finalize: false };
     }
 
     default:
