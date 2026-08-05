@@ -1,6 +1,6 @@
 import "server-only";
 import { createCompanyWithOwner } from "@/services/supabase/companyService";
-import { createVehicle } from "@/services/supabase/vehicleService";
+import { createVehicle, setDefaultVehicle } from "@/services/supabase/vehicleService";
 import { saveMemory } from "@/services/supabase/memoryService";
 import type { SupabaseDbClient } from "@/services/supabase/types";
 import type { OnboardingCollectedData } from "./onboardingConversation";
@@ -55,17 +55,24 @@ export async function finalizeOnboarding(
 
   if (collectedData.vehicleType) {
     const temMarcaModelo = collectedData.primaryVehicleRaw && !collectedData.primaryVehicleSkipped;
-    await createVehicle(admin, company.id, userId, {
-      name: temMarcaModelo ? truncate(collectedData.primaryVehicleRaw!, 120) : undefined,
-      notes: temMarcaModelo ? collectedData.primaryVehicleRaw : undefined,
-      vehicleType: collectedData.vehicleType,
-      axleCount: collectedData.axleCount ?? undefined,
-    }).catch(() => {
+    try {
+      const veiculo = await createVehicle(admin, company.id, userId, {
+        name: temMarcaModelo ? truncate(collectedData.primaryVehicleRaw!, 120) : undefined,
+        notes: temMarcaModelo ? collectedData.primaryVehicleRaw : undefined,
+        vehicleType: collectedData.vehicleType,
+        axleCount: collectedData.axleCount ?? undefined,
+      });
+      // Nesta V1 é sempre o único veículo da conta — marcar como padrão
+      // agora é o que faz a IA reaproveitar tipo/eixos/marca depois, sem
+      // perguntar de novo (ver regra no system prompt). Sem isso, o
+      // veículo existe no banco mas fica invisível pra IA.
+      await setDefaultVehicle(admin, veiculo.id, company.id, userId);
+    } catch {
       // Onboarding já concluiu do ponto de vista do usuário — se a
       // gravação do veículo falhar (ex.: texto livre não passa no schema
       // estrito), não trava a conclusão. O cliente pode cadastrar o
       // veículo depois via gerenciar_veiculo.
-    });
+    }
   }
 
   return company;
