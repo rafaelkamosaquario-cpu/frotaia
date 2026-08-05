@@ -99,8 +99,38 @@ function askBaseLocation(): OnboardingReply {
   return textReply("Qual cidade ou região você utiliza como base principal?");
 }
 
+const OPCOES_REGIAO: Array<{ id: string; title: string; label: string }> = [
+  { id: "norte", title: "Norte", label: "Norte" },
+  { id: "nordeste", title: "Nordeste", label: "Nordeste" },
+  { id: "centro_oeste", title: "Centro-Oeste", label: "Centro-Oeste" },
+  { id: "sudeste", title: "Sudeste", label: "Sudeste" },
+  { id: "sul", title: "Sul", label: "Sul" },
+  { id: "todas", title: "Todas as regiões", label: "Todas as regiões" },
+];
+
+/**
+ * Lista nativa (confirmada entregando bem em teste real, ao contrário dos
+ * botões — ver askFixedRoute) com as 5 regiões + "todas". A lista do
+ * WhatsApp só permite tocar em UMA opção por vez (sem seleção múltipla
+ * nativa) — pra quem atua em mais de uma região, digitar texto livre
+ * continua funcionando em paralelo (ver resolverRegiao), por isso o texto
+ * da pergunta menciona as duas formas.
+ */
 function askRegion(): OnboardingReply {
-  return textReply("Qual região você mais atua? (ex.: Sul, Sudeste, Centro-Oeste, ou os estados/rotas principais)");
+  return {
+    kind: "list",
+    text: "Em qual região você mais atua? Toque numa opção, ou digite se forem várias (ex.: \"Sul e Sudeste\").",
+    title: "Região de atuação",
+    buttonLabel: "Escolher opção",
+    options: OPCOES_REGIAO.map((o) => ({ id: o.id, title: o.title })),
+  };
+}
+
+/** Mapeia o toque na lista pro rótulo bonito; texto livre (uma ou várias regiões) passa direto. */
+function resolverRegiao(texto: string): string {
+  const t = norm(texto);
+  const porId = OPCOES_REGIAO.find((o) => o.id === t);
+  return porId ? porId.label : texto.trim();
 }
 
 /**
@@ -120,8 +150,34 @@ function askPrimaryVehicle(): OnboardingReply {
   return textReply('Qual a marca e modelo do seu veículo? Pode incluir o ano. Caso não queira cadastrar agora, responda "depois".');
 }
 
+/**
+ * Ids batem literalmente com as palavras-chave que
+ * vehicleConfigClassifier.ts já reconhece — o toque na lista vira
+ * `selectedRowId`, que entra em classificarConfiguracaoVeiculo() do mesmo
+ * jeito que texto digitado (nenhuma mudança precisou no classificador).
+ * Cavalo mecânico/carreta continuam caindo na desambiguação (5/6/7/9
+ * eixos) depois do toque, igual já funcionava com texto livre.
+ */
+const OPCOES_CONFIG_VEICULO: Array<{ id: string; title: string }> = [
+  { id: "toco", title: "Toco" },
+  { id: "truck", title: "Truck / Trucado" },
+  { id: "tres quartos", title: "Três-quartos" },
+  { id: "bitruck", title: "Bitruck" },
+  { id: "cavalo mecanico", title: "Cavalo mecânico" },
+  { id: "carreta", title: "Carreta" },
+  { id: "bitrem", title: "Bitrem" },
+  { id: "rodotrem", title: "Rodotrem" },
+  { id: "outro", title: "Outro / não sei ainda" },
+];
+
 function askVehicleConfiguration(): OnboardingReply {
-  return textReply("Qual a configuração do seu veículo? (ex.: toco, truck, cavalo mecânico, carreta, bitrem, rodotrem...)");
+  return {
+    kind: "list",
+    text: "Qual a configuração do seu veículo? Toque numa opção, ou digite se preferir (ex.: \"cavalo mecânico\").",
+    title: "Configuração do veículo",
+    buttonLabel: "Escolher opção",
+    options: OPCOES_CONFIG_VEICULO.map((o) => ({ id: o.id, title: o.title })),
+  };
 }
 
 /**
@@ -267,7 +323,7 @@ export function processOnboardingMessage(
       if (!incomingText.trim()) {
         return { nextState: state, reply: askRegion(), collectedData, finalize: false };
       }
-      const updated = { ...collectedData, region: incomingText.trim() };
+      const updated = { ...collectedData, region: resolverRegiao(incomingText) };
       return { nextState: "awaiting_fixed_route", reply: askFixedRoute(), collectedData: updated, finalize: false };
     }
 

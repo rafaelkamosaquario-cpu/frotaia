@@ -95,6 +95,17 @@ const MENSAGEM_POS_CADASTRO =
 
 const TEXTO_LISTA_SUGESTOES = "Como posso ajudar com sua frota hoje?";
 
+/**
+ * Enviado como mensagem separada logo após a lista — nunca dentro do corpo
+ * dela (TEXTO_LISTA_SUGESTOES é um dos textos fixos da especificação,
+ * nunca alterado). Reforça que nenhuma das 10 opções é obrigatória: o
+ * cliente sempre pode digitar a própria pergunta em vez de tocar numa
+ * sugestão — já valia antes, só não ficava claro quando o menu era
+ * reaberto por palavra-chave (esse caminho não passa por
+ * MENSAGEM_POS_CADASTRO, que já tinha esse aviso).
+ */
+const LEMBRETE_PERGUNTA_LIVRE = "Se preferir, pode digitar sua própria pergunta a qualquer momento — não precisa escolher uma das opções acima.";
+
 function construirFallbackNumerado(): string {
   const linhas = FROTA_SUGGESTIONS.map((s, i) => `${i + 1}. ${s.title}`).join("\n");
   return `${TEXTO_LISTA_SUGESTOES}\n\n${linhas}\n\nResponda com o número ou escreva sua pergunta normalmente.`;
@@ -130,6 +141,7 @@ async function enviarSugestoesIniciais(
       "Ver sugestões",
       FROTA_SUGGESTIONS.map((s) => ({ id: s.id, title: s.title, description: s.description }))
     );
+    await sendWhatsappText(phoneE164, LEMBRETE_PERGUNTA_LIVRE).catch(() => {});
     await updateOnboardingSession(admin, userId, {
       collectedData: { ...collectedDataAtual, suggestionsMenuSentAt: new Date().toISOString(), awaitingNumberedMenuSelection: false },
     });
