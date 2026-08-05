@@ -11,9 +11,15 @@ interface RecordToolExecutionResult {
 }
 
 /**
- * Registra a execução de uma ferramenta já concluída (as 11 ferramentas em
- * src/ai/tools são síncronas e puras — não recalcula nada aqui, só grava
- * entrada/saída para auditoria e reaproveitamento de contexto).
+ * Registra a execução de uma ferramenta já concluída (qualquer uma das 22 —
+ * síncronas/puras ou assíncronas/integração) — não recalcula nada aqui, só
+ * grava entrada/saída para auditoria e reaproveitamento de contexto.
+ *
+ * `toolExecutionCreateSchema.parse(input)` valida `toolName` contra
+ * `frotaIaToolNameSchema` (src/lib/validation/schemas.ts) — toda ferramenta
+ * nova precisa ser adicionada lá também, ou essa validação lança ZodError
+ * pra ferramenta que na verdade funcionou (ver histórico de bugs iguais a
+ * esse nesse mesmo enum).
  */
 export async function recordToolExecution(
   client: SupabaseDbClient,

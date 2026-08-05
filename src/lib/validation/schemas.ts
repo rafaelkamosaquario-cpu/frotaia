@@ -264,6 +264,21 @@ export const frotaIaToolNameSchema = z.enum([
   "gerar_documento",
   "verificar_piso_minimo_antt",
   "consultar_rota",
+  // Camada 6/7: mesma classe de bug do gerenciar_google_calendar acima -
+  // 5 ferramentas novas nunca tinham sido adicionadas aqui. A acao real
+  // (registrar_despesa, gerenciar_veiculo, definir_estilo_resposta,
+  // consultar_conhecimento_operacional, gerenciar_rota_salva) funcionava
+  // normalmente, mas o registro em tool_executions quebrava com ZodError
+  // silencioso - a IA reportava "a ferramenta falhou" ao cliente mesmo
+  // quando a acao tinha sido salva com sucesso. Achado em teste real no
+  // WhatsApp (05/08/2026): definir_estilo_resposta salvou a preferencia
+  // corretamente em company_preferences, mas o cliente foi informado de
+  // uma falha.
+  "registrar_despesa",
+  "gerenciar_veiculo",
+  "definir_estilo_resposta",
+  "consultar_conhecimento_operacional",
+  "gerenciar_rota_salva",
 ]);
 
 export const toolExecutionCreateSchema = z.object({
