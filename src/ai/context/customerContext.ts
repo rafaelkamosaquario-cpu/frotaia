@@ -98,9 +98,22 @@ export const resolveDefaultVehicle = resolveDefaultVehicleRow;
 export { startAnalysisRun as saveAnalysisRun } from "@/services/supabase/analysisHistoryService";
 
 /**
- * Executa uma das 11 ferramentas puras e registra a execução em
- * tool_executions, medindo a duração real. Não altera o resultado da
- * ferramenta de forma alguma — só mede e grava em volta dela.
+ * Executa qualquer uma das ferramentas (as 11 puras e as de integração
+ * assíncronas — Agenda, alertas, veículo, rota, histórico, conhecimento
+ * operacional etc.) e registra a execução em tool_executions, medindo a
+ * duração real. Não altera o resultado da ferramenta de forma alguma — só
+ * mede e grava em volta dela.
+ *
+ * `executar()` é sempre aguardado (await), mesmo quando a ferramenta é
+ * síncrona (await sobre um valor não-Promise só resolve na hora, sem
+ * custo) — antes disso, ferramentas `async` (ex.:
+ * consultar_conhecimento_operacional, que lê arquivo do disco) tinham o
+ * resultado tratado como se já estivesse pronto: a Promise não resolvida
+ * ia parar em `outputData` (grava lixo em tool_executions) e podia
+ * derrubar `recordToolExecution` ao tentar serializar isso, fazendo a
+ * ferramenta "falhar" mesmo com a lógica interna dela funcionando
+ * perfeitamente — foi exatamente o que aconteceu em teste real no
+ * WhatsApp (05/08/2026).
  */
 export async function saveToolExecution<TSaida>(
   client: SupabaseDbClient,
@@ -114,12 +127,12 @@ export async function saveToolExecution<TSaida>(
     messageId?: string;
     toolVersion?: string;
   },
-  executar: () => TSaida
+  executar: () => TSaida | Promise<TSaida>
 ): Promise<TSaida> {
   const start = performance.now();
 
   try {
-    const output = executar();
+    const output = await executar();
     const durationMs = Math.round(performance.now() - start);
 
     await recordToolExecution(
