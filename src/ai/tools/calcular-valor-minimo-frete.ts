@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, EstrategiaSobreposicao, NivelCompletude, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_CUSTO_POR_KM_PADRAO, CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_CUSTO_POR_KM_PADRAO, CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 import { CASAS_DECIMAIS_DISTANCIA_PADRAO, CASAS_DECIMAIS_PESO_PADRAO } from "./calcular-custo-viagem";
 import { resolverValorOuAliquota } from "./calcular-margem";
 import type { ResumoCustoViagem } from "./calcular-margem";
@@ -1412,7 +1412,9 @@ function respostaFalha(modo: ModoValorMinimoFrete, dadosFaltantes: string[], err
   };
 }
 
-export function calcularValorMinimoFrete(entrada: CalcularValorMinimoFreteEntrada): CalcularValorMinimoFreteResultado {
+export function calcularValorMinimoFrete(entradaBruta: CalcularValorMinimoFreteEntrada): CalcularValorMinimoFreteResultado {
+  // cenarios chega como string JSON, não array — ver normalizarPossivelJson em utils.ts.
+  const entrada: CalcularValorMinimoFreteEntrada = { ...entradaBruta, cenarios: normalizarPossivelJson(entradaBruta.cenarios) };
   const errosTopo = validarEstruturaTopo(entrada);
   if (errosTopo.length > 0) return respostaFalha(entrada.modo, [], errosTopo);
 

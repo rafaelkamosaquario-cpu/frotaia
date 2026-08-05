@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 
 /**
  * Ferramenta: calcular_cpk
@@ -592,7 +592,15 @@ function calcularComparacaoCpk(entrada: CalcularCpkEntrada, casas: number): Calc
 // Função principal
 // ---------------------------------------------------------------------------
 
-export function calcularCpk(entrada: CalcularCpkEntrada): CalcularCpkResultado {
+export function calcularCpk(entradaBruta: CalcularCpkEntrada): CalcularCpkResultado {
+  // operacaoA/operacaoB chegam como string JSON, não objeto, quando vem de tool use — ver
+  // normalizarPossivelJson em utils.ts. Passa direto quando já é objeto (chamadas internas, ex.:
+  // comparar-pneus.ts reaproveitando esta função em TS).
+  const entrada: CalcularCpkEntrada = {
+    ...entradaBruta,
+    operacaoA: normalizarPossivelJson(entradaBruta.operacaoA),
+    operacaoB: normalizarPossivelJson(entradaBruta.operacaoB),
+  };
   const casas = entrada.arredondamentoCasasDecimais ?? CASAS_DECIMAIS_PADRAO;
 
   const errosBasicos = validarValoresBasicos(entrada);

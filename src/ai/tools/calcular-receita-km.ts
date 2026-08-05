@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, NivelCompletude, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_CUSTO_POR_KM_PADRAO, CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_CUSTO_POR_KM_PADRAO, CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 import { CASAS_DECIMAIS_DISTANCIA_PADRAO, CASAS_DECIMAIS_PESO_PADRAO } from "./calcular-custo-viagem";
 import { calcularMargem } from "./calcular-margem";
 import type { ResumoCustoViagem } from "./calcular-margem";
@@ -1483,7 +1483,14 @@ function respostaFalha(modo: ModoReceitaKm, dadosFaltantes: string[], erros: str
   };
 }
 
-export function calcularReceitaKm(entrada: CalcularReceitaKmEntrada): CalcularReceitaKmResultado {
+export function calcularReceitaKm(entradaBruta: CalcularReceitaKmEntrada): CalcularReceitaKmResultado {
+  // cenarios/viagens/veiculos chegam como string JSON, não array — ver normalizarPossivelJson em utils.ts.
+  const entrada: CalcularReceitaKmEntrada = {
+    ...entradaBruta,
+    cenarios: normalizarPossivelJson(entradaBruta.cenarios),
+    viagens: normalizarPossivelJson(entradaBruta.viagens),
+    veiculos: normalizarPossivelJson(entradaBruta.veiculos),
+  };
   const errosTopo = validarEstruturaTopo(entrada);
   if (errosTopo.length > 0) return respostaFalha(entrada.modo, [], errosTopo);
 

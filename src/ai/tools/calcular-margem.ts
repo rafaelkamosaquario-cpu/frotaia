@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, EstrategiaSobreposicao, NivelCompletude, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_CUSTO_POR_KM_PADRAO, CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_CUSTO_POR_KM_PADRAO, CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 import { calcularCpk } from "./calcular-cpk";
 
 /**
@@ -1239,7 +1239,11 @@ function calcularPrevistoRealizado(
 // Função principal
 // ---------------------------------------------------------------------------
 
-export function calcularMargem(entrada: CalcularMargemEntrada): CalcularMargemResultado {
+export function calcularMargem(entradaBruta: CalcularMargemEntrada): CalcularMargemResultado {
+  // cenarios chega como string JSON (via tool use), não array — ver normalizarPossivelJson em utils.ts.
+  // normalizarPossivelJson passa valores não-string direto, então chamadas internas (outras ferramentas
+  // reaproveitando calcularMargem em TS) continuam funcionando sem mudança.
+  const entrada: CalcularMargemEntrada = { ...entradaBruta, cenarios: normalizarPossivelJson(entradaBruta.cenarios) };
   const casas = casasDecimaisDe(entrada);
   const estrategia = entrada.estrategiaSobreposicao ?? "REJEITAR_SOBREPOSICAO";
 

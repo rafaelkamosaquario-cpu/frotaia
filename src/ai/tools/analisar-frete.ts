@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, EstrategiaSobreposicao, NivelCompletude, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, CASAS_DECIMAIS_CUSTO_POR_KM_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, CASAS_DECIMAIS_CUSTO_POR_KM_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 import { CASAS_DECIMAIS_DISTANCIA_PADRAO, CASAS_DECIMAIS_PESO_PADRAO } from "./calcular-custo-viagem";
 import { calcularMargem, resolverValorOuAliquota } from "./calcular-margem";
 import type { CalcularMargemEntrada, ClassificacaoMargem, DadosMargemVariante, ImpactoRetornoVazio, ResumoCustoViagem } from "./calcular-margem";
@@ -1492,7 +1492,9 @@ function respostaFalha(entrada: AnalisarFreteEntrada, mensagemResumo: string, da
 // Função principal
 // ---------------------------------------------------------------------------
 
-export function analisarFrete(entrada: AnalisarFreteEntrada): AnalisarFreteResultado {
+export function analisarFrete(entradaBruta: AnalisarFreteEntrada): AnalisarFreteResultado {
+  // propostas chega como string JSON, não array — ver normalizarPossivelJson em utils.ts.
+  const entrada: AnalisarFreteEntrada = { ...entradaBruta, propostas: normalizarPossivelJson(entradaBruta.propostas) };
   const casas = casasDecimaisDe(entrada);
 
   const errosTopo = validarEstruturaTopo(entrada);

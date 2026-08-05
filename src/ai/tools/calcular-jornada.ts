@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, EstrategiaSobreposicao, NivelCompletude, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 import { calcularCustoVeiculoParado } from "./calcular-custo-veiculo-parado";
 import { calcularReceitaKm } from "./calcular-receita-km";
 import { calcularMargem } from "./calcular-margem";
@@ -2090,7 +2090,17 @@ function validarEstruturaTopo(entrada: CalcularJornadaEntrada): string[] {
 
 const MODOS_MOTORISTAS: ModoJornada[] = ["UM_MOTORISTA", "DOIS_MOTORISTAS", "MULTIPLOS_MOTORISTAS", "REVEZAMENTO"];
 
-export function calcularJornada(entrada: CalcularJornadaEntrada): CalcularJornadaResultado {
+export function calcularJornada(entradaBruta: CalcularJornadaEntrada): CalcularJornadaResultado {
+  // etapas/periodos/motoristas/regrasConformidade/cenarios/veiculos chegam como string JSON, não array — ver normalizarPossivelJson em utils.ts.
+  const entrada: CalcularJornadaEntrada = {
+    ...entradaBruta,
+    etapas: normalizarPossivelJson(entradaBruta.etapas),
+    periodos: normalizarPossivelJson(entradaBruta.periodos),
+    motoristas: normalizarPossivelJson(entradaBruta.motoristas),
+    regrasConformidade: normalizarPossivelJson(entradaBruta.regrasConformidade),
+    cenarios: normalizarPossivelJson(entradaBruta.cenarios),
+    veiculos: normalizarPossivelJson(entradaBruta.veiculos),
+  };
   const errosTopo = validarEstruturaTopo(entrada);
   if (errosTopo.length > 0) return respostaFalha(entrada, errosTopo.join(" "));
 

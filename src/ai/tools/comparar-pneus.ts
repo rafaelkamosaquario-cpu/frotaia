@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, NivelCompletude, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 import { calcularCpk } from "./calcular-cpk";
 
 /**
@@ -871,7 +871,8 @@ function respostaFalha(
 // Função principal
 // ---------------------------------------------------------------------------
 
-export function compararPneus(entrada: CompararPneusEntrada): CompararPneusResultado {
+export function compararPneus(entradaBruta: CompararPneusEntrada): CompararPneusResultado {
+  const entrada: CompararPneusEntrada = { ...entradaBruta, opcoes: normalizarPossivelJson(entradaBruta.opcoes) as OpcaoPneu[] };
   const casasMoeda = entrada.casasDecimais ?? CASAS_DECIMAIS_MOEDA_PADRAO;
   const casasCpk = entrada.casasDecimais ?? CASAS_DECIMAIS_CPK_PADRAO;
   const casasPercentual = entrada.casasDecimais ?? CASAS_DECIMAIS_PERCENTUAL_PADRAO;

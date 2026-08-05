@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 
 /**
  * Ferramenta: calcular_combustivel
@@ -790,7 +790,13 @@ function calcularComparacaoCenarios(
 // Função principal
 // ---------------------------------------------------------------------------
 
-export function calcularCombustivel(entrada: CalcularCombustivelEntrada): CalcularCombustivelResultado {
+export function calcularCombustivel(entradaBruta: CalcularCombustivelEntrada): CalcularCombustivelResultado {
+  // cenarioA/cenarioB chegam como string JSON, não objeto — ver normalizarPossivelJson em utils.ts.
+  const entrada: CalcularCombustivelEntrada = {
+    ...entradaBruta,
+    cenarioA: normalizarPossivelJson(entradaBruta.cenarioA),
+    cenarioB: normalizarPossivelJson(entradaBruta.cenarioB),
+  };
   const casas = entrada.arredondamentoCasasDecimais ?? CASAS_DECIMAIS_PADRAO;
 
   const errosBasicos = validarValoresBasicos(entrada);

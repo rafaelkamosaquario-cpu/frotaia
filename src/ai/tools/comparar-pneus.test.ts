@@ -1,6 +1,25 @@
 import { describe, it, expect } from "vitest";
 import { compararPneus } from "./comparar-pneus";
 
+describe("comparar_pneus — opcoes como string JSON (regressão, teste real em WhatsApp 05/08/2026)", () => {
+  it("aceita opcoes serializado como string (formato que o Claude realmente envia via tool use)", () => {
+    const opcoesComoString = JSON.stringify([
+      { nome: "A", custoAquisicao: 1000, quilometragemPrevista: 100000 },
+      { nome: "B", custoAquisicao: 1000, quilometragemPrevista: 50000 },
+    ]);
+    // @ts-expect-error -- simula exatamente o que chega via tool use (string, não array)
+    const r = compararPneus({ modo: "COMPARACAO_SIMPLES", opcoes: opcoesComoString });
+    expect(r.sucesso).toBe(true);
+    expect(r.melhorOpcao).toBe("A");
+  });
+
+  it("não quebra (nunca lança) quando opcoes é uma string JSON inválida", () => {
+    // @ts-expect-error -- simula entrada malformada
+    const r = compararPneus({ modo: "COMPARACAO_SIMPLES", opcoes: "não é json" });
+    expect(r.sucesso).toBe(false);
+  });
+});
+
 describe("comparar_pneus — validação estrutural", () => {
   it("exige ao menos duas opções", () => {
     const r = compararPneus({ modo: "COMPARACAO_SIMPLES", opcoes: [{ nome: "Único", custoAquisicao: 100, quilometragemPrevista: 1000 }] });

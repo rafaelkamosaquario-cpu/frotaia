@@ -6,6 +6,7 @@ import {
   arredondar,
   formatarBRL,
   formatarNumero,
+  normalizarPossivelJson,
 } from "./utils";
 import { calcularCombustivel } from "./calcular-combustivel";
 import { calcularCpk } from "./calcular-cpk";
@@ -1773,7 +1774,23 @@ function calcularUmaVariante(
   return { agregacao, consolidado, erros: [], alertasSobreposicao };
 }
 
-export function calcularCustoViagem(entrada: CalcularCustoViagemEntrada): CalcularCustoViagemResultado {
+export function calcularCustoViagem(entradaBruta: CalcularCustoViagemEntrada): CalcularCustoViagemResultado {
+  // veiculo/arla/pedagios/motorista/ajudante/operacao/custosFixos/volta/previsto/realizado chegam
+  // como string JSON, não objeto — ver normalizarPossivelJson em utils.ts. Parsear previsto/realizado
+  // já resolve os campos aninhados dentro deles (o modelo manda o bloco inteiro como uma string só).
+  const entrada: CalcularCustoViagemEntrada = {
+    ...entradaBruta,
+    veiculo: normalizarPossivelJson(entradaBruta.veiculo),
+    arla: normalizarPossivelJson(entradaBruta.arla),
+    pedagios: normalizarPossivelJson(entradaBruta.pedagios),
+    motorista: normalizarPossivelJson(entradaBruta.motorista),
+    ajudante: normalizarPossivelJson(entradaBruta.ajudante),
+    operacao: normalizarPossivelJson(entradaBruta.operacao),
+    custosFixos: normalizarPossivelJson(entradaBruta.custosFixos),
+    volta: normalizarPossivelJson(entradaBruta.volta),
+    previsto: normalizarPossivelJson(entradaBruta.previsto),
+    realizado: normalizarPossivelJson(entradaBruta.realizado),
+  };
   const casas = casasDecimaisDe(entrada);
   const estrategiaSobreposicao = entrada.estrategiaSobreposicao ?? "REJEITAR_SOBREPOSICAO";
 

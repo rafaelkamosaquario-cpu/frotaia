@@ -1,5 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { arredondar, formatarBRL, formatarNumero } from "./utils";
+import { arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
+
+describe("normalizarPossivelJson", () => {
+  it("faz o parse quando o valor chega como string JSON (formato real que o Claude envia via tool use)", () => {
+    expect(normalizarPossivelJson('[{"a":1}]')).toEqual([{ a: 1 }]);
+    expect(normalizarPossivelJson('{"a":1}')).toEqual({ a: 1 });
+  });
+
+  it("passa o valor direto quando já não é string (chamada interna entre ferramentas em TS)", () => {
+    const arr = [{ a: 1 }];
+    expect(normalizarPossivelJson(arr)).toBe(arr);
+  });
+
+  it("retorna undefined (nunca lança) para string JSON inválida, null ou undefined", () => {
+    expect(normalizarPossivelJson("não é json")).toBeUndefined();
+    expect(normalizarPossivelJson(null)).toBeUndefined();
+    expect(normalizarPossivelJson(undefined)).toBeUndefined();
+  });
+});
 
 describe("arredondar", () => {
   it("arredonda para o número de casas pedido", () => {

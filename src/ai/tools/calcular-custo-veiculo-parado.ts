@@ -1,5 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, EstrategiaSobreposicao, NivelCompletude, ResultadoFerramentaBase } from "./types";
-import { CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero } from "./utils";
+import { CASAS_DECIMAIS_MOEDA_PADRAO, CASAS_DECIMAIS_PERCENTUAL_PADRAO, arredondar, formatarBRL, formatarNumero, normalizarPossivelJson } from "./utils";
 import { calcularCustoDia } from "./calcular-custo-dia";
 import type { ItemCustoFixo, TipoDia } from "./calcular-custo-dia";
 import { calcularMargem } from "./calcular-margem";
@@ -1638,7 +1638,16 @@ function respostaFalha(modo: ModoCustoVeiculoParado, dadosFaltantes: string[], e
   };
 }
 
-export function calcularCustoVeiculoParado(entrada: CalcularCustoVeiculoParadoEntrada): CalcularCustoVeiculoParadoResultado {
+export function calcularCustoVeiculoParado(entradaBruta: CalcularCustoVeiculoParadoEntrada): CalcularCustoVeiculoParadoResultado {
+  // custosFixos/custosAdicionais/custosEvitados/cenarios/veiculos chegam como string JSON, não array — ver normalizarPossivelJson em utils.ts.
+  const entrada: CalcularCustoVeiculoParadoEntrada = {
+    ...entradaBruta,
+    custosFixos: normalizarPossivelJson(entradaBruta.custosFixos),
+    custosAdicionais: normalizarPossivelJson(entradaBruta.custosAdicionais),
+    custosEvitados: normalizarPossivelJson(entradaBruta.custosEvitados),
+    cenarios: normalizarPossivelJson(entradaBruta.cenarios),
+    veiculos: normalizarPossivelJson(entradaBruta.veiculos),
+  };
   const errosTopo = validarEstruturaTopo(entrada);
   if (errosTopo.length > 0) return respostaFalha(entrada.modo, [], errosTopo);
 
