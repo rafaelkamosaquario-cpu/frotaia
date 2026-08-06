@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifySignedToken } from "@/lib/google/signedToken";
 import { connectGoogleCalendar } from "@/services/google/googleCalendarService";
+import { GoogleCalendarApiError } from "@/lib/google/calendarClient";
 
 interface CalendarOAuthState extends Record<string, unknown> {
   userId: string;
@@ -43,7 +44,15 @@ export async function GET(request: Request) {
   try {
     await connectGoogleCalendar({ userId: payload.userId, companyId: payload.companyId, code });
   } catch (err) {
-    const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : JSON.stringify(err);
+    // Nunca loga o corpo da resposta do Google (pode ter dado de conta do
+    // usuário) — mas httpStatus/code são seguros e já dizem qual chamada
+    // falhou (GoogleCalendarApiError.code = "HTTP_<status>").
+    const detalhe =
+      err instanceof GoogleCalendarApiError
+        ? `${err.name}: ${err.message} (httpStatus=${err.httpStatus}, code=${err.code})`
+        : err instanceof Error
+          ? `${err.name}: ${err.message}`
+          : JSON.stringify(err);
     console.error(`[calendar-callback] Falha ao conectar: ${detalhe}`);
     return NextResponse.redirect(`${appOrigin}/?calendar_erro=falha_conexao`);
   }
