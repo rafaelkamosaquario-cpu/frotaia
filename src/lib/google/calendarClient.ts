@@ -33,6 +33,23 @@ async function parseErrorSafely(response: Response): Promise<never> {
   );
 }
 
+/**
+ * Só para o endpoint de token (exchangeCodeForTokens/refreshAccessToken) —
+ * diferente de parseErrorSafely, inclui o corpo do erro na mensagem porque
+ * a resposta de erro do endpoint de token do Google é sempre protocolar
+ * (`{error: "invalid_client"|"invalid_grant"|..., error_description}`),
+ * nunca dado de conta do usuário — só o endpoint de userinfo/calendar pode
+ * devolver isso, e esses continuam usando parseErrorSafely.
+ */
+async function parseTokenErrorSafely(response: Response): Promise<never> {
+  const corpo = await response.text().catch(() => "");
+  throw new GoogleCalendarApiError(
+    `Falha na comunicação com o Google Calendar (token endpoint): ${corpo.slice(0, 300)}`,
+    response.status,
+    `HTTP_${response.status}`
+  );
+}
+
 export interface GoogleTokenResponse {
   accessToken: string;
   refreshToken?: string;
@@ -72,7 +89,7 @@ export async function exchangeCodeForTokens(code: string): Promise<GoogleTokenRe
     }),
   });
 
-  if (!response.ok) return parseErrorSafely(response);
+  if (!response.ok) return parseTokenErrorSafely(response);
 
   const body = (await response.json()) as {
     access_token: string;
@@ -98,7 +115,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
     }),
   });
 
-  if (!response.ok) return parseErrorSafely(response);
+  if (!response.ok) return parseTokenErrorSafely(response);
 
   const body = (await response.json()) as { access_token: string; expires_in: number };
   return { accessToken: body.access_token, expiresIn: body.expires_in };
