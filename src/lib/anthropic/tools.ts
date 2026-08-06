@@ -74,12 +74,20 @@ export function construirFerramentasAnthropic(): Anthropic.Tool[] {
 
 /**
  * Domínios oficiais aos quais a busca web fica restrita — cobre a ANTT
- * (piso mínimo, RNTRC, resoluções), a ANP (preço de combustível) e as
- * principais fontes de legislação/trânsito. Restringir a domínios (em vez
- * de busca livre) é o que torna essa ferramenta segura para dado
+ * (piso mínimo, RNTRC, resoluções, pedágio de concessão federal), a ANP
+ * (preço de combustível), as principais fontes de legislação/trânsito, e
+ * (desde 06/08/2026) as 4 agências estaduais de pedágio mais citadas nas
+ * rotas do produto (SP, PR, SC, RS — cada uma verificada por busca real
+ * antes de entrar aqui, nunca digitada de memória). Restringir a domínios
+ * (em vez de busca livre) é o que torna essa ferramenta segura para dado
  * regulatório: nunca traz opinião de blog/terceiro como se fosse fonte
  * oficial. Lista mantida manualmente — ampliar conforme necessário, nunca
  * remover um domínio "porque não achou nada" numa busca isolada.
+ *
+ * Pedágio estadual de outros estados (fora SP/PR/SC/RS) ainda não tem
+ * domínio cadastrado — ver regra correspondente no system prompt: nesse
+ * caso a IA pede o valor ao cliente em vez de tentar buscar fora da
+ * lista permitida.
  */
 const DOMINIOS_OFICIAIS: string[] = [
   "gov.br",
@@ -92,13 +100,19 @@ const DOMINIOS_OFICIAIS: string[] = [
   "dnit.gov.br",
   "senatran.gov.br",
   "lexml.gov.br",
+  // Pedágio estadual — só as 4 agências já verificadas (ver comentário acima).
+  "artesp.sp.gov.br",
+  "agepar.pr.gov.br",
+  "aresc.sc.gov.br",
+  "agergs.rs.gov.br",
+  "daer.rs.gov.br",
 ];
 
 /**
  * Ferramenta de busca web nativa da Claude (server-side — não é uma das
  * FERRAMENTAS_FROTA_IA, roda na infraestrutura da Anthropic, não passa pelo
  * loop de execução local de gerarRespostaAssistente.ts). Restrita aos
- * domínios oficiais acima, para consultar piso mínimo/RNTRC (ANTT), preço
+ * domínios oficiais acima, para consultar piso mínimo/RNTRC/pedágio de concessão (ANTT + 4 agências estaduais), preço
  * de referência de combustível (ANP) e legislação/normas de trânsito —
  * sempre como pesquisa em tempo real, nunca como base de conhecimento
  * própria mantida por este projeto (mais simples de manter, sempre
