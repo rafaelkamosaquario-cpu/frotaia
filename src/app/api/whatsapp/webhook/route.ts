@@ -504,6 +504,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    // Catch mais externo do pipeline inteiro (qualquer ferramenta, qualquer
+    // parte de gerarRespostaAssistente, chamada à Anthropic) — sem log aqui
+    // não dá pra saber o que quebrou quando cai nesse fallback genérico.
+    const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : JSON.stringify(err);
+    console.error(`[webhook] Falha ao gerar resposta: ${detalhe}`);
     await sendWhatsappText(phoneE164, "Não consegui processar sua mensagem agora. Tente novamente em instantes.").catch(() => {});
     return NextResponse.json({ ok: true });
   }
