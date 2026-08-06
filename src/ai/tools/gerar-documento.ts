@@ -148,7 +148,10 @@ async function executar(entrada: GerarDocumentoEntrada): Promise<GerarDocumentoR
       enviado: true,
       mensagemResumo: `Documento "${tituloFinal}" gerado e enviado pelo WhatsApp.`,
     };
-  } catch {
+  } catch (err) {
+    const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    const corpo = err && typeof err === "object" && "body" in err ? String((err as { body: unknown }).body) : "";
+    console.error(`[gerar-documento] Falha ao gerar/enviar PDF: ${detalhe}${corpo ? ` | body: ${corpo.slice(0, 300)}` : ""}`);
     return respostaFalha(["Não consegui gerar ou enviar o documento agora. A análise continua salva no histórico — pode tentar de novo em instantes."]);
   }
 }
