@@ -29,6 +29,33 @@ const LARGURA_PAGINA = 595.28; // A4 pt
 const ALTURA_PAGINA = 841.89;
 const LARGURA_UTIL = LARGURA_PAGINA - MARGEM * 2;
 
+/**
+ * `StandardFonts` do pdf-lib usa WinAnsiEncoding (Windows-1252) — cobre
+ * ASCII + acentuação latina (por isso português com acento sempre
+ * funcionou) mas NÃO cobre seta, emoji e outros símbolos usados nas
+ * mensagens das ferramentas (ex.: "Pneu A → CPK ..."). Sem sanitizar,
+ * `page.drawText` lança exceção e a geração do PDF inteiro falha — bug
+ * real encontrado em 06/08/2026 (analisar_frete no modo comparação usa
+ * "→" no resumo). Trata os símbolos conhecidos explicitamente; qualquer
+ * outro caractere não previsto ainda quebraria, então `escreverLinha`
+ * abaixo também tem uma rede de segurança (cai pra versão só-ASCII da
+ * linha em vez de derrubar o documento inteiro).
+ */
+const SUBSTITUICOES_SIMBOLOS: Array<[RegExp, string]> = [
+  [/→/g, "->"],
+  [/←/g, "<-"],
+  [/[✅⚠️🔔🚨🛣️⛽📅📄]/gu, ""],
+];
+
+function sanitizarSimbolosConhecidos(texto: string): string {
+  return SUBSTITUICOES_SIMBOLOS.reduce((acc, [padrao, substituto]) => acc.replace(padrao, substituto), texto);
+}
+
+/** Última rede de segurança — remove qualquer caractere fora do Latin-1, garantindo que o PDF sempre gera. */
+function paraAsciiSeguro(texto: string): string {
+  return texto.replace(/[^\x00-\xFF]/g, "");
+}
+
 function quebrarLinha(texto: string, maxCaracteres: number): string[] {
   const palavras = texto.split(/\s+/);
   const linhas: string[] = [];
@@ -66,17 +93,16 @@ export async function gerarPdfRelatorio(doc: DocumentoRelatorio): Promise<Uint8A
     const tamanho = opcoes.tamanho ?? 11;
     const fonte = opcoes.negrito ? fonteNegrito : fonteRegular;
     const maxCaracteres = Math.floor(LARGURA_UTIL / (tamanho * 0.5));
-    const linhas = quebrarLinha(texto, Math.max(maxCaracteres, 20));
+    const linhas = quebrarLinha(sanitizarSimbolosConhecidos(texto), Math.max(maxCaracteres, 20));
 
     for (const linha of linhas) {
       novaPaginaSeNecessario(tamanho + 4);
-      page.drawText(linha, {
-        x: MARGEM,
-        y: cursorY,
-        size: tamanho,
-        font: fonte,
-        color: opcoes.cor ? rgb(...opcoes.cor) : rgb(0.1, 0.1, 0.1),
-      });
+      const propriedades = { x: MARGEM, y: cursorY, size: tamanho, font: fonte, color: opcoes.cor ? rgb(...opcoes.cor) : rgb(0.1, 0.1, 0.1) };
+      try {
+        page.drawText(linha, propriedades);
+      } catch {
+        page.drawText(paraAsciiSeguro(linha), propriedades);
+      }
       cursorY -= tamanho + 6;
     }
   }
