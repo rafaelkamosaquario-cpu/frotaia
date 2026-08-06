@@ -183,6 +183,21 @@ const DOMINIOS_ENTIDADES_E_IMPRENSA: string[] = [
   "automotivebusiness.com.br",
   "ocarreteiro.com.br",
   "diariodotransporte.com.br",
+  // Imprensa especializada (lista ampliada 06/08/2026, a pedido do Rafael —
+  // fontes voltadas pro motorista/caminhoneiro do dia a dia, não só mercado
+  // corporativo). Cada domínio verificado por busca real antes de entrar.
+  "blogdocaminhoneiro.com",
+  "penaestrada.com.br", // Trucão
+  "estradas.com.br", // rodovias, pedágio, PRF, DNIT, ANTT
+  "caminhoes-e-carretas.com", // Portal Caminhões e Carretas
+  "brasilcaminhoneiro.com.br",
+  "revistacaminhoneiro.com.br",
+  "cargapesada.com.br", // Revista Carga Pesada
+  "chicodaboleia.com.br",
+  "brasildotrecho.com.br",
+  "transportemundial.com.br",
+  "frotacia.com.br", // Frota&Cia
+  "mundologistica.com.br",
 ];
 
 const TODOS_DOMINIOS_PERMITIDOS: string[] = [...DOMINIOS_OFICIAIS, ...DOMINIOS_FABRICANTES, ...DOMINIOS_ENTIDADES_E_IMPRENSA];
