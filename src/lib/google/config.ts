@@ -41,10 +41,17 @@ export function isGoogleCalendarConfigured(): boolean {
 
 /**
  * Escopos mínimos: leitura da lista de calendários + leitura/escrita de
- * eventos. Não usa o escopo amplo `calendar` (que também permite apagar
- * calendários inteiros) nem pede acesso à conta Google além disso.
+ * eventos, + `userinfo.email` (necessário porque connectGoogleCalendar
+ * chama o endpoint oauth2/v2/userinfo pra identificar de qual conta é —
+ * sem escopo de identidade, o Google devolve 401 nesse endpoint mesmo com
+ * um access token de Calendar válido — bug real encontrado em 06/08/2026,
+ * a troca de código por token sempre funcionou, só essa segunda chamada
+ * falhava). Não usa o escopo amplo `calendar` (que também permite apagar
+ * calendários inteiros) nem `profile`/`openid` (não precisa de nome, só
+ * do e-mail pra exibir "Agenda conectada (fulano@gmail.com)").
  */
 export const GOOGLE_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/userinfo.email",
 ] as const;
