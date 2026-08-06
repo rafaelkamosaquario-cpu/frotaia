@@ -1,7 +1,10 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
 import { arredondar } from "./utils";
 import { isGoogleMapsConfigured } from "@/lib/google/mapsConfig";
-import { geocodificarEndereco, calcularRota, GoogleMapsApiError } from "@/lib/google/mapsClient";
+import { geocodificarEndereco, calcularRota, buscarImagemMapaEstatico, GoogleMapsApiError } from "@/lib/google/mapsClient";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { listChannelsForUser } from "@/services/supabase/channelIdentityService";
+import { sendWhatsappImage } from "@/lib/whatsapp/zapiClient";
 
 /**
  * Ferramenta: consultar_rota
@@ -28,11 +31,21 @@ export type ModoConsultarRota = "GEOCODIFICAR_ENDERECO" | "CALCULAR_DISTANCIA_RO
 
 export interface ConsultarRotaEntrada {
   modo: ModoConsultarRota;
+  userId?: string;
   /** Obrigatório em GEOCODIFICAR_ENDERECO. */
   endereco?: string;
   /** Obrigatórios em CALCULAR_DISTANCIA_ROTA — endereço em texto (cidade/UF, endereço completo etc.). */
   origem?: string;
   destino?: string;
+  /**
+   * Se true, além de calcular distância/duração (CALCULAR_DISTANCIA_ROTA),
+   * manda a imagem do mapa da rota pelo WhatsApp (best-effort — se falhar,
+   * não derruba o resultado da distância/duração, que já foi calculado com
+   * sucesso). Só peça quando o cliente pedir explicitamente pra ver o
+   * mapa/visual da rota — não em toda consulta de distância pra alimentar
+   * outro cálculo.
+   */
+  enviarMapaVisual?: boolean;
 }
 
 export interface ConsultarRotaResultado extends ResultadoFerramentaBase {
@@ -54,6 +67,8 @@ export interface ConsultarRotaResultado extends ResultadoFerramentaBase {
    * resposta ao usuário (não é informação legível/útil pra ele).
    */
   polylineCodificada?: string;
+  /** true só quando `enviarMapaVisual` foi pedido E o envio deu certo — ver executar(). */
+  mapaVisualEnviado?: boolean;
 
   limitacoes: string[];
 }
@@ -188,18 +203,36 @@ async function executar(entrada: ConsultarRotaEntrada): Promise<ConsultarRotaRes
     const distanciaKm = arredondar(rota.distanciaMetros / 1000, 1);
     const duracaoMinutos = arredondar(rota.duracaoSegundos / 60, 0);
 
+    let mapaVisualEnviado = false;
+    if (entrada.enviarMapaVisual && rota.polylineCodificada && entrada.userId) {
+      try {
+        const admin = createAdminClient();
+        const canais = await listChannelsForUser(admin, entrada.userId);
+        const canalWhatsapp = canais.find((c) => c.channel_type === "whatsapp" && c.phone_e164);
+        if (canalWhatsapp?.phone_e164) {
+          const imagemBytes = await buscarImagemMapaEstatico(rota.polylineCodificada);
+          await sendWhatsappImage(canalWhatsapp.phone_e164, imagemBytes, `${origemGeo.enderecoFormatado} → ${destinoGeo.enderecoFormatado}`);
+          mapaVisualEnviado = true;
+        }
+      } catch {
+        // Best-effort: o cálculo de distância/duração já deu certo — não falha a
+        // ferramenta inteira só porque o envio da imagem do mapa não funcionou.
+      }
+    }
+
     return {
       sucesso: true,
       modo: entrada.modo,
       alertas: [],
       premissas: [`Rota calculada de "${origemGeo.enderecoFormatado}" até "${destinoGeo.enderecoFormatado}" (rota rodoviária mais comum, com trânsito no momento da consulta).`],
       dadosFaltantes: [],
-      mensagemResumo: `Distância: ${distanciaKm} km — duração estimada: ${duracaoMinutos} min.`,
+      mensagemResumo: `Distância: ${distanciaKm} km — duração estimada: ${duracaoMinutos} min.${mapaVisualEnviado ? " Mapa da rota enviado pelo WhatsApp." : ""}`,
       origemFormatada: origemGeo.enderecoFormatado,
       destinoFormatado: destinoGeo.enderecoFormatado,
       distanciaKm,
       duracaoMinutos,
       polylineCodificada: rota.polylineCodificada,
+      mapaVisualEnviado,
       limitacoes: LIMITACOES_PADRAO,
     };
   } catch (err) {
@@ -223,16 +256,24 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
     descricao: "GEOCODIFICAR_ENDERECO só confirma/localiza um endereço; CALCULAR_DISTANCIA_ROTA calcula distância e duração entre origem e destino.",
     valoresPossiveis: ["GEOCODIFICAR_ENDERECO", "CALCULAR_DISTANCIA_ROTA"],
   },
+  { nome: "userId", tipo: "string", obrigatorio: false, descricao: "Usuário da conversa (do contexto) — necessário só para enviarMapaVisual, pra achar o WhatsApp de destino." },
   { nome: "endereco", tipo: "string", obrigatorio: false, descricao: "Endereço a geocodificar — obrigatório em GEOCODIFICAR_ENDERECO." },
   { nome: "origem", tipo: "string", obrigatorio: false, descricao: "Endereço de origem (cidade/UF ou endereço completo) — obrigatório em CALCULAR_DISTANCIA_ROTA." },
   { nome: "destino", tipo: "string", obrigatorio: false, descricao: "Endereço de destino — obrigatório em CALCULAR_DISTANCIA_ROTA." },
+  {
+    nome: "enviarMapaVisual",
+    tipo: "boolean",
+    obrigatorio: false,
+    descricao:
+      "Se true, além da distância/duração, manda pelo WhatsApp uma imagem do mapa da rota calculada (Google Static Maps). Use só quando o cliente pedir explicitamente pra ver o mapa/visual da rota — não em toda consulta de distância feita só pra alimentar outro cálculo (ex.: calcular_custo_viagem).",
+  },
 ];
 
 export const ferramentaConsultarRota: DefinicaoFerramenta<ConsultarRotaEntrada, ConsultarRotaResultado> = {
   nome: "consultar_rota",
-  descricao: "Consulta distância e duração de rota entre dois endereços (Google Maps), ou confirma/localiza um endereço.",
+  descricao: "Consulta distância e duração de rota entre dois endereços (Google Maps), ou confirma/localiza um endereço. Pode opcionalmente enviar o mapa visual da rota pelo WhatsApp.",
   objetivo:
-    "Preencher distanciaKm automaticamente nas ferramentas de cálculo (calcular_custo_viagem, analisar_frete, verificar_piso_minimo_antt etc.) a partir de origem/destino em texto, sem exigir que o motorista informe o km manualmente. Se não configurada, explica a limitação — nunca inventa distância.",
+    "Preencher distanciaKm automaticamente nas ferramentas de cálculo (calcular_custo_viagem, analisar_frete, verificar_piso_minimo_antt etc.) a partir de origem/destino em texto, sem exigir que o motorista informe o km manualmente. Se não configurada, explica a limitação — nunca inventa distância. Quando o cliente pedir pra visualizar a rota, use enviarMapaVisual pra mandar o mapa como imagem.",
   parametros: PARAMETROS,
   executar,
 };

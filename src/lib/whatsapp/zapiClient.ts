@@ -154,3 +154,33 @@ export async function sendWhatsappPdf(phoneE164: string, pdfBytes: Uint8Array, f
     throw new ZApiRequestError(response.status, bodyText);
   }
 }
+
+/**
+ * Envia uma imagem gerada na hora (ex.: mapa estático de uma rota) — mesmo
+ * padrão do sendWhatsappPdf acima, base64 direto, sem depender de
+ * Storage/URL pública. Endpoint confirmado contra a documentação oficial
+ * (developer.z-api.io/message/send-message-image): campo `image` aceita
+ * base64 com prefixo data URI ou uma URL direta; `caption` é opcional.
+ */
+export async function sendWhatsappImage(phoneE164: string, imageBytes: Uint8Array, caption?: string): Promise<void> {
+  const { ZAPI_INSTANCE_ID, ZAPI_INSTANCE_TOKEN, ZAPI_CLIENT_TOKEN } = getWhatsappConfig();
+  const base64 = Buffer.from(imageBytes).toString("base64");
+
+  const response = await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_INSTANCE_TOKEN}/send-image`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Client-Token": ZAPI_CLIENT_TOKEN,
+    },
+    body: JSON.stringify({
+      phone: normalizePhone(phoneE164),
+      image: `data:image/png;base64,${base64}`,
+      ...(caption ? { caption } : {}),
+    }),
+  });
+
+  if (!response.ok) {
+    const bodyText = await response.text().catch(() => "");
+    throw new ZApiRequestError(response.status, bodyText);
+  }
+}

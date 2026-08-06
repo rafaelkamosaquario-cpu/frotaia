@@ -2,10 +2,10 @@ import "server-only";
 import { getGoogleMapsConfig } from "./mapsConfig";
 
 /**
- * Cliente mínimo do Google Maps Platform (Geocoding API + Routes API) via
- * fetch direto — mesmo padrão de "sem SDK oficial" já usado em
- * calendarClient.ts e zapiClient.ts. Único ponto de chamada direta a
- * maps.googleapis.com/routes.googleapis.com — nenhum outro arquivo deve
+ * Cliente mínimo do Google Maps Platform (Geocoding API + Routes API +
+ * Static Maps API) via fetch direto — mesmo padrão de "sem SDK oficial" já
+ * usado em calendarClient.ts e zapiClient.ts. Único ponto de chamada direta
+ * a maps.googleapis.com/routes.googleapis.com — nenhum outro arquivo deve
  * chamar essas URLs diretamente.
  *
  * Fluxo sempre: geocodificar origem e destino (texto → coordenadas) e só
@@ -16,6 +16,7 @@ import { getGoogleMapsConfig } from "./mapsConfig";
 
 const GEOCODING_API_BASE = "https://maps.googleapis.com/maps/api/geocode/json";
 const ROUTES_API_COMPUTE_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
+const STATIC_MAPS_API_BASE = "https://maps.googleapis.com/maps/api/staticmap";
 
 export class GoogleMapsApiError extends Error {
   constructor(
@@ -71,12 +72,12 @@ export interface RotaCalculada {
   distanciaMetros: number;
   duracaoSegundos: number;
   /**
-   * Geometria da rota codificada (Google Encoded Polyline). Não usada por
-   * nenhuma ferramenta ainda — pedida desde já porque o item 3 (pedágio,
-   * Maplink Toll API) precisa de uma rota já calculada como entrada, e é
-   * mais barato pedir esse campo agora (mesma chamada) do que ter que
-   * alterar o fieldMask de novo quando a integração com a Maplink for
-   * decidida. Ver docs/camada-6-whatsapp-v1.md (item 3 na checklist).
+   * Geometria da rota codificada (Google Encoded Polyline). Usada por
+   * `buscarImagemMapaEstatico` (mapa visual da rota) — pedida desde a
+   * mesma chamada da Routes API porque o item 3 (pedágio, Maplink Toll
+   * API) também vai precisar de uma rota já calculada como entrada, e é
+   * mais barato pedir esse campo agora do que alterar o fieldMask de novo
+   * depois. Ver docs/camada-6-whatsapp-v1.md (item 3 na checklist).
    */
   polylineCodificada?: string;
 }
@@ -120,4 +121,28 @@ export async function calcularRota(
   const duracaoSegundos = Number(rota.duration.replace("s", ""));
 
   return { distanciaMetros: rota.distanceMeters, duracaoSegundos, polylineCodificada: rota.polyline?.encodedPolyline };
+}
+
+/**
+ * Busca a imagem (PNG, bytes) de um mapa estático mostrando a rota
+ * calculada — só a geometria (`path=enc:{polyline}`), sem `center`/`zoom`
+ * manual: a Static Maps API já ajusta o enquadramento sozinha pra caber o
+ * traçado inteiro. Usada por consultar_rota (campo `enviarMapaVisual`) pra
+ * mandar o mapa como imagem pelo WhatsApp — ver zapiClient.sendWhatsappImage.
+ * Mesma `GOOGLE_MAPS_API_KEY` das outras 2 APIs deste arquivo.
+ */
+export async function buscarImagemMapaEstatico(polylineCodificada: string): Promise<Uint8Array> {
+  const { GOOGLE_MAPS_API_KEY } = getGoogleMapsConfig();
+
+  const url = new URL(STATIC_MAPS_API_BASE);
+  url.searchParams.set("size", "640x400");
+  url.searchParams.set("path", `weight:4|color:0x1a73e8ff|enc:${polylineCodificada}`);
+  url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new GoogleMapsApiError("Falha na comunicação com a Static Maps API.", response.status);
+  }
+
+  return new Uint8Array(await response.arrayBuffer());
 }

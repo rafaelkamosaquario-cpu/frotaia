@@ -1,4 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
+import { normalizarPossivelJson } from "./utils";
 import {
   checkCalendarConnection,
   createEvent,
@@ -44,8 +45,18 @@ export type ModoGerenciarGoogleCalendar =
   | "DEFINIR_CALENDARIO_PADRAO"
   | "CONSULTAR"
   | "CRIAR"
+  | "CRIAR_JORNADA"
   | "ALTERAR"
   | "EXCLUIR";
+
+export interface EventoJornadaEntrada {
+  title: string;
+  /** ISO 8601 com offset — nunca uma expressão relativa. */
+  start: string;
+  end: string;
+  description?: string;
+  location?: string;
+}
 
 export interface GerenciarGoogleCalendarEntrada {
   modo: ModoGerenciarGoogleCalendar;
@@ -82,6 +93,15 @@ export interface GerenciarGoogleCalendarEntrada {
 
   // DEFINIR_CALENDARIO_PADRAO
   novoCalendarioPadraoId?: string;
+
+  /**
+   * CRIAR_JORNADA — lista de compromissos pra criar de uma vez (viagem
+   * completa: saída, paradas, chegada etc.), todos no mesmo `timezone`
+   * informado acima. Chega como string JSON do Claude (limitação de schema
+   * — ver normalizarPossivelJson em src/ai/tools/utils.ts), nunca array
+   * nativo; normalizado no início de executar().
+   */
+  eventos?: EventoJornadaEntrada[];
 }
 
 export interface EventoGoogleCalendarResumo {
@@ -179,7 +199,12 @@ function mensagemErroSeguro(err: unknown): { alerta: string; foiDesconectado: bo
   return { alerta: "Não foi possível concluir a ação na Agenda Google por um erro inesperado.", foiDesconectado: false };
 }
 
-async function executar(entrada: GerenciarGoogleCalendarEntrada): Promise<GerenciarGoogleCalendarResultado> {
+async function executar(entradaBruta: GerenciarGoogleCalendarEntrada): Promise<GerenciarGoogleCalendarResultado> {
+  // eventos chega como string JSON, não array — ver normalizarPossivelJson em utils.ts.
+  const entrada: GerenciarGoogleCalendarEntrada = {
+    ...entradaBruta,
+    eventos: normalizarPossivelJson(entradaBruta.eventos),
+  };
   const { modo, userId } = entrada;
 
   if (!userId) {
@@ -304,6 +329,71 @@ async function executar(entrada: GerenciarGoogleCalendarEntrada): Promise<Gerenc
         };
       }
 
+      case "CRIAR_JORNADA": {
+        const faltando: string[] = [];
+        if (!entrada.companyId) faltando.push("companyId");
+        if (!entrada.timezone) faltando.push("timezone");
+        if (!entrada.eventos || entrada.eventos.length === 0) faltando.push("eventos");
+
+        if (faltando.length > 0) {
+          return respostaFalha(
+            modo,
+            ["Faltam dados para criar a jornada completa — nunca invento a programação da viagem (título, início e fim de cada compromisso, e o fuso horário)."],
+            faltando
+          );
+        }
+
+        const criados: EventoGoogleCalendarResumo[] = [];
+        const falhas: string[] = [];
+
+        for (const [indice, ev] of entrada.eventos!.entries()) {
+          const rotulo = ev?.title || `compromisso ${indice + 1}`;
+          if (!ev?.title || !ev.start || !ev.end) {
+            falhas.push(`"${rotulo}": faltou título, início ou fim.`);
+            continue;
+          }
+          if (!ISO_COM_OFFSET.test(ev.start) || !ISO_COM_OFFSET.test(ev.end)) {
+            falhas.push(`"${rotulo}": start/end precisam ser data e horário absolutos com fuso.`);
+            continue;
+          }
+
+          try {
+            const criado = await createEvent({
+              userId,
+              companyId: entrada.companyId!,
+              calendarId: entrada.calendarId,
+              title: ev.title,
+              startIso: ev.start,
+              endIso: ev.end,
+              timezone: entrada.timezone!,
+              description: ev.description,
+              location: ev.location,
+              conversationId: entrada.conversationId,
+            });
+            criados.push(mapaEvento(criado));
+          } catch (err) {
+            // Desconexão no meio do lote não é um erro "deste evento" — deixa o
+            // catch externo tratar (mesma resposta de reconexão dos outros modos).
+            if (err instanceof GoogleCalendarNotConnectedError) throw err;
+            const { alerta } = mensagemErroSeguro(err);
+            falhas.push(`"${rotulo}": ${alerta}`);
+          }
+        }
+
+        const todosCriados = falhas.length === 0;
+        return {
+          sucesso: todosCriados,
+          modo,
+          alertas: falhas,
+          premissas: [],
+          dadosFaltantes: [],
+          eventos: criados,
+          mensagemResumo: todosCriados
+            ? `${criados.length} compromisso(s) da jornada criado(s) na Agenda Google.`
+            : `${criados.length} de ${entrada.eventos!.length} compromisso(s) criado(s) — ${falhas.length} falharam (ver alertas).`,
+        };
+      }
+
       case "ALTERAR": {
         const faltando: string[] = [];
         if (!entrada.externalEventId) faltando.push("externalEventId");
@@ -410,6 +500,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
       "DEFINIR_CALENDARIO_PADRAO",
       "CONSULTAR",
       "CRIAR",
+      "CRIAR_JORNADA",
       "ALTERAR",
       "EXCLUIR",
     ],
@@ -422,7 +513,14 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
   { nome: "title", tipo: "string", obrigatorio: false, descricao: "Título do compromisso (CRIAR/ALTERAR)." },
   { nome: "start", tipo: "string", obrigatorio: false, descricao: "Início em ISO 8601 com offset — nunca uma expressão relativa (CRIAR/ALTERAR)." },
   { nome: "end", tipo: "string", obrigatorio: false, descricao: "Fim em ISO 8601 com offset (CRIAR/ALTERAR)." },
-  { nome: "timezone", tipo: "string", obrigatorio: false, descricao: "Fuso horário IANA (ex.: America/Sao_Paulo)." },
+  { nome: "timezone", tipo: "string", obrigatorio: false, descricao: "Fuso horário IANA (ex.: America/Sao_Paulo) — em CRIAR_JORNADA, vale para todos os compromissos da lista." },
+  {
+    nome: "eventos",
+    tipo: "string",
+    obrigatorio: false,
+    descricao:
+      'Obrigatório em CRIAR_JORNADA: lista de compromissos da viagem completa, como JSON — array de objetos {title, start, end, description?, location?}, cada start/end em ISO 8601 absoluto com fuso. Ex.: \'[{"title":"Saída","start":"...","end":"..."},{"title":"Parada em X","start":"...","end":"..."}]\'.',
+  },
   { nome: "description", tipo: "string", obrigatorio: false, descricao: "Descrição do compromisso." },
   { nome: "location", tipo: "string", obrigatorio: false, descricao: "Local do compromisso." },
   { nome: "externalEventId", tipo: "string", obrigatorio: false, descricao: "Id do evento no Google Calendar — obrigatório para ALTERAR/EXCLUIR." },
@@ -440,9 +538,9 @@ export const ferramentaGerenciarGoogleCalendar: DefinicaoFerramenta<
 > = {
   nome: "gerenciar_google_calendar",
   descricao:
-    "Consulta, cria, altera ou exclui compromissos na Agenda Google do usuário, e verifica/gerencia a conexão da conta.",
+    "Consulta, cria, altera ou exclui compromissos na Agenda Google do usuário, cria de uma vez todos os compromissos de uma jornada/viagem completa, e verifica/gerencia a conexão da conta.",
   objetivo:
-    "Dar à IA acesso estruturado à Agenda Google do cliente para agendar manutenções, vencimentos de documentos e compromissos operacionais, sem nunca interpretar linguagem natural ou inventar data/horário.",
+    "Dar à IA acesso estruturado à Agenda Google do cliente para agendar manutenções, vencimentos de documentos e compromissos operacionais, sem nunca interpretar linguagem natural ou inventar data/horário. CRIAR_JORNADA evita ter que criar evento por evento quando o cliente quer a viagem inteira (saída, paradas, chegada) agendada de uma vez.",
   parametros: PARAMETROS,
   executar,
 };
