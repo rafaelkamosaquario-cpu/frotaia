@@ -85,6 +85,16 @@ export type ExpenseRow = PublicTables["expenses"]["Row"];
 export type ExpenseInsert = PublicTables["expenses"]["Insert"];
 export type ExpenseUpdate = PublicTables["expenses"]["Update"];
 
+export type SubscriptionRow = PublicTables["subscriptions"]["Row"];
+export type SubscriptionInsert = PublicTables["subscriptions"]["Insert"];
+export type SubscriptionUpdate = PublicTables["subscriptions"]["Update"];
+
+export type PaymentEventRow = PublicTables["payment_events"]["Row"];
+export type PaymentEventInsert = PublicTables["payment_events"]["Insert"];
+
+export type TrialUsageRow = PublicTables["trial_usage"]["Row"];
+export type TrialUsageInsert = PublicTables["trial_usage"]["Insert"];
+
 export type CompanyMemberRole = PublicEnums["company_member_role"];
 export type OnboardingState = PublicEnums["onboarding_state"];
 export type ScheduledAlertStatus = PublicEnums["scheduled_alert_status"];
@@ -96,3 +106,5 @@ export type AiMemorySourceTypeEnum = PublicEnums["ai_memory_source_type"];
 export type FrotaIaToolName = PublicEnums["frota_ia_tool_name"];
 export type ExpenseTypeEnum = PublicEnums["expense_type"];
 export type RunStatus = PublicEnums["run_status"];
+export type SubscriptionPlanEnum = PublicEnums["subscription_plan"];
+export type SubscriptionStatusEnum = PublicEnums["subscription_status"];

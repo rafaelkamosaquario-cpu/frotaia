@@ -797,6 +797,47 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_events: {
+        Row: {
+          company_id: string | null
+          event_type: string
+          id: string
+          mercadopago_payment_id: string | null
+          payload_json: Json | null
+          provider: string
+          received_at: string
+          status_recebido: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          event_type: string
+          id?: string
+          mercadopago_payment_id?: string | null
+          payload_json?: Json | null
+          provider?: string
+          received_at?: string
+          status_recebido?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          event_type?: string
+          id?: string
+          mercadopago_payment_id?: string | null
+          payload_json?: Json | null
+          provider?: string
+          received_at?: string
+          status_recebido?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1008,6 +1049,65 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          iniciado_em: string | null
+          mercadopago_payment_id: string | null
+          mercadopago_subscription_id: string | null
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_avisado_dia5: boolean
+          trial_avisado_ultimo_dia: boolean
+          trial_iniciado_em: string | null
+          updated_at: string
+          valido_ate: string | null
+          valor_centavos: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          iniciado_em?: string | null
+          mercadopago_payment_id?: string | null
+          mercadopago_subscription_id?: string | null
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_avisado_dia5?: boolean
+          trial_avisado_ultimo_dia?: boolean
+          trial_iniciado_em?: string | null
+          updated_at?: string
+          valido_ate?: string | null
+          valor_centavos?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          iniciado_em?: string | null
+          mercadopago_payment_id?: string | null
+          mercadopago_subscription_id?: string | null
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_avisado_dia5?: boolean
+          trial_avisado_ultimo_dia?: boolean
+          trial_iniciado_em?: string | null
+          updated_at?: string
+          valido_ate?: string | null
+          valor_centavos?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tool_executions: {
         Row: {
           analysis_run_id: string | null
@@ -1087,6 +1187,32 @@ export type Database = {
             columns: ["message_id"]
             isOneToOne: false
             referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trial_usage: {
+        Row: {
+          company_id: string | null
+          phone_e164: string
+          used_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          phone_e164: string
+          used_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          phone_e164?: string
+          used_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_usage_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1515,6 +1641,18 @@ export type Database = {
       route_data_source: "manual" | "google_routes" | "outro"
       run_status: "started" | "completed" | "failed" | "cancelled"
       scheduled_alert_status: "pending" | "sent" | "cancelled" | "failed"
+      subscription_plan:
+        | "TRIAL"
+        | "MENSAL"
+        | "ANUAL_PARCELADO"
+        | "ANUAL_PIX"
+        | "EMPRESA"
+      subscription_status:
+        | "TRIAL"
+        | "ATIVA"
+        | "INADIMPLENTE"
+        | "CANCELADA"
+        | "EXPIRADA"
       tire_category:
         | "novo_nacional"
         | "novo_importado"
@@ -1755,6 +1893,20 @@ export const Constants = {
       route_data_source: ["manual", "google_routes", "outro"],
       run_status: ["started", "completed", "failed", "cancelled"],
       scheduled_alert_status: ["pending", "sent", "cancelled", "failed"],
+      subscription_plan: [
+        "TRIAL",
+        "MENSAL",
+        "ANUAL_PARCELADO",
+        "ANUAL_PIX",
+        "EMPRESA",
+      ],
+      subscription_status: [
+        "TRIAL",
+        "ATIVA",
+        "INADIMPLENTE",
+        "CANCELADA",
+        "EXPIRADA",
+      ],
       tire_category: [
         "novo_nacional",
         "novo_importado",
