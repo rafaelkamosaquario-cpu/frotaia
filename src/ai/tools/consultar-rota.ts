@@ -214,9 +214,15 @@ async function executar(entrada: ConsultarRotaEntrada): Promise<ConsultarRotaRes
           await sendWhatsappImage(canalWhatsapp.phone_e164, imagemBytes, `${origemGeo.enderecoFormatado} → ${destinoGeo.enderecoFormatado}`);
           mapaVisualEnviado = true;
         }
-      } catch {
+      } catch (err) {
         // Best-effort: o cálculo de distância/duração já deu certo — não falha a
         // ferramenta inteira só porque o envio da imagem do mapa não funcionou.
+        // Log deliberado (não silencioso) pra diagnosticar via Railway logs —
+        // esse envio depende de 2 integrações externas (Static Maps + Z-API
+        // send-image) que ainda não tinham sido validadas com tráfego real.
+        const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+        const corpo = err && typeof err === "object" && "body" in err ? String((err as { body: unknown }).body) : "";
+        console.error(`[consultar-rota] Falha ao enviar mapa visual: ${detalhe}${corpo ? ` | body: ${corpo.slice(0, 300)}` : ""}`);
       }
     }
 

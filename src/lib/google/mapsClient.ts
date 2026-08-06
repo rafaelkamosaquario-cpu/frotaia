@@ -141,7 +141,8 @@ export async function buscarImagemMapaEstatico(polylineCodificada: string): Prom
 
   const response = await fetch(url.toString());
   if (!response.ok) {
-    throw new GoogleMapsApiError("Falha na comunicação com a Static Maps API.", response.status);
+    const corpo = await response.text().catch(() => "");
+    throw new GoogleMapsApiError(`Falha na comunicação com a Static Maps API: ${corpo.slice(0, 300)}`, response.status);
   }
 
   return new Uint8Array(await response.arrayBuffer());
