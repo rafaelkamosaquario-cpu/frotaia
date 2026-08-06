@@ -142,7 +142,10 @@ async function executar(entrada: GerenciarAlertaEntrada): Promise<GerenciarAlert
       }
     }
   } catch (err) {
-    const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    // Erro do Supabase (PostgrestError) não é instância de Error — cai num
+    // objeto plano (message/code/details/hint), por isso o JSON.stringify
+    // como fallback em vez de só String(err) (que dava "[object Object]").
+    const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : JSON.stringify(err);
     console.error(`[gerenciar-alerta] Falha no modo ${modo}: ${detalhe}`);
     return respostaFalha(modo, ["Não foi possível concluir a ação de alerta agora. Tente novamente em instantes."]);
   }
