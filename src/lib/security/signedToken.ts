@@ -1,5 +1,10 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+
+/** Impressão digital segura do segredo (8 hex do SHA-256) — nunca o valor em si, só pra comparar se create/verify usaram a mesma chave. */
+function fingerprint(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex").slice(0, 8);
+}
 
 /**
  * Tokens assinados (HMAC-SHA256) de curta duração, sem estado no servidor.
@@ -30,6 +35,7 @@ export class InvalidSignedTokenError extends Error {
 export function createSignedToken(payload: Record<string, unknown>, ttlSeconds: number, secret: string): string {
   const body = base64UrlEncode(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
   const signature = sign(body, secret);
+  console.log(`[signedToken] create — secretFingerprint=${fingerprint(secret)} bodyLen=${body.length} sigLen=${signature.length}`);
   return `${body}.${signature}`;
 }
 
@@ -42,6 +48,9 @@ export function verifySignedToken<T extends Record<string, unknown>>(token: stri
   const b = Buffer.from(expectedSignature);
 
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    console.error(
+      `[signedToken] verify falhou — secretFingerprint=${fingerprint(secret)} bodyLen=${body.length} sigLen=${signature.length} expectedSigLen=${expectedSignature.length}`
+    );
     throw new InvalidSignedTokenError("assinatura não confere.");
   }
 
