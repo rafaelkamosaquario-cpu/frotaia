@@ -49,6 +49,7 @@ export async function updatePreferences(
       allow_automatic_memory: parsed.allowAutomaticMemory,
       allow_analysis_history: parsed.allowAnalysisHistory,
       allow_tool_history: parsed.allowToolHistory,
+      daily_news_enabled: parsed.dailyNewsEnabled,
       updated_by: userId,
     })
     .eq("company_id", companyId)
@@ -57,4 +58,36 @@ export async function updatePreferences(
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * Empresas com notícias diárias ativadas e que ainda não receberam hoje
+ * (daily_news_last_sent_at nulo ou anterior à meia-noite UTC de hoje) —
+ * evita reenvio duplicado se o job de despacho rodar mais de uma vez no
+ * mesmo dia (retry, múltiplas execuções do cron). Comparação em UTC por
+ * simplicidade (mesmo padrão do resto do projeto); aceitável já que o
+ * envio não precisa ser num horário exato, só uma vez por dia.
+ */
+export async function listCompaniesDueForNewsDigest(client: SupabaseDbClient, limit = 200): Promise<CompanyPreferencesRow[]> {
+  const inicioDeHojeUtc = new Date();
+  inicioDeHojeUtc.setUTCHours(0, 0, 0, 0);
+
+  const { data, error } = await client
+    .from("company_preferences")
+    .select("*")
+    .eq("daily_news_enabled", true)
+    .or(`daily_news_last_sent_at.is.null,daily_news_last_sent_at.lt.${inicioDeHojeUtc.toISOString()}`)
+    .limit(limit);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function markNewsDigestSent(client: SupabaseDbClient, companyId: string): Promise<void> {
+  const { error } = await client
+    .from("company_preferences")
+    .update({ daily_news_last_sent_at: new Date().toISOString() })
+    .eq("company_id", companyId);
+
+  if (error) throw error;
 }

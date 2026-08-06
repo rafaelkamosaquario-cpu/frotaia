@@ -29,6 +29,13 @@ export async function listChannelsForUser(client: SupabaseDbClient, userId: stri
   return data ?? [];
 }
 
+/** Canais (ex.: WhatsApp) de todos os usuários de uma empresa — usado pelo despacho de notícias diárias, que é uma preferência por empresa (company_preferences), não por usuário. */
+export async function listChannelsForCompany(client: SupabaseDbClient, companyId: string): Promise<UserChannelRow[]> {
+  const { data, error } = await client.from("user_channels").select("*").eq("company_id", companyId);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function linkChannel(
   client: SupabaseDbClient,
   userId: string,

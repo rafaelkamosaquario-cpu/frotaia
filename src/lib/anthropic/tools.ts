@@ -173,7 +173,7 @@ const DOMINIOS_FABRICANTES: string[] = [
  * real (06/08/2026). Concatenada nas mesmas allowed_domains abaixo pelo
  * mesmo motivo técnico das outras listas.
  */
-const DOMINIOS_ENTIDADES_E_IMPRENSA: string[] = [
+export const DOMINIOS_ENTIDADES_E_IMPRENSA: string[] = [
   // Entidade técnica do transporte
   "cnt.org.br", // Confederação Nacional do Transporte
   "portalntc.org.br", // NTC&Logística — publica o INCT (Índice Nacional de Custos do Transporte)
@@ -283,5 +283,20 @@ export function construirFerramentaLeituraAmpla(): Anthropic.WebFetchTool2026020
     name: "web_fetch",
     max_uses: 2,
     max_content_tokens: 8000,
+  };
+}
+
+/**
+ * Busca restrita só à imprensa especializada + entidades técnicas do
+ * transporte (sem oficial/fabricante — não fazem sentido pra manchete de
+ * notícia). Usada só pelo job de despacho diário de notícias
+ * (`/api/news/dispatch`), nunca dentro do loop de chat normal.
+ */
+export function construirFerramentaBuscaNoticias(): Anthropic.WebSearchTool20260209 {
+  return {
+    type: "web_search_20260209",
+    name: "web_search",
+    max_uses: 3,
+    allowed_domains: DOMINIOS_ENTIDADES_E_IMPRENSA,
   };
 }

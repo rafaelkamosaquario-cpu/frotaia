@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -373,6 +373,8 @@ export type Database = {
           ask_before_saving_memory: boolean
           company_id: string
           created_at: string
+          daily_news_enabled: boolean
+          daily_news_last_sent_at: string | null
           default_average_speed_kmh: number | null
           default_currency: string
           default_fuel_price: number | null
@@ -392,6 +394,8 @@ export type Database = {
           ask_before_saving_memory?: boolean
           company_id: string
           created_at?: string
+          daily_news_enabled?: boolean
+          daily_news_last_sent_at?: string | null
           default_average_speed_kmh?: number | null
           default_currency?: string
           default_fuel_price?: number | null
@@ -411,6 +415,8 @@ export type Database = {
           ask_before_saving_memory?: boolean
           company_id?: string
           created_at?: string
+          daily_news_enabled?: boolean
+          daily_news_last_sent_at?: string | null
           default_average_speed_kmh?: number | null
           default_currency?: string
           default_fuel_price?: number | null
@@ -1478,6 +1484,7 @@ export type Database = {
         | "definir_estilo_resposta"
         | "consultar_conhecimento_operacional"
         | "gerenciar_rota_salva"
+        | "gerenciar_noticias_setor"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -1713,6 +1720,7 @@ export const Constants = {
         "definir_estilo_resposta",
         "consultar_conhecimento_operacional",
         "gerenciar_rota_salva",
+        "gerenciar_noticias_setor",
       ],
       fuel_type: [
         "diesel_s10",
@@ -1769,4 +1777,3 @@ export const Constants = {
     },
   },
 } as const
-

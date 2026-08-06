@@ -84,6 +84,12 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     titulo: "Histórico e legislação",
     exemplos: ["Traga a análise que eu fiz semana passada", "Esse valor está acima do piso mínimo da ANTT?", "Qual o preço do diesel essa semana?"],
   },
+  {
+    id: "noticias",
+    emoji: "📰",
+    titulo: "Notícias do setor",
+    exemplos: ["Quero receber notícias do setor todo dia", "Pode desativar as notícias diárias"],
+  },
 ];
 
 const PALAVRAS_GATILHO_AJUDA = [

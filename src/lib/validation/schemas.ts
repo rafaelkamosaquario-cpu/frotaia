@@ -197,6 +197,7 @@ export const companyPreferencesUpdateSchema = z.object({
   allowAutomaticMemory: z.boolean().optional(),
   allowAnalysisHistory: z.boolean().optional(),
   allowToolHistory: z.boolean().optional(),
+  dailyNewsEnabled: z.boolean().optional(),
 });
 
 // ── ai memory ────────────────────────────────────────────────────────────
@@ -279,6 +280,7 @@ export const frotaIaToolNameSchema = z.enum([
   "definir_estilo_resposta",
   "consultar_conhecimento_operacional",
   "gerenciar_rota_salva",
+  "gerenciar_noticias_setor",
 ]);
 
 export const toolExecutionCreateSchema = z.object({
