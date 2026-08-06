@@ -160,6 +160,10 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
 
     if (buscaRestritaSemResultado && !buscaAmplaOferecida && rodada < MAX_TOOL_ROUNDS) {
       buscaAmplaOferecida = true;
+      // Log deliberado — este é o único jeito de confirmar de fora (ex.:
+      // Railway logs) que o fallback do nível 8 realmente disparou, já que
+      // web_search é server-side e não deixa rastro em tool_executions.
+      console.log(`[busca-ampla] Nível 8 liberado (busca restrita sem resultado) — conversationId=${conversation.id}`);
       tools = [...ferramentasProprias, construirFerramentaBuscaAmpla(), construirFerramentaLeituraAmpla()];
       mensagensAnthropic.push({ role: "assistant", content: resposta.content });
       mensagensAnthropic.push({
