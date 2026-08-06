@@ -141,7 +141,9 @@ async function executar(entrada: GerenciarAlertaEntrada): Promise<GerenciarAlert
         return respostaFalha(modoNuncaVisto as ModoGerenciarAlerta, [`Modo desconhecido: ${String(modoNuncaVisto)}.`]);
       }
     }
-  } catch {
+  } catch (err) {
+    const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error(`[gerenciar-alerta] Falha no modo ${modo}: ${detalhe}`);
     return respostaFalha(modo, ["Não foi possível concluir a ação de alerta agora. Tente novamente em instantes."]);
   }
 }
