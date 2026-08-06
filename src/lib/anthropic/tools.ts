@@ -160,21 +160,52 @@ const DOMINIOS_FABRICANTES: string[] = [
   "cummins.com", // sem .com.br dedicado, site global com seção pt-br
 ];
 
-const TODOS_DOMINIOS_PERMITIDOS: string[] = [...DOMINIOS_OFICIAIS, ...DOMINIOS_FABRICANTES];
+/**
+ * Domínios de entidade técnica do transporte e imprensa especializada —
+ * dois níveis mais "baixos" no catálogo de confiança do produto (dados do
+ * cliente > API/base/página oficial > fabricante > entidade técnica >
+ * imprensa especializada > internet geral). Nunca fonte de fato
+ * regulatório nem de especificação de produto — isso continua vindo só
+ * de DOMINIOS_OFICIAIS/DOMINIOS_FABRICANTES. Serve pra contexto de
+ * mercado, índice setorial (ex.: INCT da NTC&Logística) e conteúdo
+ * educativo do próprio setor — sempre apresentado como contexto/opinião
+ * de mercado, nunca como fato oficial. Cada domínio verificado por busca
+ * real (06/08/2026). Concatenada nas mesmas allowed_domains abaixo pelo
+ * mesmo motivo técnico das outras listas.
+ */
+const DOMINIOS_ENTIDADES_E_IMPRENSA: string[] = [
+  // Entidade técnica do transporte
+  "cnt.org.br", // Confederação Nacional do Transporte
+  "portalntc.org.br", // NTC&Logística — publica o INCT (Índice Nacional de Custos do Transporte)
+  "sestsenat.org.br", // SEST SENAT — saúde/segurança/capacitação do trabalhador do transporte
+  // Imprensa especializada
+  "transportemoderno.com.br",
+  "automotivebusiness.com.br",
+  "ocarreteiro.com.br",
+  "diariodotransporte.com.br",
+];
+
+const TODOS_DOMINIOS_PERMITIDOS: string[] = [...DOMINIOS_OFICIAIS, ...DOMINIOS_FABRICANTES, ...DOMINIOS_ENTIDADES_E_IMPRENSA];
 
 /**
  * Ferramenta de busca web nativa da Claude (server-side — não é uma das
  * FERRAMENTAS_FROTA_IA, roda na infraestrutura da Anthropic, não passa pelo
  * loop de execução local de gerarRespostaAssistente.ts). Restrita à união
- * dos domínios oficiais + fabricante acima (TODOS_DOMINIOS_PERMITIDOS),
- * para consultar piso mínimo/RNTRC/pedágio de concessão (ANTT + agências
- * estaduais), preço de referência de combustível (ANP), legislação/normas
- * de trânsito, restrição da PRF, malha rodoviária (DNIT/DER), alerta
- * meteorológico (INMET), portal público de CT-e/MDF-e, e especificação de
- * produto de fabricante (pneu/caminhão/motor) — sempre como pesquisa em
- * tempo real, nunca como base de conhecimento própria mantida por este
- * projeto (mais simples de manter, sempre atualizada). `max_uses` limita
- * buscas por resposta, controlando custo.
+ * das 3 listas acima (TODOS_DOMINIOS_PERMITIDOS — oficial + fabricante +
+ * entidade/imprensa), para consultar piso mínimo/RNTRC/pedágio de
+ * concessão (ANTT + agências estaduais), preço de referência de
+ * combustível (ANP), legislação/normas de trânsito, restrição da PRF,
+ * malha rodoviária (DNIT/DER), alerta meteorológico (INMET), portal
+ * público de CT-e/MDF-e, especificação de produto de fabricante
+ * (pneu/caminhão/motor), e contexto/tendência de mercado (entidade técnica
+ * do transporte + imprensa especializada) — sempre como pesquisa em tempo
+ * real, nunca como base de conhecimento própria mantida por este projeto
+ * (mais simples de manter, sempre atualizada). `max_uses` limita buscas
+ * por resposta, controlando custo. Não cobre o nível 8 do catálogo de
+ * fontes do produto ("internet geral, só como complemento") — isso é
+ * `construirFerramentaBuscaAmpla`/`construirFerramentaLeituraAmpla` abaixo,
+ * usadas só como fallback controlado (ver gerarRespostaAssistente.ts),
+ * nunca nesta chamada restrita.
  */
 export function construirFerramentaBuscaOficial(): Anthropic.WebSearchTool20260209 {
   return {
@@ -202,6 +233,40 @@ export function construirFerramentaLeituraOficial(): Anthropic.WebFetchTool20260
     name: "web_fetch",
     max_uses: 3,
     allowed_domains: TODOS_DOMINIOS_PERMITIDOS,
+    max_content_tokens: 8000,
+  };
+}
+
+/**
+ * Nível 8 do catálogo de fontes ("internet geral, só como complemento") —
+ * SEM `allowed_domains`, busca/leitura realmente aberta. Só deve ser usada
+ * como fallback de ÚLTIMO RECURSO, quando `construirFerramentaBuscaOficial`
+ * já rodou nesta troca e voltou zero resultado nos 7 níveis restritos
+ * (oficial + fabricante + entidade/imprensa) — nunca a primeira tentativa.
+ * `gerarRespostaAssistente.ts` é quem decide QUANDO trocar pra esta versão
+ * (detecta `web_search_tool_result` vazio na resposta restrita e libera
+ * esta ferramenta só pra 1 rodada extra da mesma troca) — decisão de
+ * Rafael em 06/08/2026: cobertura de "achar algo" pesa mais que a garantia
+ * de domínio restrito NESTE nível específico, mas só como último recurso,
+ * nunca a via padrão. Por isso o system prompt exige que todo resultado
+ * vindo daqui seja explicitamente marcado pro cliente como "não é fonte
+ * oficial/verificada" antes de ser usado — a garantia de segurança se
+ * desloca de "domínio restrito" pra "aviso obrigatório ao cliente".
+ * `max_uses` menor (2) porque é exceção, não fluxo padrão.
+ */
+export function construirFerramentaBuscaAmpla(): Anthropic.WebSearchTool20260209 {
+  return {
+    type: "web_search_20260209",
+    name: "web_search",
+    max_uses: 2,
+  };
+}
+
+export function construirFerramentaLeituraAmpla(): Anthropic.WebFetchTool20260209 {
+  return {
+    type: "web_fetch_20260209",
+    name: "web_fetch",
+    max_uses: 2,
     max_content_tokens: 8000,
   };
 }

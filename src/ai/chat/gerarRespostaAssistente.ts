@@ -1,7 +1,14 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicClient, CLAUDE_MODEL } from "@/lib/anthropic/client";
-import { construirFerramentasAnthropic, construirFerramentaBuscaOficial, construirFerramentaLeituraOficial, CAMPOS_DE_CONTEXTO_RESERVADOS } from "@/lib/anthropic/tools";
+import {
+  construirFerramentasAnthropic,
+  construirFerramentaBuscaOficial,
+  construirFerramentaLeituraOficial,
+  construirFerramentaBuscaAmpla,
+  construirFerramentaLeituraAmpla,
+  CAMPOS_DE_CONTEXTO_RESERVADOS,
+} from "@/lib/anthropic/tools";
 import { construirSystemPrompt } from "@/lib/anthropic/systemPrompt";
 import { saveToolExecution, type CustomerContext, type VehicleContext } from "@/ai/context/customerContext";
 import { appendMessage, listMessages } from "@/services/supabase/conversationService";
@@ -112,9 +119,11 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
 
   const anthropic = createAnthropicClient();
   const system = construirSystemPrompt(customerContext, vehicleContext, new Date());
-  const tools = [...construirFerramentasAnthropic(), construirFerramentaBuscaOficial(), construirFerramentaLeituraOficial()];
+  const ferramentasProprias = construirFerramentasAnthropic();
+  let tools = [...ferramentasProprias, construirFerramentaBuscaOficial(), construirFerramentaLeituraOficial()];
 
   let textoFinal = "";
+  let buscaAmplaOferecida = false;
 
   for (let rodada = 0; rodada <= MAX_TOOL_ROUNDS; rodada++) {
     const resposta = await anthropic.messages.create({
@@ -136,6 +145,28 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     // pra ela continuar de onde parou, sem mensagem extra tipo "continue".
     if (resposta.stop_reason === "pause_turn" && rodada < MAX_TOOL_ROUNDS) {
       mensagensAnthropic.push({ role: "assistant", content: resposta.content });
+      continue;
+    }
+
+    // Nível 8 do catálogo de fontes ("internet geral, só como complemento"):
+    // se TODA busca restrita (níveis 2-7) tentada nesta rodada voltou zero
+    // resultado, libera busca/leitura sem allowed_domains por 1 rodada
+    // extra desta mesma troca — nunca a primeira tentativa, só fallback.
+    // `buscaAmplaOferecida` garante que isso só escala uma vez por troca
+    // (evita custo/loop desnecessário se a busca ampla também não achar
+    // nada — nesse caso a resposta final já reflete isso pro usuário).
+    const blocosBusca = resposta.content.filter((b): b is Anthropic.WebSearchToolResultBlock => b.type === "web_search_tool_result");
+    const buscaRestritaSemResultado = blocosBusca.length > 0 && blocosBusca.every((b) => Array.isArray(b.content) && b.content.length === 0);
+
+    if (buscaRestritaSemResultado && !buscaAmplaOferecida && rodada < MAX_TOOL_ROUNDS) {
+      buscaAmplaOferecida = true;
+      tools = [...ferramentasProprias, construirFerramentaBuscaAmpla(), construirFerramentaLeituraAmpla()];
+      mensagensAnthropic.push({ role: "assistant", content: resposta.content });
+      mensagensAnthropic.push({
+        role: "user",
+        content:
+          "A busca restrita aos domínios oficiais/fabricante/entidade/imprensa não encontrou nada sobre isso. Você agora pode tentar UMA busca mais ampla, sem restrição de domínio — só como último recurso. Se usar um resultado dela, deixe explícito pro cliente que essa fonte NÃO é oficial/verificada e que o dado deve ser confirmado antes de qualquer decisão importante.",
+      });
       continue;
     }
 
