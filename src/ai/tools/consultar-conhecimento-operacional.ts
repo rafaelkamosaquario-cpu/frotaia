@@ -15,9 +15,16 @@ import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerram
  * Diferente da ANTT/ANP (fato regulatório que muda e precisa de fonte
  * oficial ao vivo), o conteúdo aqui é referência de boas práticas — por
  * isso vive em arquivo local versionado (`src/ai/conhecimentos/`), não em
- * busca externa. Não é RAG/embedding: com só 5 tópicos fixos e bem
+ * busca externa. Não é RAG/embedding: com só 6 tópicos fixos e bem
  * definidos, o próprio Claude já escolhe o tópico certo pela descrição do
  * parâmetro, sem precisar de busca semântica.
+ *
+ * TIPOS_DE_VEICULO (adicionado em 06/08/2026) reaproveita o mesmo arquivo
+ * que vehicleConfigClassifier.ts usa internamente pro cadastro
+ * (src/ai/conhecimentos/tipos-de-veiculo.md) — antes só existia no disco,
+ * sem estar registrado aqui, então a IA não conseguia trazer essa
+ * referência (ex.: "qual a diferença entre bitrem e rodotrem?") numa
+ * conversa normal.
  *
  * Nunca é fonte de número fixo, fato legal ou dado calculado — cada
  * arquivo se declara "referência geral" e aponta de volta pras ferramentas
@@ -32,7 +39,8 @@ export type TopicoConhecimentoOperacional =
   | "MANUTENCAO_PREVENTIVA"
   | "PNEUS_E_DIRECAO_ECONOMICA"
   | "GESTAO_E_INDICADORES"
-  | "JORNADA_E_BEM_ESTAR";
+  | "JORNADA_E_BEM_ESTAR"
+  | "TIPOS_DE_VEICULO";
 
 const ARQUIVO_POR_TOPICO: Record<TopicoConhecimentoOperacional, string> = {
   NEGOCIACAO_E_ATENDIMENTO: "negociacao-e-atendimento.md",
@@ -40,6 +48,7 @@ const ARQUIVO_POR_TOPICO: Record<TopicoConhecimentoOperacional, string> = {
   PNEUS_E_DIRECAO_ECONOMICA: "pneus-e-direcao-economica.md",
   GESTAO_E_INDICADORES: "gestao-e-indicadores.md",
   JORNADA_E_BEM_ESTAR: "jornada-e-bem-estar.md",
+  TIPOS_DE_VEICULO: "tipos-de-veiculo.md",
 };
 
 const TOPICOS = Object.keys(ARQUIVO_POR_TOPICO) as TopicoConhecimentoOperacional[];
@@ -96,7 +105,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
     tipo: "enum",
     obrigatorio: true,
     descricao:
-      "NEGOCIACAO_E_ATENDIMENTO: ler proposta de frete, red flags, comunicação com embarcador. MANUTENCAO_PREVENTIVA: intervalos de referência, sinais de alerta. PNEUS_E_DIRECAO_ECONOMICA: cuidado com pneu e direção econômica. GESTAO_E_INDICADORES: como interpretar CPK/margem/receita por km. JORNADA_E_BEM_ESTAR: boas práticas de planejamento e fadiga (nunca o limite legal em si).",
+      "NEGOCIACAO_E_ATENDIMENTO: ler proposta de frete, red flags, comunicação com embarcador. MANUTENCAO_PREVENTIVA: intervalos de referência, sinais de alerta. PNEUS_E_DIRECAO_ECONOMICA: cuidado com pneu e direção econômica. GESTAO_E_INDICADORES: como interpretar CPK/margem/receita por km. JORNADA_E_BEM_ESTAR: boas práticas de planejamento e fadiga (nunca o limite legal em si). TIPOS_DE_VEICULO: classificação de veículos e conjuntos (toco, truck, cavalo mecânico, carreta, bitrem, rodotrem etc.) e configuração de eixos de cada um — use quando o cliente perguntar sobre a diferença entre tipos de veículo/conjunto, não durante o cadastro (isso já é resolvido por outro fluxo).",
     valoresPossiveis: TOPICOS,
   },
 ];
@@ -106,7 +115,7 @@ export const ferramentaConsultarConhecimentoOperacional: DefinicaoFerramenta<
   ConsultarConhecimentoOperacionalResultado
 > = {
   nome: "consultar_conhecimento_operacional",
-  descricao: "Traz referência de boas práticas do setor (negociação, manutenção, pneus/direção econômica, indicadores, jornada/bem-estar) para enriquecer a resposta.",
+  descricao: "Traz referência de boas práticas do setor (negociação, manutenção, pneus/direção econômica, indicadores, jornada/bem-estar, tipos de veículo) para enriquecer a resposta.",
   objetivo:
     "Complementar a resposta com conhecimento de especialista quando a pergunta for sobre prática/técnica, não sobre número. Nunca usar como fonte de dado calculado, fato legal ou preço — isso continua sendo sempre as ferramentas de cálculo ou busca oficial ao vivo.",
   parametros: PARAMETROS,
