@@ -42,7 +42,9 @@ export async function GET(request: Request) {
 
   try {
     await connectGoogleCalendar({ userId: payload.userId, companyId: payload.companyId, code });
-  } catch {
+  } catch (err) {
+    const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : JSON.stringify(err);
+    console.error(`[calendar-callback] Falha ao conectar: ${detalhe}`);
     return NextResponse.redirect(`${appOrigin}/?calendar_erro=falha_conexao`);
   }
 
