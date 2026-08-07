@@ -92,25 +92,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
   },
 ];
 
-const PALAVRAS_GATILHO_AJUDA = [
-  "ajuda",
-  "menu",
-  "opções",
-  "opcoes",
-  "sugestões",
-  "sugestoes",
-  "funções",
-  "funcoes",
-  "o que você pode fazer",
-  "o que voce pode fazer",
-  "o que você faz",
-  "o que voce faz",
-  "mostrar funções",
-  "mostrar funcoes",
-  "quais são as funções",
-  "quais sao as funcoes",
-  "help",
-];
+const PALAVRAS_GATILHO_AJUDA = ["ajuda", "menu", "opções", "opcoes", "sugestões", "sugestoes", "help"];
 
 /** Tolerante: casa por inclusão, não exige frase exata (mesmo padrão do parser de onboarding). */
 export function ehPedidoDeAjuda(texto: string | undefined | null): boolean {
@@ -120,10 +102,46 @@ export function ehPedidoDeAjuda(texto: string | undefined | null): boolean {
   return PALAVRAS_GATILHO_AJUDA.some((gatilho) => normalizado === gatilho || normalizado.includes(gatilho));
 }
 
-/** Versão em texto corrido (painel web / referência no system prompt) — sem sintaxe de lista nativa do WhatsApp. */
+/**
+ * Separado de PALAVRAS_GATILHO_AJUDA em 07/08/2026 — achado real testando:
+ * "quais suas funções" caiu na IA (que resumiu e derrubou uma categoria,
+ * inclusive "Notícias do setor") em vez de bater no gatilho determinístico.
+ * Pergunta tipo "o que você faz" é justamente o momento mais sensível pra
+ * um prospect decidir se vale a pena continuar — não pode depender do
+ * julgamento da IA. Intercepta ANTES da IA e manda construirTextoAjudaCompleto()
+ * literal, nunca resumido, nunca gasta chamada de modelo.
+ */
+const PALAVRAS_GATILHO_FUNCOES = [
+  "funções",
+  "funcoes",
+  "funcionalidades",
+  "o que você pode fazer",
+  "o que voce pode fazer",
+  "o que você faz",
+  "o que voce faz",
+  "o que você oferece",
+  "o que voce oferece",
+  "mostrar funções",
+  "mostrar funcoes",
+  "quais são as funções",
+  "quais sao as funcoes",
+  "quais suas funções",
+  "quais suas funcoes",
+];
+
+export function ehPedidoDeFuncionalidades(texto: string | undefined | null): boolean {
+  if (!texto) return false;
+  const normalizado = texto.trim().toLowerCase();
+  if (normalizado.length > 80) return false;
+  return PALAVRAS_GATILHO_FUNCOES.some((gatilho) => normalizado === gatilho || normalizado.includes(gatilho));
+}
+
+/** Versão em texto corrido (painel web / WhatsApp determinístico via ehPedidoDeFuncionalidades / referência no system prompt) — sem sintaxe de lista nativa do WhatsApp. */
 export function construirTextoAjudaCompleto(): string {
-  return CATEGORIAS_AJUDA.map((categoria) => {
+  const intro = "Hoje eu ajudo em várias frentes da sua operação:";
+  const categorias = CATEGORIAS_AJUDA.map((categoria) => {
     const exemplos = categoria.exemplos.map((ex) => `  - "${ex}"`).join("\n");
     return `${categoria.emoji} ${categoria.titulo}\n${exemplos}`;
   }).join("\n\n");
+  return `${intro}\n\n${categorias}\n\nManda o que precisar que eu já calculo.`;
 }

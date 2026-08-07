@@ -8,7 +8,7 @@ import { baixarMidia, paraBase64 } from "@/lib/whatsapp/mediaDownloader";
 import { isWhisperConfigured } from "@/lib/openai/whisperConfig";
 import { transcreverAudio } from "@/lib/openai/whisperClient";
 import { planilhaParaTexto, MIME_TYPES_PLANILHA_SUPORTADOS, SpreadsheetParseError } from "@/lib/spreadsheet/spreadsheetParser";
-import { ehPedidoDeAjuda } from "@/lib/helpMenu";
+import { ehPedidoDeAjuda, ehPedidoDeFuncionalidades, construirTextoAjudaCompleto } from "@/lib/helpMenu";
 import { FROTA_SUGGESTIONS, resolverSelecaoNumerada } from "@/lib/frotaSuggestions";
 import { toPhoneE164 } from "@/lib/identity/phoneNormalizer";
 import { resolveOrCreateUserByPhone } from "@/services/supabase/userIdentityService";
@@ -296,6 +296,26 @@ export async function POST(request: Request) {
       ...inboundBase,
     });
     await enviarSugestoesIniciais(admin, userId, phoneE164, (session.collected_data ?? {}) as Record<string, unknown>);
+    return NextResponse.json({ ok: true });
+  }
+
+  // "O que você faz"/"quais suas funções" etc. — interceptado ANTES da IA,
+  // mesmo princípio do bloco acima. Achado real em 07/08/2026: deixado pra
+  // IA responder, ela resumiu e derrubou uma categoria inteira (Notícias do
+  // setor) em vez de repetir o texto completo — pergunta mais sensível pra
+  // um prospect decidir se continua, não pode depender do julgamento dela.
+  if (ehPedidoDeFuncionalidades(textoDireto)) {
+    await appendMessage(admin, {
+      conversation_id: conversation.id,
+      company_id: companyId,
+      user_id: userId,
+      role: "user",
+      direction: "inbound",
+      content: textoDireto ?? "",
+      content_type: "text",
+      ...inboundBase,
+    });
+    await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch(() => {});
     return NextResponse.json({ ok: true });
   }
 
