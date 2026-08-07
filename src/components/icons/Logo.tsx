@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** Logo oficial (public/frota-ia-logo.jpg) — caminhão + circuito + mapa do Brasil, fundo circular escuro. */
+/** Logo oficial (public/frota-ia-logo.jpg) — caminhão + circuito + mapa do Brasil, fundo verde-claro (atualizada em 2026-08-07). */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <Image
