@@ -76,6 +76,33 @@ export async function criarAssinaturaTeste(
   return { subscription, testeJaUsadoNesteNumero };
 }
 
+/**
+ * Assinaturas em TRIAL que precisam de aviso (dia 5 ou último dia) e ainda
+ * não foram avisadas desse tipo — usado pelo job de disparo diário. Um
+ * mesmo registro pode aparecer aqui precisando dos dois avisos ao mesmo
+ * tempo (ex.: cron ficou fora do ar alguns dias); quem chama decide qual(is)
+ * mandar, recalculando as datas por registro.
+ */
+export async function listarTestesParaAvisar(client: SupabaseDbClient, limit = 200): Promise<SubscriptionRow[]> {
+  const cincoDiasAtras = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+  const em24Horas = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await client
+    .from("subscriptions")
+    .select("*")
+    .eq("status", "TRIAL")
+    .or(`and(trial_avisado_dia5.eq.false,trial_iniciado_em.lte.${cincoDiasAtras}),and(trial_avisado_ultimo_dia.eq.false,valido_ate.lte.${em24Horas})`)
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function marcarAvisoTrialEnviado(client: SupabaseDbClient, companyId: string, tipo: "dia5" | "ultimoDia"): Promise<void> {
+  const update = tipo === "dia5" ? { trial_avisado_dia5: true } : { trial_avisado_ultimo_dia: true };
+  const { error } = await client.from("subscriptions").update(update).eq("company_id", companyId);
+  if (error) throw error;
+}
+
 export interface AtualizarAssinaturaPorPagamentoInput {
   companyId: string;
   plan: SubscriptionPlanEnum;
