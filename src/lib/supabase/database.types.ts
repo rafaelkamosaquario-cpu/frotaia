@@ -1639,6 +1639,7 @@ export type Database = {
         | "awaiting_vehicle_configuration"
         | "completed"
         | "paused"
+        | "awaiting_intent"
       route_data_source: "manual" | "google_routes" | "outro"
       run_status: "started" | "completed" | "failed" | "cancelled"
       scheduled_alert_status: "pending" | "sent" | "cancelled" | "failed"
@@ -1891,6 +1892,7 @@ export const Constants = {
         "awaiting_vehicle_configuration",
         "completed",
         "paused",
+        "awaiting_intent",
       ],
       route_data_source: ["manual", "google_routes", "outro"],
       run_status: ["started", "completed", "failed", "cancelled"],

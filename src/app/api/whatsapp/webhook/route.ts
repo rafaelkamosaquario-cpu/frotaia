@@ -94,6 +94,20 @@ async function enviarRespostaOnboarding(phoneE164: string, reply: OnboardingRepl
 const MENSAGEM_POS_CADASTRO =
   "Cadastro concluído!\n\nAgora você já pode conversar normalmente com o Frota IA.\n\nEscolha uma das opções abaixo para começar ou envie sua própria pergunta por texto, áudio, foto ou documento.";
 
+/**
+ * Personaliza a mensagem de conclusão citando a categoria que o cliente
+ * escolheu na pergunta "o que você quer resolver primeiro" (ver
+ * askIntent/onboardingConversation.ts, 07/08/2026) — reforça que o sistema
+ * "lembrou" o que ele disse, em vez de cair só no texto genérico. Sem
+ * intentId/intentLabel (sessão antiga que não passou por essa etapa), ou
+ * quando o cliente escolheu "ver tudo" (já recebeu o catálogo completo
+ * nessa etapa, mensagem genérica encaixa melhor), usa o texto padrão.
+ */
+function construirMensagemPosCadastro(intentId: unknown, intentLabel: unknown): string {
+  if (intentId === "ver_tudo" || typeof intentLabel !== "string" || !intentLabel) return MENSAGEM_POS_CADASTRO;
+  return `Cadastro concluído! Sobre ${intentLabel.toLowerCase()}, é só mandar quando quiser que eu já calculo.\n\nAqui embaixo tem outras coisas que também faço — ou envie sua própria pergunta por texto, áudio, foto ou documento.`;
+}
+
 const TEXTO_LISTA_SUGESTOES = "Como posso ajudar com sua frota hoje?";
 
 /**
@@ -252,7 +266,8 @@ export async function POST(request: Request) {
       // abaixo no fluxo pós-onboarding).
       const collectedDataAtual = resultado.collectedData as Record<string, unknown>;
       if (!collectedDataAtual.suggestionsMenuSentAt) {
-        await sendWhatsappText(phoneE164, MENSAGEM_POS_CADASTRO).catch(() => {});
+        const mensagem = construirMensagemPosCadastro(collectedDataAtual.intentId, collectedDataAtual.intentLabel);
+        await sendWhatsappText(phoneE164, mensagem).catch(() => {});
         await enviarSugestoesIniciais(admin, userId, phoneE164, collectedDataAtual);
       }
       return NextResponse.json({ ok: true });

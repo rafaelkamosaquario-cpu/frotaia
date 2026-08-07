@@ -1,6 +1,7 @@
 import type { OnboardingState, VehicleTypeEnum } from "@/lib/supabase/tables";
 import type { CompanyRow } from "@/lib/supabase/tables";
 import { classificarConfiguracaoVeiculo, resolverDesambiguacaoArticulado } from "./vehicleConfigClassifier";
+import { CATEGORIAS_AJUDA, construirTextoAjudaCompleto } from "@/lib/helpMenu";
 
 /**
  * Onboarding conversacional pelo WhatsApp (Camada 6, seções 3-6 do prompt
@@ -12,10 +13,12 @@ import { classificarConfiguracaoVeiculo, resolverDesambiguacaoArticulado } from 
  *
  * Redesenho (identidade obrigatória e curta; detalhe de veículo/implemento
  * fica progressivo — perguntado pela IA só quando uma ferramenta precisar,
- * fora deste arquivo): nome → perfil (lista) → cidade → região → rota fixa
- * (botão) → marca/modelo do veículo (texto livre, opcional) →
- * configuração do veículo (obrigatória, ver vehicleConfigClassifier.ts) →
- * concluído.
+ * fora deste arquivo): nome → perfil (lista) → intenção ("o que você quer
+ * resolver primeiro", ver askIntent — adicionado em 07/08/2026, a pedido
+ * do Rafael, pra já mostrar a abrangência do produto antes de pedir mais
+ * dado) → cidade → região → rota fixa (botão) → marca/modelo do veículo
+ * (texto livre, opcional) → configuração do veículo (obrigatória, ver
+ * vehicleConfigClassifier.ts) → concluído.
  *
  * Camada 7: a pergunta "quantos veículos" foi removida — o produto só
  * permite 1 veículo ativo por conta (constraint no banco,
@@ -34,6 +37,9 @@ export interface OnboardingCollectedData {
   baseState?: string;
   region?: string;
   hasFixedRoute?: boolean;
+  /** Categoria escolhida na pergunta "o que você quer resolver primeiro" — id de CATEGORIAS_AJUDA, ou "ver_tudo". Ausente se o cliente veio de uma sessão antiga (retomada em paused) que não tinha essa etapa. */
+  intentId?: string;
+  intentLabel?: string;
   primaryVehicleRaw?: string;
   primaryVehicleSkipped?: boolean;
   vehicleType?: VehicleTypeEnum;
@@ -73,8 +79,19 @@ function textReply(text: string): OnboardingReply {
   return { kind: "text", text };
 }
 
+/**
+ * Reescrita em 07/08/2026 (proposta do Rafael, testando de verdade): a
+ * versão anterior pedia o nome sem explicar nada do produto — quem chega
+ * pela primeira vez não tinha ideia da abrangência antes de já estar
+ * respondendo pergunta. Agora explica o valor primeiro.
+ */
 export function firstOnboardingMessage(): string {
-  return "Olá! Eu sou o Frota IA, seu assistente de IA especializado em transporte rodoviário.\n\nAntes de começarmos, como posso chamar você?";
+  return (
+    "Olá! Eu sou o Frota IA, seu especialista em transporte pelo WhatsApp.\n\n" +
+    "Antes de aceitar um frete ou tomar uma decisão, eu ajudo você a calcular o que realmente compensa. Analiso fretes, custos, combustível, CPK, pneus, manutenção, rotas, jornada e documentos. Também crio alertas e busco notícias e informações em fontes oficiais.\n\n" +
+    "Você pode falar comigo por texto, áudio, foto, PDF ou planilha.\n\n" +
+    "Como posso chamar você?"
+  );
 }
 
 const OPCOES_PERFIL: Array<{ id: string; title: string; companyType: OnboardingCompanyType; label: string }> = [
@@ -93,6 +110,53 @@ function askProfile(name: string): OnboardingReply {
     buttonLabel: "Escolher opção",
     options: OPCOES_PERFIL.map((o) => ({ id: o.id, title: o.title })),
   };
+}
+
+const ID_VER_TUDO = "ver_tudo";
+
+/**
+ * "O que você quer resolver primeiro?" — gerada a partir de
+ * CATEGORIAS_AJUDA (mesma fonte da resposta "o que você faz" em
+ * helpMenu.ts, nunca duplicada) + a opção "ver tudo". Adicionada em
+ * 07/08/2026: mostra a abrangência do produto logo no início, em vez de só
+ * pedir dado atrás de dado — e o que o cliente escolhe aqui personaliza a
+ * mensagem de conclusão do cadastro (ver MENSAGEM_POS_CADASTRO no webhook).
+ */
+function askIntent(): OnboardingReply {
+  return {
+    kind: "list",
+    text: "O que você quer resolver primeiro com o Frota IA?",
+    title: "Por onde começar",
+    buttonLabel: "Escolher opção",
+    options: [
+      ...CATEGORIAS_AJUDA.map((c) => ({ id: c.id, title: `${c.emoji} ${c.titulo}` })),
+      { id: ID_VER_TUDO, title: "Ver tudo que o Frota IA faz" },
+    ],
+  };
+}
+
+/** Texto curto de transição por categoria — diz o que mandar em seguida, sem tentar calcular nada ainda (empresa/veículo só existem no fim do onboarding). */
+const TRANSICAO_POR_INTENCAO: Record<string, string> = {
+  fretes: 'Perfeito! Quando quiser, me manda a foto do CT-e, a proposta de frete, ou escreve: origem e destino, valor oferecido, tipo de veículo, consumo médio e preço do diesel.',
+  combustivel_custos: "Show! Me conta o consumo do seu veículo (km/l) e o trajeto, ou os custos que quer calcular — CPK, gasto de combustível, margem, o que precisar.",
+  pneus_manutencao: "Legal! Quando quiser, me diz se é pra comparar pneu novo com recapado, calcular custo por km, ou tirar dúvida sobre manutenção preventiva.",
+  documentos: "Beleza! Pode mandar foto de nota fiscal, CRLV, CT-e ou comprovante de seguro assim que quiser — eu leio e te digo o que encontrei.",
+  alertas_agenda: "Combinado! Quando quiser, me diz o que devo te lembrar (vencimento, cobrança, revisão) e quando.",
+  jornada: "Perfeito! Quando for viajar, me conta o horário e o trajeto que eu organizo a jornada pra você.",
+  rotas: "Show! Me manda a origem e o destino quando quiser que eu calculo a distância — e posso salvar se for uma rota que você roda sempre.",
+  historico_legislacao: "Beleza! Pode perguntar sobre uma análise antiga, piso mínimo da ANTT, preço do diesel ou qualquer dúvida de legislação.",
+  noticias: "Legal! Eu busco notícia e informação atualizada do setor sempre que você perguntar — e se quiser, também mando um resumo todo dia (é só pedir depois).",
+};
+
+/** Aceita o id da lista (toque) ou, como fallback, o título/texto digitado. */
+function resolverIntencao(texto: string): { id: string; label: string } | null {
+  const t = norm(texto);
+  if (t === ID_VER_TUDO || t.includes("ver tudo")) return { id: ID_VER_TUDO, label: "Ver tudo que o Frota IA faz" };
+  const porId = CATEGORIAS_AJUDA.find((c) => norm(c.id) === t);
+  if (porId) return { id: porId.id, label: porId.titulo };
+  const porTitulo = CATEGORIAS_AJUDA.find((c) => t.includes(norm(c.titulo)));
+  if (porTitulo) return { id: porTitulo.id, label: porTitulo.titulo };
+  return null;
 }
 
 function askBaseLocation(): OnboardingReply {
@@ -282,6 +346,7 @@ export function processOnboardingMessage(
     // não respondida a partir do collectedData já salvo.
     if (!collectedData.name) return { nextState: "awaiting_name", reply: textReply(firstOnboardingMessage()), collectedData, finalize: false };
     if (!collectedData.companyType) return { nextState: "awaiting_profile", reply: askProfile(collectedData.name), collectedData, finalize: false };
+    if (!collectedData.intentId) return { nextState: "awaiting_intent", reply: askIntent(), collectedData, finalize: false };
     if (!collectedData.baseCity) return { nextState: "awaiting_base_location", reply: askBaseLocation(), collectedData, finalize: false };
     if (!collectedData.region) return { nextState: "awaiting_region", reply: askRegion(), collectedData, finalize: false };
     if (collectedData.hasFixedRoute === undefined) return { nextState: "awaiting_fixed_route", reply: askFixedRoute(), collectedData, finalize: false };
@@ -307,7 +372,22 @@ export function processOnboardingMessage(
         return { nextState: state, reply: askProfile(collectedData.name ?? ""), collectedData, finalize: false };
       }
       const updated = { ...collectedData, companyType: parsed.companyType, profileLabel: parsed.label };
-      return { nextState: "awaiting_base_location", reply: askBaseLocation(), collectedData: updated, finalize: false };
+      return { nextState: "awaiting_intent", reply: askIntent(), collectedData: updated, finalize: false };
+    }
+
+    case "awaiting_intent": {
+      const resolvido = resolverIntencao(incomingText);
+      if (!resolvido) {
+        return { nextState: state, reply: askIntent(), collectedData, finalize: false };
+      }
+      const updated = { ...collectedData, intentId: resolvido.id, intentLabel: resolvido.label };
+      const textoTransicao = resolvido.id === ID_VER_TUDO ? construirTextoAjudaCompleto() : TRANSICAO_POR_INTENCAO[resolvido.id];
+      return {
+        nextState: "awaiting_base_location",
+        reply: textReply(`${textoTransicao}\n\n${(askBaseLocation() as { kind: "text"; text: string }).text}`),
+        collectedData: updated,
+        finalize: false,
+      };
     }
 
     case "awaiting_base_location": {

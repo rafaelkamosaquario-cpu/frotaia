@@ -21,6 +21,8 @@ export interface CategoriaAjuda {
   id: string;
   emoji: string;
   titulo: string;
+  /** Parágrafo curto (1-2 frases) explicando o que essa categoria cobre — usado na resposta completa e na transição da pergunta de intenção do onboarding. */
+  descricao: string;
   /** 2-4 frases de exemplo, sempre mensagens reais que o cliente mandaria. */
   exemplos: string[];
 }
@@ -30,6 +32,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "fretes",
     emoji: "🚛",
     titulo: "Fretes e viagens",
+    descricao: "Analiso se o frete compensa, comparo propostas lado a lado, calculo margem e valor mínimo, e leio CT-e direto da foto.",
     exemplos: [
       "Esse frete de R$ 4.200 pra Santos compensa?",
       "Analise este CT-e (manda a foto)",
@@ -41,6 +44,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "combustivel_custos",
     emoji: "⛽",
     titulo: "Combustível e custos",
+    descricao: "Calculo consumo, gasto de diesel, CPK, custo do caminhão parado e sua margem real em qualquer frete.",
     exemplos: [
       "Meu caminhão faz 2,5 km/l, quanto vou gastar até Curitiba?",
       "Calcula meu CPK",
@@ -52,42 +56,49 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "pneus_manutencao",
     emoji: "🛞",
     titulo: "Pneus e manutenção",
+    descricao: "Comparo pneu novo com recapado, calculo custo por km, e ajudo a organizar a manutenção preventiva.",
     exemplos: ["Vale mais a pena recapar ou comprar pneu novo?", "De quanto em quanto tempo faço manutenção preventiva?"],
   },
   {
     id: "documentos",
     emoji: "📄",
     titulo: "Documentos",
+    descricao: "Leio nota fiscal, CRLV, CT-e, comprovante de seguro, PDF e planilha — e gero relatório em PDF das suas análises.",
     exemplos: ["Manda foto de nota fiscal, CRLV, CT-e ou comprovante de seguro", "Gera o relatório dessa análise em PDF", "Quais documentos eu já gerei?"],
   },
   {
     id: "alertas_agenda",
     emoji: "🔔",
     titulo: "Alertas, agenda e vencimentos",
+    descricao: "Crio lembretes de vencimento, cobrança e manutenção, e posso integrar com sua Agenda Google.",
     exemplos: ["Me avise 15 dias antes de vencer o seguro", "Me lembra de cobrar esse frete daqui a 30 dias", "Marca a revisão do caminhão pra semana que vem"],
   },
   {
     id: "jornada",
     emoji: "🕐",
     titulo: "Jornada",
+    descricao: "Organizo sua jornada de viagem — horário de saída, paradas obrigatórias e se dá tempo de rodar sozinho.",
     exemplos: ["Vou sair amanhã às 5h de Curitiba pra São Paulo, organize minha jornada", "Dá tempo de fazer essa viagem sozinho, sem parar?"],
   },
   {
     id: "rotas",
     emoji: "🗺️",
     titulo: "Rotas salvas",
+    descricao: "Calculo distância e duração de qualquer trajeto, e guardo as rotas que você roda com frequência.",
     exemplos: ["Salva essa rota", "Quais rotas eu tenho salvas?"],
   },
   {
     id: "historico_legislacao",
     emoji: "📊",
     titulo: "Histórico e legislação",
+    descricao: "Guardo suas análises pra você consultar depois, e busco informação atualizada sobre piso mínimo, preço de combustível e legislação de trânsito.",
     exemplos: ["Traga a análise que eu fiz semana passada", "Esse valor está acima do piso mínimo da ANTT?", "Qual o preço do diesel essa semana?"],
   },
   {
     id: "noticias",
     emoji: "📰",
     titulo: "Notícias do setor",
+    descricao: "Busco notícia e informação atualizada do setor em fontes como ANTT, ANP, PRF e imprensa especializada — e posso mandar um resumo todo dia, se você quiser.",
     exemplos: ["Quero receber notícias do setor todo dia", "Pode desativar as notícias diárias"],
   },
 ];
@@ -136,12 +147,19 @@ export function ehPedidoDeFuncionalidades(texto: string | undefined | null): boo
   return PALAVRAS_GATILHO_FUNCOES.some((gatilho) => normalizado === gatilho || normalizado.includes(gatilho));
 }
 
-/** Versão em texto corrido (painel web / WhatsApp determinístico via ehPedidoDeFuncionalidades / referência no system prompt) — sem sintaxe de lista nativa do WhatsApp. */
+/**
+ * Versão em texto corrido (painel web / WhatsApp determinístico via
+ * ehPedidoDeFuncionalidades / referência no system prompt) — sem sintaxe
+ * de lista nativa do WhatsApp. Formato numerado com descrição + exemplos
+ * por categoria, refeito em 07/08/2026 a partir de um rascunho do Rafael —
+ * versão anterior (só emoji + bullets) era rasa demais pra decidir se vale
+ * a pena continuar usando o produto.
+ */
 export function construirTextoAjudaCompleto(): string {
-  const intro = "Hoje eu ajudo em várias frentes da sua operação:";
-  const categorias = CATEGORIAS_AJUDA.map((categoria) => {
+  const intro = "🚛 O Frota IA ajuda você em várias áreas da operação:";
+  const categorias = CATEGORIAS_AJUDA.map((categoria, indice) => {
     const exemplos = categoria.exemplos.map((ex) => `  - "${ex}"`).join("\n");
-    return `${categoria.emoji} ${categoria.titulo}\n${exemplos}`;
+    return `${indice + 1}. ${categoria.emoji} ${categoria.titulo}\n${categoria.descricao}\n${exemplos}`;
   }).join("\n\n");
   return `${intro}\n\n${categorias}\n\nManda o que precisar que eu já calculo.`;
 }
