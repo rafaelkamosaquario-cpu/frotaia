@@ -18,6 +18,7 @@ import { finalizeOnboarding } from "@/ai/whatsapp/finalizeOnboarding";
 import { loadCustomerContext, loadVehicleContext } from "@/ai/context/customerContext";
 import { getOrCreateOpenConversation, appendMessage } from "@/services/supabase/conversationService";
 import { gerarRespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
+import { getSubscription, isAccessAllowed } from "@/services/supabase/subscriptionService";
 import { AnthropicConfigError } from "@/lib/anthropic/client";
 import { isUniqueViolation } from "@/lib/supabase/errors";
 import type { MessageInsert } from "@/lib/supabase/tables";
@@ -234,7 +235,7 @@ export async function POST(request: Request) {
 
     if (resultado.finalize) {
       try {
-        await finalizeOnboarding(admin, userId, resultado.collectedData);
+        await finalizeOnboarding(admin, userId, resultado.collectedData, phoneE164);
       } catch {
         await sendWhatsappText(
           phoneE164,
@@ -474,6 +475,24 @@ export async function POST(request: Request) {
 
   if (!mensagemUsuario) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Bloqueio de acesso por assinatura (Fase 2 do fluxo de pagamento) — só
+  // entra em vigor depois do onboarding (que sempre precisa completar pra
+  // criar o teste em primeiro lugar). Mensagem que parece pedido de
+  // assinatura passa direto (sem gastar chamada de IA nas demais, pra não
+  // cobrar por conversa que o cliente não pode mais usar) — o
+  // gerenciar_assinatura real acontece no fluxo normal logo abaixo.
+  const assinatura = await getSubscription(admin, companyId);
+  if (!isAccessAllowed(assinatura)) {
+    const pareceQuererAssinar = /assin|contrat|pagar|pagamento|plano|mensalidade|renovar/i.test(mensagemUsuario);
+    if (!pareceQuererAssinar) {
+      await sendWhatsappText(
+        phoneE164,
+        "Seu período de teste gratuito do Frota IA terminou. Pra continuar usando, é só responder \"quero assinar\" que eu te mostro os planos disponíveis."
+      ).catch(() => {});
+      return NextResponse.json({ ok: true });
+    }
   }
 
   try {

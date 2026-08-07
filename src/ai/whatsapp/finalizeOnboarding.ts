@@ -2,6 +2,7 @@ import "server-only";
 import { createCompanyWithOwner } from "@/services/supabase/companyService";
 import { createVehicle, setDefaultVehicle } from "@/services/supabase/vehicleService";
 import { saveMemory } from "@/services/supabase/memoryService";
+import { criarAssinaturaTeste } from "@/services/supabase/subscriptionService";
 import type { SupabaseDbClient } from "@/services/supabase/types";
 import type { OnboardingCollectedData } from "./onboardingConversation";
 import type { CompanyRow } from "@/lib/supabase/tables";
@@ -22,7 +23,8 @@ import { truncate } from "@/lib/utils";
 export async function finalizeOnboarding(
   admin: SupabaseDbClient,
   userId: string,
-  collectedData: OnboardingCollectedData
+  collectedData: OnboardingCollectedData,
+  phoneE164: string
 ): Promise<CompanyRow> {
   const company = await createCompanyWithOwner(admin, userId, {
     name: collectedData.name ?? "Minha operação",
@@ -30,6 +32,16 @@ export async function finalizeOnboarding(
     city: collectedData.baseCity,
     state: collectedData.baseState,
   });
+
+  try {
+    await criarAssinaturaTeste(admin, company.id, phoneE164);
+  } catch {
+    // Onboarding já concluiu do ponto de vista do usuário — se a criação
+    // do teste falhar, não trava a conclusão (mesmo princípio do veículo
+    // abaixo). Sem assinatura nenhuma criada, o gating do webhook trata
+    // isAccessAllowed(null) como acesso negado — pior caso é o cliente
+    // precisar contatar o suporte, não um bug de segurança.
+  }
 
   if (collectedData.region) {
     await saveMemory(admin, company.id, userId, {
