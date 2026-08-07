@@ -281,6 +281,7 @@ export const frotaIaToolNameSchema = z.enum([
   "consultar_conhecimento_operacional",
   "gerenciar_rota_salva",
   "gerenciar_noticias_setor",
+  "gerenciar_assinatura",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

@@ -1611,6 +1611,7 @@ export type Database = {
         | "consultar_conhecimento_operacional"
         | "gerenciar_rota_salva"
         | "gerenciar_noticias_setor"
+        | "gerenciar_assinatura"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -1859,6 +1860,7 @@ export const Constants = {
         "consultar_conhecimento_operacional",
         "gerenciar_rota_salva",
         "gerenciar_noticias_setor",
+        "gerenciar_assinatura",
       ],
       fuel_type: [
         "diesel_s10",
