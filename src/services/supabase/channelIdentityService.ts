@@ -36,6 +36,20 @@ export async function listChannelsForCompany(client: SupabaseDbClient, companyId
   return data ?? [];
 }
 
+/**
+ * Vincula todos os canais (ex.: WhatsApp) de um usuário à empresa dele —
+ * chamado logo depois que a empresa é criada no onboarding. Sem isso,
+ * user_channels.company_id fica sempre nulo pra quem entrou pelo WhatsApp
+ * (o canal é criado no primeiro contato, antes de existir empresa — só a
+ * ligação via company_members existia até aqui), quebrando qualquer busca
+ * de canal por empresa (listChannelsForCompany), usada pelos despachos de
+ * notícia diária e aviso de teste grátis. Achado em produção em 07/08/2026.
+ */
+export async function setCompanyForUserChannels(client: SupabaseDbClient, userId: string, companyId: string): Promise<void> {
+  const { error } = await client.from("user_channels").update({ company_id: companyId }).eq("user_id", userId);
+  if (error) throw error;
+}
+
 export async function linkChannel(
   client: SupabaseDbClient,
   userId: string,

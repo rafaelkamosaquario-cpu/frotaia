@@ -3,6 +3,7 @@ import { createCompanyWithOwner } from "@/services/supabase/companyService";
 import { createVehicle, setDefaultVehicle } from "@/services/supabase/vehicleService";
 import { saveMemory } from "@/services/supabase/memoryService";
 import { criarAssinaturaTeste } from "@/services/supabase/subscriptionService";
+import { setCompanyForUserChannels } from "@/services/supabase/channelIdentityService";
 import type { SupabaseDbClient } from "@/services/supabase/types";
 import type { OnboardingCollectedData } from "./onboardingConversation";
 import type { CompanyRow } from "@/lib/supabase/tables";
@@ -41,6 +42,17 @@ export async function finalizeOnboarding(
     // abaixo). Sem assinatura nenhuma criada, o gating do webhook trata
     // isAccessAllowed(null) como acesso negado — pior caso é o cliente
     // precisar contatar o suporte, não um bug de segurança.
+  }
+
+  try {
+    // Corrige o "galinha e ovo": o canal de WhatsApp é criado no primeiro
+    // contato, antes de existir empresa (ver resolveOrCreateUserByPhone) —
+    // sem isso, user_channels.company_id fica nulo pra sempre, quebrando
+    // listChannelsForCompany (despacho de notícia diária e aviso de teste
+    // grátis). Achado em produção em 07/08/2026.
+    await setCompanyForUserChannels(admin, userId, company.id);
+  } catch {
+    // Mesmo princípio dos outros catches aqui: não trava o onboarding.
   }
 
   if (collectedData.region) {
