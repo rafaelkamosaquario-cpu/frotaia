@@ -107,6 +107,7 @@ export const vehicleCreateSchema = z.object({
   insuranceExpiryDate: z.string().date().optional(),
   licensingExpiryDate: z.string().date().optional(),
   notes: maxText(2000, "Observações").optional(),
+  active: z.boolean().optional(),
 });
 
 export const vehicleUpdateSchema = vehicleCreateSchema.partial();

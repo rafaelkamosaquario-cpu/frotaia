@@ -13,6 +13,18 @@ export async function listVehicles(client: SupabaseDbClient, companyId: string):
   return data ?? [];
 }
 
+/** Todos os veículos da empresa (ativos e inativos) — painel V2, pra permitir reativar. listVehicles continua filtrado a ativos, usado pela IA. */
+export async function listVehiclesForPanel(client: SupabaseDbClient, companyId: string): Promise<VehicleRow[]> {
+  const { data, error } = await client
+    .from("vehicles")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("active", { ascending: false })
+    .order("name");
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function getVehicle(client: SupabaseDbClient, vehicleId: string): Promise<VehicleRow | null> {
   const { data, error } = await client.from("vehicles").select("*").eq("id", vehicleId).maybeSingle();
   if (error) throw error;
@@ -104,6 +116,7 @@ export async function updateVehicle(
       insurance_expiry_date: parsed.insuranceExpiryDate,
       licensing_expiry_date: parsed.licensingExpiryDate,
       notes: parsed.notes,
+      active: parsed.active,
       updated_by: userId,
     })
     .eq("id", vehicleId)

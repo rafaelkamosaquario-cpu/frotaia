@@ -337,6 +337,7 @@ export type Database = {
           document_type:
             | Database["public"]["Enums"]["company_document_type"]
             | null
+          fleet_panel_enabled: boolean
           id: string
           name: string
           state: string | null
@@ -356,6 +357,7 @@ export type Database = {
           document_type?:
             | Database["public"]["Enums"]["company_document_type"]
             | null
+          fleet_panel_enabled?: boolean
           id?: string
           name: string
           state?: string | null
@@ -375,6 +377,7 @@ export type Database = {
           document_type?:
             | Database["public"]["Enums"]["company_document_type"]
             | null
+          fleet_panel_enabled?: boolean
           id?: string
           name?: string
           state?: string | null
