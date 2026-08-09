@@ -1,6 +1,6 @@
 # V2 — Painel de gestão de frota (roadmap, não iniciado)
 
-Status: **planejamento, sem início de construção** (decisão do Rafael em 09/08/2026: documentar agora, codar depois).
+Status: **Fase 1 concluída** (schema de dados — `drivers`, `vehicle_documents`, `maintenance_schedules`, `checklist_dispatches`, trava de 1 veículo condicionada a `company_type='transportadora'` via trigger — sem UI, sem auth de cliente, sem automação de checklist ainda). Próximas fases (UI do painel, login de cliente, automação de checklist) seguem sem início de construção.
 
 ## Contexto
 
@@ -8,7 +8,7 @@ O Frota IA V1 (WhatsApp-first, sem painel pro cliente) é pra motorista autônom
 
 **Decisões já confirmadas com o Rafael:**
 1. **V1 e V2 coexistem** — motorista autônomo continua exatamente como está hoje (1 veículo, WhatsApp-only). V2 é um tipo de conta novo, pra transportadora com frota — não altera nem quebra nada do que já existe.
-2. **Painel V2 continua uso interno/admin**, não é o cliente final logando (mesma régua da V1: `CUSTOMER_PANEL_ENABLED` continua controlando isso).
+2. **Painel V2 dá acesso ao CLIENTE final**, não é uso interno/admin — o cliente continua com o Frota IA via WhatsApp e GANHA, além disso, acesso a um painel de gestão de frota completo (mesmas telas do protótipo auditado), no mesmo link do painel web de hoje. Vira um valor novo a cobrar (plano específico, decisão de preço fora de escopo por enquanto). (Correção 09/08/2026 — a versão anterior deste documento dizia "admin-only", o que estava errado.)
 3. Sem prazo definido — é pra planejar agora, construir quando o Rafael decidir avançar.
 
 ## Auditoria do protótipo (`Projetos-/frotabot`) — o que aproveitar e o que NUNCA repetir
