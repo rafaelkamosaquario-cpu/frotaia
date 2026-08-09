@@ -95,6 +95,22 @@ export type PaymentEventInsert = PublicTables["payment_events"]["Insert"];
 export type TrialUsageRow = PublicTables["trial_usage"]["Row"];
 export type TrialUsageInsert = PublicTables["trial_usage"]["Insert"];
 
+export type DriverRow = PublicTables["drivers"]["Row"];
+export type DriverInsert = PublicTables["drivers"]["Insert"];
+export type DriverUpdate = PublicTables["drivers"]["Update"];
+
+export type VehicleDocumentRow = PublicTables["vehicle_documents"]["Row"];
+export type VehicleDocumentInsert = PublicTables["vehicle_documents"]["Insert"];
+export type VehicleDocumentUpdate = PublicTables["vehicle_documents"]["Update"];
+
+export type MaintenanceScheduleRow = PublicTables["maintenance_schedules"]["Row"];
+export type MaintenanceScheduleInsert = PublicTables["maintenance_schedules"]["Insert"];
+export type MaintenanceScheduleUpdate = PublicTables["maintenance_schedules"]["Update"];
+
+export type ChecklistDispatchRow = PublicTables["checklist_dispatches"]["Row"];
+export type ChecklistDispatchInsert = PublicTables["checklist_dispatches"]["Insert"];
+export type ChecklistDispatchUpdate = PublicTables["checklist_dispatches"]["Update"];
+
 export type CompanyMemberRole = PublicEnums["company_member_role"];
 export type OnboardingState = PublicEnums["onboarding_state"];
 export type ScheduledAlertStatus = PublicEnums["scheduled_alert_status"];
@@ -108,3 +124,6 @@ export type ExpenseTypeEnum = PublicEnums["expense_type"];
 export type RunStatus = PublicEnums["run_status"];
 export type SubscriptionPlanEnum = PublicEnums["subscription_plan"];
 export type SubscriptionStatusEnum = PublicEnums["subscription_status"];
+export type VehicleDocumentTypeEnum = PublicEnums["vehicle_document_type"];
+export type MaintenanceStatusEnum = PublicEnums["maintenance_status"];
+export type ChecklistResponseStatusEnum = PublicEnums["checklist_response_status"];

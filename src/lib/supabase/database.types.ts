@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -264,6 +264,67 @@ export type Database = {
           },
         ]
       }
+      checklist_dispatches: {
+        Row: {
+          attempt_count: number
+          company_id: string
+          created_at: string
+          driver_id: string
+          id: string
+          responded_at: string | null
+          response_status: Database["public"]["Enums"]["checklist_response_status"]
+          response_text: string | null
+          sent_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          attempt_count?: number
+          company_id: string
+          created_at?: string
+          driver_id: string
+          id?: string
+          responded_at?: string | null
+          response_status?: Database["public"]["Enums"]["checklist_response_status"]
+          response_text?: string | null
+          sent_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          attempt_count?: number
+          company_id?: string
+          created_at?: string
+          driver_id?: string
+          id?: string
+          responded_at?: string | null
+          response_status?: Database["public"]["Enums"]["checklist_response_status"]
+          response_text?: string | null
+          sent_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_dispatches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_dispatches_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_dispatches_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           active: boolean
@@ -509,6 +570,60 @@ export type Database = {
           },
         ]
       }
+      drivers: {
+        Row: {
+          active: boolean
+          cnh_expiry_date: string | null
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          phone_e164: string | null
+          toxicologico_expiry_date: string | null
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          cnh_expiry_date?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          phone_e164?: string | null
+          toxicologico_expiry_date?: string | null
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          cnh_expiry_date?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          phone_e164?: string | null
+          toxicologico_expiry_date?: string | null
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
@@ -699,6 +814,60 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_schedules: {
+        Row: {
+          alert_sent: boolean
+          company_id: string
+          created_at: string
+          due_date: string
+          id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["maintenance_status"]
+          type: string
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          alert_sent?: boolean
+          company_id: string
+          created_at?: string
+          due_date: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["maintenance_status"]
+          type: string
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          alert_sent?: boolean
+          company_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["maintenance_status"]
+          type?: string
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_schedules_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]
@@ -1357,6 +1526,64 @@ export type Database = {
           },
         ]
       }
+      vehicle_documents: {
+        Row: {
+          company_id: string
+          created_at: string
+          document_type: Database["public"]["Enums"]["vehicle_document_type"]
+          driver_id: string | null
+          expiry_date: string | null
+          id: string
+          notes: string | null
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          document_type: Database["public"]["Enums"]["vehicle_document_type"]
+          driver_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          document_type?: Database["public"]["Enums"]["vehicle_document_type"]
+          driver_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_documents_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_documents_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_tire_profiles: {
         Row: {
           acquisition_cost: number | null
@@ -1571,6 +1798,7 @@ export type Database = {
       calendar_action_type: "create" | "read" | "update" | "delete"
       channel_provider: "z_api" | "internal" | "outro"
       channel_type: "whatsapp" | "web" | "outro"
+      checklist_response_status: "pendente" | "ok" | "atencao"
       company_document_type: "cpf" | "cnpj" | "outro"
       company_member_role: "owner" | "admin" | "operator" | "viewer"
       company_member_status: "active" | "invited" | "removed"
@@ -1625,6 +1853,7 @@ export type Database = {
         | "expired"
         | "revoked"
         | "error"
+      maintenance_status: "pendente" | "agendado" | "concluido"
       message_direction: "inbound" | "outbound" | "internal"
       message_role: "user" | "assistant" | "system" | "tool"
       onboarding_state:
@@ -1661,6 +1890,7 @@ export type Database = {
         | "recapado"
         | "misto"
         | "outro"
+      vehicle_document_type: "tacografo" | "rntrc" | "cnh" | "toxicologico"
       vehicle_type:
         | "utilitario"
         | "tres_quartos"
@@ -1820,6 +2050,7 @@ export const Constants = {
       calendar_action_type: ["create", "read", "update", "delete"],
       channel_provider: ["z_api", "internal", "outro"],
       channel_type: ["whatsapp", "web", "outro"],
+      checklist_response_status: ["pendente", "ok", "atencao"],
       company_document_type: ["cpf", "cnpj", "outro"],
       company_member_role: ["owner", "admin", "operator", "viewer"],
       company_member_status: ["active", "invited", "removed"],
@@ -1878,6 +2109,7 @@ export const Constants = {
         "revoked",
         "error",
       ],
+      maintenance_status: ["pendente", "agendado", "concluido"],
       message_direction: ["inbound", "outbound", "internal"],
       message_role: ["user", "assistant", "system", "tool"],
       onboarding_state: [
@@ -1918,6 +2150,7 @@ export const Constants = {
         "misto",
         "outro",
       ],
+      vehicle_document_type: ["tacografo", "rntrc", "cnh", "toxicologico"],
       vehicle_type: [
         "utilitario",
         "tres_quartos",
