@@ -112,6 +112,19 @@ export const vehicleCreateSchema = z.object({
 
 export const vehicleUpdateSchema = vehicleCreateSchema.partial();
 
+// ── driver ───────────────────────────────────────────────────────────────
+
+export const driverCreateSchema = z.object({
+  name: maxText(120, "Nome do motorista"),
+  phoneE164: phoneE164Schema.optional(),
+  vehicleId: uuidSchema.nullable().optional(),
+  cnhExpiryDate: z.string().date().optional(),
+  toxicologicoExpiryDate: z.string().date().optional(),
+  active: z.boolean().optional(),
+});
+
+export const driverUpdateSchema = driverCreateSchema.partial();
+
 // ── vehicle cost profile ─────────────────────────────────────────────────
 
 const vehicleCostProfileFields = z.object({
