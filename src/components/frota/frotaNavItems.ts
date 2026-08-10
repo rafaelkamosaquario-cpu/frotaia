@@ -26,7 +26,7 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/empresa", label: "Empresa", icon: Building2, disponivel: false },
   { href: "/frota/veiculos", label: "Veículos", icon: Truck, disponivel: true },
   { href: "/frota/motoristas", label: "Motoristas", icon: Users, disponivel: true },
-  { href: "/frota/manutencao", label: "Manutenção", icon: Wrench, disponivel: false },
+  { href: "/frota/manutencao", label: "Manutenção", icon: Wrench, disponivel: true },
   { href: "/frota/documentos", label: "Documentos", icon: FileText, disponivel: false },
   { href: "/frota/checklists", label: "Checklists", icon: ClipboardList, disponivel: false },
   { href: "/frota/alertas", label: "Alertas", icon: AlertTriangle, disponivel: false },

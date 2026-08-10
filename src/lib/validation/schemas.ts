@@ -125,6 +125,20 @@ export const driverCreateSchema = z.object({
 
 export const driverUpdateSchema = driverCreateSchema.partial();
 
+// ── maintenance schedule ─────────────────────────────────────────────────
+
+export const maintenanceStatusSchema = z.enum(["pendente", "agendado", "concluido"]);
+
+export const maintenanceScheduleCreateSchema = z.object({
+  vehicleId: uuidSchema,
+  type: maxText(120, "Tipo de manutenção").min(1, "Tipo é obrigatório."),
+  dueDate: z.string().date(),
+  status: maintenanceStatusSchema.optional(),
+  notes: maxText(2000, "Observações").optional(),
+});
+
+export const maintenanceScheduleUpdateSchema = maintenanceScheduleCreateSchema.partial();
+
 // ── vehicle cost profile ─────────────────────────────────────────────────
 
 const vehicleCostProfileFields = z.object({
