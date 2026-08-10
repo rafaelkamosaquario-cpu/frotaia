@@ -2,8 +2,10 @@ import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
   BarChart3,
+  Building2,
   ClipboardList,
   FileText,
+  LayoutDashboard,
   Settings,
   Truck,
   Users,
@@ -18,7 +20,10 @@ export interface FrotaNavItem {
   disponivel: boolean;
 }
 
+/** Mesma ordem/seções do protótipo (Projetos-/frotabot/admin) auditado. "Empresas" aqui vira o perfil da própria empresa (V2 é escopado por RLS, não multi-tenant como o protótipo era). */
 export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
+  { href: "/frota/dashboard", label: "Dashboard", icon: LayoutDashboard, disponivel: false },
+  { href: "/frota/empresa", label: "Empresa", icon: Building2, disponivel: false },
   { href: "/frota/veiculos", label: "Veículos", icon: Truck, disponivel: true },
   { href: "/frota/motoristas", label: "Motoristas", icon: Users, disponivel: false },
   { href: "/frota/manutencao", label: "Manutenção", icon: Wrench, disponivel: false },

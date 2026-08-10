@@ -99,62 +99,72 @@ export function VeiculosClient({ veiculosIniciais }: VeiculosClientProps) {
           </EmptyState>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {veiculos.map((veiculo) => (
-            <Card key={veiculo.id} className="flex flex-col gap-3 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">{veiculo.name || veiculo.plate || "Sem apelido"}</p>
-                  <p className="text-xs text-muted-foreground">{veiculo.plate ?? "Sem placa"}</p>
-                </div>
-                <span
-                  className={
-                    veiculo.active
-                      ? "shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success"
-                      : "shrink-0 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                  }
-                >
-                  {veiculo.active ? "Ativo" : "Inativo"}
-                </span>
-              </div>
-
-              <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <dt>Tipo</dt>
-                <dd className="text-right text-foreground">{veiculo.vehicle_type ? VEHICLE_TYPE_LABEL[veiculo.vehicle_type] : "—"}</dd>
-                <dt>Seguro vence</dt>
-                <dd className="text-right text-foreground">{formatDate(veiculo.insurance_expiry_date)}</dd>
-                <dt>Licenciamento vence</dt>
-                <dd className="text-right text-foreground">{formatDate(veiculo.licensing_expiry_date)}</dd>
-              </dl>
-
-              <div className="mt-1 flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => setFormTarget(veiculo)}>
-                  <SquarePen className="size-3.5" aria-hidden />
-                  Editar
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 gap-1.5"
-                  disabled={isToggling && toggleTarget?.id === veiculo.id}
-                  onClick={() => setToggleTarget(veiculo)}
-                >
-                  {veiculo.active ? (
-                    <>
-                      <Ban className="size-3.5" aria-hidden />
-                      Desativar
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="size-3.5" aria-hidden />
-                      Ativar
-                    </>
-                  )}
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Placa</th>
+                <th className="px-4 py-3 font-medium">Apelido</th>
+                <th className="px-4 py-3 font-medium">Tipo</th>
+                <th className="px-4 py-3 font-medium">Seguro vence</th>
+                <th className="px-4 py-3 font-medium">Licenciamento vence</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {veiculos.map((veiculo) => (
+                <tr key={veiculo.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
+                  <td className="px-4 py-3 font-medium text-foreground">{veiculo.plate ?? "—"}</td>
+                  <td className="px-4 py-3 text-foreground">{veiculo.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {veiculo.vehicle_type ? VEHICLE_TYPE_LABEL[veiculo.vehicle_type] : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDate(veiculo.insurance_expiry_date)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDate(veiculo.licensing_expiry_date)}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={
+                        veiculo.active
+                          ? "rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success"
+                          : "rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+                      }
+                    >
+                      {veiculo.active ? "Ativo" : "Inativo"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setFormTarget(veiculo)}>
+                        <SquarePen className="size-3.5" aria-hidden />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={isToggling && toggleTarget?.id === veiculo.id}
+                        onClick={() => setToggleTarget(veiculo)}
+                      >
+                        {veiculo.active ? (
+                          <>
+                            <Ban className="size-3.5" aria-hidden />
+                            Desativar
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="size-3.5" aria-hidden />
+                            Ativar
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
 
       <VehicleFormModal
