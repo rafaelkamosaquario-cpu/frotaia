@@ -22,8 +22,8 @@ export interface FrotaNavItem {
 
 /** Mesma ordem/seções do protótipo (Projetos-/frotabot/admin) auditado. "Empresas" aqui vira o perfil da própria empresa (V2 é escopado por RLS, não multi-tenant como o protótipo era). */
 export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
-  { href: "/frota/dashboard", label: "Dashboard", icon: LayoutDashboard, disponivel: false },
-  { href: "/frota/empresa", label: "Empresa", icon: Building2, disponivel: false },
+  { href: "/frota/dashboard", label: "Dashboard", icon: LayoutDashboard, disponivel: true },
+  { href: "/frota/empresa", label: "Empresa", icon: Building2, disponivel: true },
   { href: "/frota/veiculos", label: "Veículos", icon: Truck, disponivel: true },
   { href: "/frota/motoristas", label: "Motoristas", icon: Users, disponivel: true },
   { href: "/frota/manutencao", label: "Manutenção", icon: Wrench, disponivel: true },
