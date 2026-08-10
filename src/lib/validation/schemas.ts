@@ -139,6 +139,32 @@ export const maintenanceScheduleCreateSchema = z.object({
 
 export const maintenanceScheduleUpdateSchema = maintenanceScheduleCreateSchema.partial();
 
+// ── vehicle document ─────────────────────────────────────────────────────
+
+export const vehicleDocumentTypeSchema = z.enum(["tacografo", "rntrc", "cnh", "toxicologico"]);
+
+const vehicleDocumentFields = z.object({
+  documentType: vehicleDocumentTypeSchema,
+  vehicleId: uuidSchema.nullable().optional(),
+  driverId: uuidSchema.nullable().optional(),
+  expiryDate: z.string().date().optional(),
+  notes: maxText(2000, "Observações").optional(),
+});
+
+/** Espelha o CHECK vehicle_documents_exactly_one_owner do banco (Fase 1). */
+const exactlyOneOwner = (data: { vehicleId?: string | null; driverId?: string | null }) =>
+  (data.vehicleId ? 1 : 0) + (data.driverId ? 1 : 0) === 1;
+
+export const vehicleDocumentCreateSchema = vehicleDocumentFields.refine(exactlyOneOwner, {
+  message: "Selecione um veículo OU um motorista — nunca os dois, nunca nenhum.",
+  path: ["vehicleId"],
+});
+
+export const vehicleDocumentUpdateSchema = vehicleDocumentFields.partial().refine(
+  (data) => (data.vehicleId === undefined && data.driverId === undefined ? true : exactlyOneOwner(data)),
+  { message: "Selecione um veículo OU um motorista — nunca os dois, nunca nenhum.", path: ["vehicleId"] }
+);
+
 // ── vehicle cost profile ─────────────────────────────────────────────────
 
 const vehicleCostProfileFields = z.object({
