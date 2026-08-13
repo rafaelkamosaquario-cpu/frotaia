@@ -9,7 +9,7 @@ import { isWhisperConfigured } from "@/lib/openai/whisperConfig";
 import { transcreverAudio } from "@/lib/openai/whisperClient";
 import { planilhaParaTexto, MIME_TYPES_PLANILHA_SUPORTADOS, SpreadsheetParseError } from "@/lib/spreadsheet/spreadsheetParser";
 import { ehPedidoDeAjuda, ehPedidoDeFuncionalidades, construirTextoAjudaCompleto } from "@/lib/helpMenu";
-import { FROTA_SUGGESTIONS, resolverSelecaoNumerada } from "@/lib/frotaSuggestions";
+import { FROTA_SUGGESTIONS, SUGESTOES_LISTA_NATIVA_WHATSAPP, resolverSelecaoNumerada } from "@/lib/frotaSuggestions";
 import { toPhoneE164 } from "@/lib/identity/phoneNormalizer";
 import { resolveOrCreateUserByPhone } from "@/services/supabase/userIdentityService";
 import { getOnboardingSession, createOnboardingSession, updateOnboardingSession } from "@/services/supabase/onboardingSessionService";
@@ -113,7 +113,7 @@ const TEXTO_LISTA_SUGESTOES = "Como posso ajudar com sua frota hoje?";
 /**
  * Enviado como mensagem separada logo após a lista — nunca dentro do corpo
  * dela (TEXTO_LISTA_SUGESTOES é um dos textos fixos da especificação,
- * nunca alterado). Reforça que nenhuma das 10 opções é obrigatória: o
+ * nunca alterado). Reforça que nenhuma das opções é obrigatória: o
  * cliente sempre pode digitar a própria pergunta em vez de tocar numa
  * sugestão — já valia antes, só não ficava claro quando o menu era
  * reaberto por palavra-chave (esse caminho não passa por
@@ -121,17 +121,27 @@ const TEXTO_LISTA_SUGESTOES = "Como posso ajudar com sua frota hoje?";
  */
 const LEMBRETE_PERGUNTA_LIVRE = "Se preferir, pode digitar sua própria pergunta a qualquer momento — não precisa escolher uma das opções acima.";
 
+/**
+ * Fallback em texto usa as 11 sugestões completas (`FROTA_SUGGESTIONS`) —
+ * texto não tem limite de linhas como a lista nativa, então não precisa do
+ * corte de `SUGESTOES_LISTA_NATIVA_WHATSAPP`.
+ */
 function construirFallbackNumerado(): string {
   const linhas = FROTA_SUGGESTIONS.map((s, i) => `${i + 1}. ${s.title}`).join("\n");
   return `${TEXTO_LISTA_SUGESTOES}\n\n${linhas}\n\nResponda com o número ou escreva sua pergunta normalmente.`;
 }
 
 /**
- * Envia as 10 sugestões iniciais — lista nativa (única capacidade real do
+ * Envia as sugestões iniciais — lista nativa (única capacidade real do
  * adaptador atual pra isso, `sendWhatsappOptionList`, endpoint
  * `send-option-list` da Z-API) com fallback pra menu numerado em texto se o
  * envio da lista falhar. Nunca inventa um endpoint alternativo — o
  * fallback usa `sendWhatsappText`, que já existe.
+ *
+ * A lista nativa usa `SUGESTOES_LISTA_NATIVA_WHATSAPP` (10 itens), não
+ * `FROTA_SUGGESTIONS` (11) — a lista nativa do WhatsApp Business tem limite
+ * real de 10 linhas; o fallback em texto e o painel web continuam com as
+ * 11 (ver comentário em frotaSuggestions.ts).
  *
  * Se cair no fallback, marca a sessão como "aguardando escolha numerada"
  * pra próxima mensagem poder ser interpretada como seleção (ver
@@ -154,7 +164,7 @@ async function enviarSugestoesIniciais(
       TEXTO_LISTA_SUGESTOES,
       "Escolha uma opção",
       "Ver sugestões",
-      FROTA_SUGGESTIONS.map((s) => ({ id: s.id, title: s.title, description: s.description }))
+      SUGESTOES_LISTA_NATIVA_WHATSAPP.map((s) => ({ id: s.id, title: s.title, description: s.description }))
     );
     await sendWhatsappText(phoneE164, LEMBRETE_PERGUNTA_LIVRE).catch(() => {});
     await updateOnboardingSession(admin, userId, {
@@ -259,7 +269,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      // Cadastro salvo com sucesso: mensagem fixa + as 10 sugestões, só
+      // Cadastro salvo com sucesso: mensagem fixa + as sugestões, só
       // desta vez (idempotência via suggestions_menu_sent_at em
       // collected_data — nunca reenviado automaticamente depois disso;
       // reabertura manual é só via "ajuda"/"menu"/"opções"/"sugestões" mais
@@ -334,7 +344,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Toque numa das 10 sugestões: equivale a "preencher e enviar" da web —
+  // Toque numa das sugestões (lista nativa mostra 10, fallback em texto mostra 11): equivale a "preencher e enviar" da web —
   // no WhatsApp não existe "só preencher", o toque já é o envio. Segue pro
   // fluxo normal da IA como se o cliente tivesse digitado o exemplo.
   const sugestaoSelecionada = body.listResponseMessage?.selectedRowId

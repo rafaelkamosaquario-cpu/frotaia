@@ -1,5 +1,5 @@
 /**
- * Fonte única das 10 sugestões iniciais do Frota IA — usada nos 2 ambientes
+ * Fonte única das 11 sugestões iniciais do Frota IA — usada nos 2 ambientes
  * (mensagem pós-onboarding no WhatsApp e cards da tela inicial do painel
  * web), pra nunca ter texto/id duplicado e divergente entre os dois.
  *
@@ -122,7 +122,29 @@ export const FROTA_SUGGESTIONS: FrotaSuggestion[] = [
     whatsappTitle: "Salvar uma rota",
     whatsappDescription: "Salva a rota de Sorriso até Santos",
   },
+  {
+    id: "noticias_setor",
+    title: "Notícias do setor",
+    description: "Quero receber notícias do setor todo dia",
+    icon: "Newspaper",
+    intent: "noticias_setor",
+    whatsappTitle: "Notícias do setor",
+    whatsappDescription: "Quero receber notícias do setor todo dia",
+  },
 ];
+
+/**
+ * A lista nativa do WhatsApp (`send-option-list` da Z-API) tem limite real
+ * de 10 linhas — restrição da própria plataforma WhatsApp Business, não da
+ * Z-API. `FROTA_SUGGESTIONS` tem 11 itens (painel web não tem esse limite),
+ * então só o envio da lista nativa usa este subconjunto de 10 — o fallback
+ * em texto (`construirFallbackNumerado`, no webhook) e o painel continuam
+ * mostrando os 11. Item removido daqui: "calcular_consumo" (mais
+ * redundante com calcular_cpk/custos_frota entre os 11).
+ */
+export const SUGESTOES_LISTA_NATIVA_WHATSAPP: FrotaSuggestion[] = FROTA_SUGGESTIONS.filter(
+  (s) => s.id !== "calcular_consumo"
+);
 
 /**
  * Resolve a resposta de um menu numerado em texto (fallback do WhatsApp,

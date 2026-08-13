@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Calculator, CircleGauge, Gauge, Truck, Scale, WalletCards, Bell, Clock3, History, MapPin, CircleDollarSign, type LucideIcon } from "lucide-react";
+import { Calculator, CircleGauge, Gauge, Truck, Scale, WalletCards, Bell, Clock3, History, MapPin, Newspaper, CircleDollarSign, type LucideIcon } from "lucide-react";
 import { FROTA_SUGGESTIONS } from "@/lib/frotaSuggestions";
 import styles from "./SuggestionCards.module.css";
 
@@ -14,11 +14,12 @@ const ICONS: Record<string, LucideIcon> = {
   Clock3,
   History,
   MapPin,
+  Newspaper,
 };
 
 /**
  * Só "Analisar um frete" pede ícone combinado no spec ("Truck acompanhado
- * de CircleDollarSign") — os outros 9 usam um ícone só. Mantido aqui (não
+ * de CircleDollarSign") — os outros 10 usam um ícone só. Mantido aqui (não
  * no tipo FrotaSuggestion) porque é detalhe de apresentação, não dado de
  * negócio compartilhado com o WhatsApp.
  */

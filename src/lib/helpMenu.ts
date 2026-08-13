@@ -2,16 +2,17 @@
  * Conteúdo de referência sobre as 22 ferramentas do Frota IA, organizado
  * por categoria com exemplos reais de mensagem.
  *
- * Desde a reformulação das sugestões iniciais (10 itens em
+ * Desde a reformulação das sugestões iniciais (11 itens em
  * src/lib/frotaSuggestions.ts), este arquivo NÃO é mais usado pra montar
  * a lista nativa do WhatsApp — isso agora é `frotaSuggestions.ts`. O que
  * sobra aqui, ainda em uso:
  * 1. `ehPedidoDeAjuda` — detecta a frase-gatilho ("ajuda"/"menu"/
- *    "opções"/"sugestões" etc.) que reabre a lista de 10 sugestões
- *    (webhook chama `frotaSuggestions.ts` diretamente, não este arquivo);
+ *    "opções"/"sugestões" etc.) que reabre a lista de sugestões (10 na
+ *    lista nativa, 11 no fallback em texto — webhook chama
+ *    `frotaSuggestions.ts` diretamente, não este arquivo);
  * 2. `construirTextoAjudaCompleto` — referência completa embutida no
  *    system prompt, pra painel web e qualquer pergunta tipo "o que você
- *    faz" que peça mais detalhe que as 10 sugestões cobrem.
+ *    faz" que peça mais detalhe que as sugestões cobrem.
  *
  * Não importa nada de "server-only" — precisa ser seguro de importar tanto
  * no webhook (servidor) quanto em componentes client do painel web.

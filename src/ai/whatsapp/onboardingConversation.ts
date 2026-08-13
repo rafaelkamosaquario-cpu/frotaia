@@ -246,7 +246,7 @@ function askVehicleConfiguration(): OnboardingReply {
 
 /**
  * O conteúdo real enviado ao cliente na conclusão do cadastro (mensagem
- * fixa + lista das 10 sugestões iniciais) é montado no webhook
+ * fixa + lista das sugestões iniciais) é montado no webhook
  * (`enviarSugestoesIniciais`, src/app/api/whatsapp/webhook/route.ts) — lá
  * é onde dá pra checar idempotência (suggestions_menu_sent_at) e cair no
  * fallback numerado se a lista nativa falhar; nenhuma das duas coisas cabe
