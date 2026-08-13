@@ -4,7 +4,16 @@ import { listVehicles, getVehicle, createVehicle, updateVehicle, setDefaultVehic
 import { replaceCostProfile } from "@/services/supabase/vehicleCostProfileService";
 import { createTireProfile } from "@/services/supabase/vehicleTireProfileService";
 import { getCompany } from "@/services/supabase/companyService";
-import type { VehicleRow, VehicleTypeEnum, FuelTypeEnum, TireCategoryEnum, VehicleCostProfileRow, VehicleTireProfileRow } from "@/lib/supabase/tables";
+import { listVehicleDocumentsForPanel, upsertVehicleDocumentByType } from "@/services/supabase/vehicleDocumentService";
+import type {
+  VehicleRow,
+  VehicleTypeEnum,
+  FuelTypeEnum,
+  TireCategoryEnum,
+  VehicleCostProfileRow,
+  VehicleTireProfileRow,
+  VehicleDocumentRow,
+} from "@/lib/supabase/tables";
 
 /**
  * Ferramenta: gerenciar_veiculo
@@ -12,6 +21,12 @@ import type { VehicleRow, VehicleTypeEnum, FuelTypeEnum, TireCategoryEnum, Vehic
  * Ferramenta de INTEGRAÇÃO (I/O real com Supabase — vehicles,
  * vehicle_cost_profiles, vehicle_tire_profiles), mesmo padrão de
  * `gerenciar_alerta`/`registrar_despesa`.
+ *
+ * `vencimentoSeguro`/`vencimentoLicenciamento` gravam em `vehicle_documents`
+ * (tipos 'seguro'/'licenciamento', upsert por veículo), não mais nas colunas
+ * `vehicles.insurance_expiry_date`/`licensing_expiry_date` — migradas na
+ * Fase 4 do plano de unificação V1+V2 pra não ter 2 lugares guardando o
+ * mesmo dado (o painel web já usa `vehicle_documents` desde a V2 Fase 5).
  *
  * Fecha a lacuna real: o onboarding só grava o veículo principal como texto
  * livre (name/notes) — nenhum campo estruturado (tipo, combustível, consumo
@@ -152,7 +167,25 @@ export interface GerenciarVeiculoResultado extends ResultadoFerramentaBase {
   perfilPneu?: PerfilPneuResumo;
 }
 
-function mapaVeiculo(row: VehicleRow): VeiculoResumo {
+interface VencimentosVeiculo {
+  seguro: string | null;
+  licenciamento: string | null;
+}
+
+/** Agrupa vehicle_documents (tipos seguro/licenciamento) por vehicle_id — usado por LISTAR pra não fazer 1 query por veículo. */
+function agruparVencimentosPorVeiculo(documentos: VehicleDocumentRow[]): Map<string, VencimentosVeiculo> {
+  const mapa = new Map<string, VencimentosVeiculo>();
+  for (const doc of documentos) {
+    if (!doc.vehicle_id || (doc.document_type !== "seguro" && doc.document_type !== "licenciamento")) continue;
+    const atual = mapa.get(doc.vehicle_id) ?? { seguro: null, licenciamento: null };
+    if (doc.document_type === "seguro") atual.seguro = doc.expiry_date;
+    else atual.licenciamento = doc.expiry_date;
+    mapa.set(doc.vehicle_id, atual);
+  }
+  return mapa;
+}
+
+function mapaVeiculo(row: VehicleRow, vencimentos?: VencimentosVeiculo): VeiculoResumo {
   return {
     id: row.id,
     nome: row.name,
@@ -167,8 +200,8 @@ function mapaVeiculo(row: VehicleRow): VeiculoResumo {
     capacidadeCargaKg: row.load_capacity_kg,
     hodometroAtualKm: row.current_odometer_km,
     numeroEixos: row.axle_count,
-    vencimentoSeguro: row.insurance_expiry_date,
-    vencimentoLicenciamento: row.licensing_expiry_date,
+    vencimentoSeguro: vencimentos?.seguro ?? null,
+    vencimentoLicenciamento: vencimentos?.licenciamento ?? null,
     padrao: row.is_default,
   };
 }
@@ -195,6 +228,25 @@ function mapaPerfilPneu(row: VehicleTireProfileRow): PerfilPneuResumo {
 
 function respostaFalha(modo: ModoGerenciarVeiculo, alertas: string[], dadosFaltantes: string[] = []): GerenciarVeiculoResultado {
   return { sucesso: false, modo, alertas, premissas: [], dadosFaltantes, mensagemResumo: alertas[0] ?? "Não foi possível concluir a ação de veículo." };
+}
+
+/**
+ * Grava (upsert) os vencimentos informados nesta chamada e devolve o par
+ * atual (seguro/licenciamento) do veículo já mesclado — campo não
+ * informado nesta chamada mantém o que já estava salvo, nunca apaga.
+ */
+async function sincronizarESeguroLicenciamento(
+  admin: ReturnType<typeof createAdminClient>,
+  companyId: string,
+  vehicleId: string,
+  vencimentoSeguro: string | undefined,
+  vencimentoLicenciamento: string | undefined
+): Promise<VencimentosVeiculo> {
+  if (vencimentoSeguro) await upsertVehicleDocumentByType(admin, companyId, vehicleId, "seguro", vencimentoSeguro);
+  if (vencimentoLicenciamento) await upsertVehicleDocumentByType(admin, companyId, vehicleId, "licenciamento", vencimentoLicenciamento);
+
+  const documentos = await listVehicleDocumentsForPanel(admin, companyId);
+  return agruparVencimentosPorVeiculo(documentos).get(vehicleId) ?? { seguro: null, licenciamento: null };
 }
 
 async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeiculoResultado> {
@@ -235,10 +287,10 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         loadCapacityKg: entrada.capacidadeCargaKg,
         currentOdometerKm: entrada.hodometroAtualKm,
         axleCount: entrada.numeroEixos,
-        insuranceExpiryDate: entrada.vencimentoSeguro,
-        licensingExpiryDate: entrada.vencimentoLicenciamento,
         notes: entrada.observacoes,
       });
+
+      const vencimentos = await sincronizarESeguroLicenciamento(admin, companyId, criado.id, entrada.vencimentoSeguro, entrada.vencimentoLicenciamento);
 
       return {
         sucesso: true,
@@ -246,13 +298,15 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         alertas: [],
         premissas: [],
         dadosFaltantes: [],
-        veiculo: mapaVeiculo(criado),
+        veiculo: mapaVeiculo(criado, vencimentos),
         mensagemResumo: `Veículo "${criado.name ?? criado.plate ?? criado.id}" cadastrado.`,
       };
     }
 
     if (modo === "LISTAR") {
-      const veiculos = (await listVehicles(admin, companyId)).map(mapaVeiculo);
+      const [veiculosRows, documentos] = await Promise.all([listVehicles(admin, companyId), listVehicleDocumentsForPanel(admin, companyId)]);
+      const vencimentosPorVeiculo = agruparVencimentosPorVeiculo(documentos);
+      const veiculos = veiculosRows.map((v) => mapaVeiculo(v, vencimentosPorVeiculo.get(v.id)));
       return {
         sucesso: true,
         modo,
@@ -288,10 +342,10 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         loadCapacityKg: entrada.capacidadeCargaKg,
         currentOdometerKm: entrada.hodometroAtualKm,
         axleCount: entrada.numeroEixos,
-        insuranceExpiryDate: entrada.vencimentoSeguro,
-        licensingExpiryDate: entrada.vencimentoLicenciamento,
         notes: entrada.observacoes,
       });
+
+      const vencimentos = await sincronizarESeguroLicenciamento(admin, companyId, atualizado.id, entrada.vencimentoSeguro, entrada.vencimentoLicenciamento);
 
       return {
         sucesso: true,
@@ -299,20 +353,22 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         alertas: [],
         premissas: [],
         dadosFaltantes: [],
-        veiculo: mapaVeiculo(atualizado),
+        veiculo: mapaVeiculo(atualizado, vencimentos),
         mensagemResumo: `Dados de "${atualizado.name ?? atualizado.plate ?? atualizado.id}" atualizados.`,
       };
     }
 
     if (modo === "DEFINIR_PADRAO") {
       const atualizado = await setDefaultVehicle(admin, entrada.vehicleId, companyId, userId);
+      const documentos = await listVehicleDocumentsForPanel(admin, companyId);
+      const vencimentos = agruparVencimentosPorVeiculo(documentos).get(atualizado.id);
       return {
         sucesso: true,
         modo,
         alertas: [],
         premissas: [],
         dadosFaltantes: [],
-        veiculo: mapaVeiculo(atualizado),
+        veiculo: mapaVeiculo(atualizado, vencimentos),
         mensagemResumo: `"${atualizado.name ?? atualizado.plate ?? atualizado.id}" agora é o veículo padrão.`,
       };
     }

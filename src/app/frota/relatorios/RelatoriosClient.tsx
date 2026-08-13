@@ -32,6 +32,8 @@ const VEHICLE_TYPE_LABEL: Record<string, string> = {
 const DOCUMENT_TYPE_LABEL: Record<string, string> = {
   tacografo: "Tacógrafo",
   rntrc: "RNTRC",
+  seguro: "Seguro",
+  licenciamento: "Licenciamento",
   cnh: "CNH",
   toxicologico: "Toxicológico",
 };

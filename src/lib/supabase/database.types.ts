@@ -1845,6 +1845,7 @@ export type Database = {
         | "gerenciar_assinatura"
         | "gerenciar_motorista"
         | "gerenciar_manutencao"
+        | "gerenciar_documento_frota"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -1895,7 +1896,13 @@ export type Database = {
         | "recapado"
         | "misto"
         | "outro"
-      vehicle_document_type: "tacografo" | "rntrc" | "cnh" | "toxicologico"
+      vehicle_document_type:
+        | "tacografo"
+        | "rntrc"
+        | "cnh"
+        | "toxicologico"
+        | "seguro"
+        | "licenciamento"
       vehicle_type:
         | "utilitario"
         | "tres_quartos"
@@ -2100,6 +2107,7 @@ export const Constants = {
         "gerenciar_assinatura",
         "gerenciar_motorista",
         "gerenciar_manutencao",
+        "gerenciar_documento_frota",
       ],
       fuel_type: [
         "diesel_s10",
@@ -2157,7 +2165,14 @@ export const Constants = {
         "misto",
         "outro",
       ],
-      vehicle_document_type: ["tacografo", "rntrc", "cnh", "toxicologico"],
+      vehicle_document_type: [
+        "tacografo",
+        "rntrc",
+        "cnh",
+        "toxicologico",
+        "seguro",
+        "licenciamento",
+      ],
       vehicle_type: [
         "utilitario",
         "tres_quartos",

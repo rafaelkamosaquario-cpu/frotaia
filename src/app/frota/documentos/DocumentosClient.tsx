@@ -22,6 +22,8 @@ function formatDate(iso: string | null) {
 const DOCUMENT_TYPE_LABEL: Record<VehicleDocumentTypeEnum, string> = {
   tacografo: "Tacógrafo",
   rntrc: "RNTRC",
+  seguro: "Seguro",
+  licenciamento: "Licenciamento",
   cnh: "CNH",
   toxicologico: "Toxicológico",
 };

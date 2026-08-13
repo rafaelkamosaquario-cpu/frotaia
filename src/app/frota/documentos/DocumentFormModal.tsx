@@ -17,10 +17,12 @@ const selectClass = cn(
 
 const labelClass = "mb-1.5 block text-sm font-medium text-foreground";
 
-/** tacografo/rntrc são documentos do veículo; cnh/toxicologico são do motorista (mesma intenção documentada na migration da Fase 1). */
+/** tacografo/rntrc/seguro/licenciamento são documentos do veículo; cnh/toxicologico são do motorista (mesma intenção documentada na migration da Fase 1, seguro/licenciamento migrados na Fase 4 do plano de unificação). */
 const OWNER_KIND_BY_TYPE: Record<VehicleDocumentTypeEnum, "vehicle" | "driver"> = {
   tacografo: "vehicle",
   rntrc: "vehicle",
+  seguro: "vehicle",
+  licenciamento: "vehicle",
   cnh: "driver",
   toxicologico: "driver",
 };
@@ -28,6 +30,8 @@ const OWNER_KIND_BY_TYPE: Record<VehicleDocumentTypeEnum, "vehicle" | "driver"> 
 const DOCUMENT_TYPE_LABEL: Record<VehicleDocumentTypeEnum, string> = {
   tacografo: "Tacógrafo",
   rntrc: "RNTRC",
+  seguro: "Seguro",
+  licenciamento: "Licenciamento",
   cnh: "CNH",
   toxicologico: "Toxicológico",
 };

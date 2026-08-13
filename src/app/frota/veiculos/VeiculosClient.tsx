@@ -7,11 +7,12 @@ import { Card } from "@/components/ui/Card";
 import { Dialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/hooks/useToast";
-import type { VehicleRow } from "@/lib/supabase/tables";
+import type { VehicleRow, VehicleDocumentRow } from "@/lib/supabase/tables";
 import { VehicleFormModal } from "./VehicleFormModal";
 
 interface VeiculosClientProps {
   veiculosIniciais: VehicleRow[];
+  documentosIniciais: VehicleDocumentRow[];
 }
 
 function formatDate(iso: string | null) {
@@ -32,19 +33,31 @@ const VEHICLE_TYPE_LABEL: Record<string, string> = {
   outro: "Outro",
 };
 
-export function VeiculosClient({ veiculosIniciais }: VeiculosClientProps) {
+export function VeiculosClient({ veiculosIniciais, documentosIniciais }: VeiculosClientProps) {
   const { showToast } = useToast();
   const [veiculos, setVeiculos] = useState(veiculosIniciais);
+  const [documentos, setDocumentos] = useState(documentosIniciais);
   const [formTarget, setFormTarget] = useState<VehicleRow | null | undefined>(undefined);
   const [toggleTarget, setToggleTarget] = useState<VehicleRow | null>(null);
   const [isToggling, setIsToggling] = useState(false);
 
-  function handleSaved(veiculo: VehicleRow) {
+  async function handleSaved(veiculo: VehicleRow) {
     setVeiculos((prev) => {
       const existe = prev.some((v) => v.id === veiculo.id);
       const proxima = existe ? prev.map((v) => (v.id === veiculo.id ? veiculo : v)) : [veiculo, ...prev];
       return [...proxima].sort((a, b) => Number(b.active) - Number(a.active) || (a.name ?? "").localeCompare(b.name ?? ""));
     });
+
+    // Recarrega documentos (seguro/licenciamento podem ter sido criados/atualizados pelo modal) — mais simples e confiável do que tentar mesclar client-side.
+    try {
+      const response = await fetch("/api/frota/documentos");
+      if (response.ok) {
+        const data = await response.json();
+        setDocumentos(data.documentos ?? []);
+      }
+    } catch {
+      // Silencioso: a lista de veículos já foi atualizada, seguro/licenciamento só ficam desatualizados até o próximo refresh da página.
+    }
   }
 
   async function handleToggleActive() {
@@ -120,8 +133,12 @@ export function VeiculosClient({ veiculosIniciais }: VeiculosClientProps) {
                   <td className="px-4 py-3 text-muted-foreground">
                     {veiculo.vehicle_type ? VEHICLE_TYPE_LABEL[veiculo.vehicle_type] : "—"}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDate(veiculo.insurance_expiry_date)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDate(veiculo.licensing_expiry_date)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatDate(documentos.find((d) => d.vehicle_id === veiculo.id && d.document_type === "seguro")?.expiry_date ?? null)}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatDate(documentos.find((d) => d.vehicle_id === veiculo.id && d.document_type === "licenciamento")?.expiry_date ?? null)}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={
@@ -171,6 +188,7 @@ export function VeiculosClient({ veiculosIniciais }: VeiculosClientProps) {
         open={formTarget !== undefined}
         onClose={() => setFormTarget(undefined)}
         vehicle={formTarget ?? null}
+        documentos={documentos}
         onSaved={handleSaved}
       />
 

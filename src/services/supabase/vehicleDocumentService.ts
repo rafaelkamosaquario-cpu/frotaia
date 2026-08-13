@@ -1,5 +1,5 @@
 import { vehicleDocumentCreateSchema, vehicleDocumentUpdateSchema } from "@/lib/validation/schemas";
-import type { VehicleDocumentRow } from "@/lib/supabase/tables";
+import type { VehicleDocumentRow, VehicleDocumentTypeEnum } from "@/lib/supabase/tables";
 import type { SupabaseDbClient } from "./types";
 
 export async function listVehicleDocumentsForPanel(
@@ -32,6 +32,35 @@ export async function createVehicleDocument(
       expiry_date: parsed.expiryDate,
       notes: parsed.notes,
     })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Upsert por (vehicle_id, document_type) — pra tipos de documento que
+ * representam "o vencimento atual" de um veículo, sem histórico (hoje só
+ * seguro/licenciamento; tacógrafo/RNTRC/CNH/toxicológico continuam
+ * criados/atualizados por id via createVehicleDocument/updateVehicleDocument
+ * normalmente). Depende do índice único parcial
+ * `vehicle_documents_vehicle_type_unique_idx` (migration
+ * 20260813190400) — só cobre document_type de veículo (driver_id nulo).
+ */
+export async function upsertVehicleDocumentByType(
+  client: SupabaseDbClient,
+  companyId: string,
+  vehicleId: string,
+  documentType: VehicleDocumentTypeEnum,
+  expiryDate: string
+): Promise<VehicleDocumentRow> {
+  const { data, error } = await client
+    .from("vehicle_documents")
+    .upsert(
+      { company_id: companyId, vehicle_id: vehicleId, driver_id: null, document_type: documentType, expiry_date: expiryDate },
+      { onConflict: "vehicle_id,document_type" }
+    )
     .select("*")
     .single();
 

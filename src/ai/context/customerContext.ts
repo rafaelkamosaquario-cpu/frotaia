@@ -5,6 +5,7 @@ import { getOrCreatePreferences } from "@/services/supabase/companyPreferencesSe
 import { getVehicle, resolveDefaultVehicle as resolveDefaultVehicleRow } from "@/services/supabase/vehicleService";
 import { getActiveCostProfile } from "@/services/supabase/vehicleCostProfileService";
 import { listTireProfiles } from "@/services/supabase/vehicleTireProfileService";
+import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
 import { saveMemory } from "@/services/supabase/memoryService";
 import { recordToolExecution } from "@/services/supabase/toolExecutionService";
 import type { SupabaseDbClient } from "@/services/supabase/types";
@@ -71,6 +72,9 @@ export interface VehicleContext {
   vehicle: VehicleRow | null;
   costProfile: VehicleCostProfileRow | null;
   tireProfiles: VehicleTireProfileRow[];
+  /** Fonte única desde a Fase 4 do plano de unificação V1+V2: vehicle_documents (tipos 'seguro'/'licenciamento'), não mais vehicles.insurance_expiry_date/licensing_expiry_date. */
+  insuranceExpiryDate: string | null;
+  licensingExpiryDate: string | null;
 }
 
 /** Se vehicleId não for informado, usa o veículo padrão (is_default) da empresa. */
@@ -82,15 +86,19 @@ export async function loadVehicleContext(
   const vehicle = vehicleId ? await getVehicle(client, vehicleId) : await resolveDefaultVehicleRow(client, companyId);
 
   if (!vehicle) {
-    return { vehicle: null, costProfile: null, tireProfiles: [] };
+    return { vehicle: null, costProfile: null, tireProfiles: [], insuranceExpiryDate: null, licensingExpiryDate: null };
   }
 
-  const [costProfile, tireProfiles] = await Promise.all([
+  const [costProfile, tireProfiles, documentos] = await Promise.all([
     getActiveCostProfile(client, vehicle.id),
     listTireProfiles(client, vehicle.id),
+    listVehicleDocumentsForPanel(client, companyId),
   ]);
 
-  return { vehicle, costProfile, tireProfiles };
+  const insuranceExpiryDate = documentos.find((d) => d.vehicle_id === vehicle.id && d.document_type === "seguro")?.expiry_date ?? null;
+  const licensingExpiryDate = documentos.find((d) => d.vehicle_id === vehicle.id && d.document_type === "licenciamento")?.expiry_date ?? null;
+
+  return { vehicle, costProfile, tireProfiles, insuranceExpiryDate, licensingExpiryDate };
 }
 
 export const resolveDefaultVehicle = resolveDefaultVehicleRow;

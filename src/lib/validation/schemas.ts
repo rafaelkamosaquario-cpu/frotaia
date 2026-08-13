@@ -141,7 +141,7 @@ export const maintenanceScheduleUpdateSchema = maintenanceScheduleCreateSchema.p
 
 // ── vehicle document ─────────────────────────────────────────────────────
 
-export const vehicleDocumentTypeSchema = z.enum(["tacografo", "rntrc", "cnh", "toxicologico"]);
+export const vehicleDocumentTypeSchema = z.enum(["tacografo", "rntrc", "cnh", "toxicologico", "seguro", "licenciamento"]);
 
 const vehicleDocumentFields = z.object({
   documentType: vehicleDocumentTypeSchema,
@@ -338,6 +338,7 @@ export const frotaIaToolNameSchema = z.enum([
   "gerenciar_assinatura",
   "gerenciar_motorista",
   "gerenciar_manutencao",
+  "gerenciar_documento_frota",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

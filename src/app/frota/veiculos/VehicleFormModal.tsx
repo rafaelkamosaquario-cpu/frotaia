@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/useToast";
 import { vehicleCreateSchema, vehicleUpdateSchema } from "@/lib/validation/schemas";
-import type { VehicleRow } from "@/lib/supabase/tables";
+import type { VehicleRow, VehicleDocumentRow } from "@/lib/supabase/tables";
 
 const selectClass = cn(
   "flex h-10 w-full rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground",
@@ -21,6 +21,8 @@ interface VehicleFormModalProps {
   open: boolean;
   onClose: () => void;
   vehicle: VehicleRow | null;
+  /** Todos os documentos da empresa — filtrados aqui pro veículo em edição (tipos seguro/licenciamento). Vazio/irrelevante ao cadastrar um veículo novo. */
+  documentos: VehicleDocumentRow[];
   onSaved: (vehicle: VehicleRow) => void;
 }
 
@@ -42,7 +44,12 @@ interface FormState {
   notes: string;
 }
 
-function toFormState(vehicle: VehicleRow | null): FormState {
+function documentoVigente(documentos: VehicleDocumentRow[], vehicleId: string | undefined, tipo: "seguro" | "licenciamento"): VehicleDocumentRow | null {
+  if (!vehicleId) return null;
+  return documentos.find((d) => d.vehicle_id === vehicleId && d.document_type === tipo) ?? null;
+}
+
+function toFormState(vehicle: VehicleRow | null, documentos: VehicleDocumentRow[]): FormState {
   return {
     name: vehicle?.name ?? "",
     plate: vehicle?.plate ?? "",
@@ -56,13 +63,19 @@ function toFormState(vehicle: VehicleRow | null): FormState {
     loadCapacityKg: vehicle?.load_capacity_kg?.toString() ?? "",
     currentOdometerKm: vehicle?.current_odometer_km?.toString() ?? "",
     axleCount: vehicle?.axle_count?.toString() ?? "",
-    insuranceExpiryDate: vehicle?.insurance_expiry_date ?? "",
-    licensingExpiryDate: vehicle?.licensing_expiry_date ?? "",
+    insuranceExpiryDate: documentoVigente(documentos, vehicle?.id, "seguro")?.expiry_date ?? "",
+    licensingExpiryDate: documentoVigente(documentos, vehicle?.id, "licenciamento")?.expiry_date ?? "",
     notes: vehicle?.notes ?? "",
   };
 }
 
-/** Só inclui campos preenchidos — todos são opcionais no Zod (mesmo schema que a coleta progressiva da IA usa), então string vazia é omitida em vez de enviada. */
+/**
+ * Só inclui campos preenchidos — todos são opcionais no Zod (mesmo schema
+ * que a coleta progressiva da IA usa), então string vazia é omitida em vez
+ * de enviada. Seguro/licenciamento NÃO entram aqui — desde a Fase 4 do
+ * plano de unificação V1+V2, viram linhas de `vehicle_documents` (ver
+ * `salvarSeguroELicenciamento`), não mais colunas de `vehicles`.
+ */
 function toPayload(form: FormState): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   if (form.name) payload.name = form.name;
@@ -77,21 +90,60 @@ function toPayload(form: FormState): Record<string, unknown> {
   if (form.loadCapacityKg) payload.loadCapacityKg = Number(form.loadCapacityKg);
   if (form.currentOdometerKm) payload.currentOdometerKm = Number(form.currentOdometerKm);
   if (form.axleCount) payload.axleCount = Number(form.axleCount);
-  if (form.insuranceExpiryDate) payload.insuranceExpiryDate = form.insuranceExpiryDate;
-  if (form.licensingExpiryDate) payload.licensingExpiryDate = form.licensingExpiryDate;
   if (form.notes) payload.notes = form.notes;
   return payload;
 }
 
-export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFormModalProps) {
+/** Upsert client-side: PATCH se já existe um documento vigente desse tipo pro veículo, senão POST. Espelha upsertVehicleDocumentByType (usada pelo gerenciar_veiculo no WhatsApp) sem precisar de rota nova — reaproveita /api/frota/documentos, já com RLS de escrita (operator+). */
+async function salvarSeguroELicenciamento(vehicleId: string, form: FormState, documentosAtuais: VehicleDocumentRow[]): Promise<void> {
+  const tarefas: Array<Promise<Response>> = [];
+
+  if (form.insuranceExpiryDate) {
+    const existente = documentoVigente(documentosAtuais, vehicleId, "seguro");
+    tarefas.push(
+      existente
+        ? fetch(`/api/frota/documentos/${existente.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ expiryDate: form.insuranceExpiryDate }),
+          })
+        : fetch("/api/frota/documentos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ documentType: "seguro", vehicleId, expiryDate: form.insuranceExpiryDate }),
+          })
+    );
+  }
+
+  if (form.licensingExpiryDate) {
+    const existente = documentoVigente(documentosAtuais, vehicleId, "licenciamento");
+    tarefas.push(
+      existente
+        ? fetch(`/api/frota/documentos/${existente.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ expiryDate: form.licensingExpiryDate }),
+          })
+        : fetch("/api/frota/documentos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ documentType: "licenciamento", vehicleId, expiryDate: form.licensingExpiryDate }),
+          })
+    );
+  }
+
+  await Promise.all(tarefas);
+}
+
+export function VehicleFormModal({ open, onClose, vehicle, documentos, onSaved }: VehicleFormModalProps) {
   const { showToast } = useToast();
-  const [form, setForm] = useState<FormState>(() => toFormState(vehicle));
+  const [form, setForm] = useState<FormState>(() => toFormState(vehicle, documentos));
   const [plateError, setPlateError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const isEditing = vehicle !== null;
 
   function resetAndClose() {
-    setForm(toFormState(null));
+    setForm(toFormState(null, []));
     setPlateError(null);
     onClose();
   }
@@ -129,6 +181,18 @@ export function VehicleFormModal({ open, onClose, vehicle, onSaved }: VehicleFor
       if (!response.ok) {
         showToast({ title: "Não foi possível salvar", description: data.error ?? "Tente novamente.", variant: "error" });
         return;
+      }
+
+      if (form.insuranceExpiryDate || form.licensingExpiryDate) {
+        try {
+          await salvarSeguroELicenciamento(data.veiculo.id, form, documentos);
+        } catch {
+          showToast({
+            title: "Veículo salvo, mas seguro/licenciamento não",
+            description: "Os demais dados foram salvos — tente atualizar o vencimento de novo.",
+            variant: "error",
+          });
+        }
       }
 
       showToast({ title: isEditing ? "Veículo atualizado" : "Veículo cadastrado", variant: "success" });
