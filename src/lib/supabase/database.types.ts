@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -1843,6 +1843,7 @@ export type Database = {
         | "gerenciar_rota_salva"
         | "gerenciar_noticias_setor"
         | "gerenciar_assinatura"
+        | "gerenciar_motorista"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -2096,6 +2097,7 @@ export const Constants = {
         "gerenciar_rota_salva",
         "gerenciar_noticias_setor",
         "gerenciar_assinatura",
+        "gerenciar_motorista",
       ],
       fuel_type: [
         "diesel_s10",
