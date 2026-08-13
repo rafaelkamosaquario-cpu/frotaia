@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { listVehicles, getVehicle, createVehicle, updateVehicle, setDefaultVehicle } from "@/services/supabase/vehicleService";
 import { replaceCostProfile } from "@/services/supabase/vehicleCostProfileService";
 import { createTireProfile } from "@/services/supabase/vehicleTireProfileService";
+import { getCompany } from "@/services/supabase/companyService";
 import type { VehicleRow, VehicleTypeEnum, FuelTypeEnum, TireCategoryEnum, VehicleCostProfileRow, VehicleTireProfileRow } from "@/lib/supabase/tables";
 
 /**
@@ -18,13 +19,16 @@ import type { VehicleRow, VehicleTypeEnum, FuelTypeEnum, TireCategoryEnum, Vehic
  * completar/corrigir isso depois, a partir do que o cliente conta na própria
  * conversa.
  *
- * Regra de produto desta V1: no máximo 1 veículo ATIVO por conta/empresa
- * (motorista autônomo / operação pequena) — CRIAR verifica isso antes de
- * escrever (ver `listVehicles` abaixo) e o índice único parcial
- * `vehicles_one_active_per_company_idx` (migration 20260731120000) garante o
- * mesmo em qualquer caminho de escrita, não só por esta ferramenta. Quando já
- * existe um veículo, o caminho certo é ATUALIZAR (ou DEFINIR_CUSTO/
- * DEFINIR_PNEU) — nunca CRIAR outro.
+ * Regra de produto: no máximo 1 veículo ATIVO por conta/empresa quando
+ * `company_type` não é `transportadora` (motorista autônomo / operação
+ * pequena) — CRIAR verifica isso antes de escrever, espelhando exatamente a
+ * mesma condição do trigger de banco `enforce_one_vehicle_for_individual_accounts`
+ * (migration 20260809180000: `tipo_empresa is distinct from 'transportadora'`).
+ * Empresa `transportadora` (V2, gestão de frota) pode cadastrar múltiplos
+ * veículos ativos por este mesmo caminho — o painel web já permitia isso,
+ * esta ferramenta só passou a espelhar a mesma regra. Quando já existe um
+ * veículo e a conta não é `transportadora`, o caminho certo é ATUALIZAR (ou
+ * DEFINIR_CUSTO/DEFINIR_PNEU) — nunca CRIAR outro.
  *
  * `vehicleId` sempre é verificado contra `companyId` antes de qualquer
  * escrita (ver `verificarPropriedade`) — nunca confia soh no id que o
@@ -210,9 +214,12 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
 
       const veiculosExistentes = await listVehicles(admin, companyId);
       if (veiculosExistentes.length > 0) {
-        return respostaFalha(modo, [
-          "Esta conta já tem um veículo cadastrado — nesta versão só é permitido 1 veículo por conta. Use ATUALIZAR para corrigir/completar os dados dele, em vez de cadastrar outro.",
-        ]);
+        const empresa = await getCompany(admin, companyId);
+        if (empresa?.company_type !== "transportadora") {
+          return respostaFalha(modo, [
+            "Esta conta já tem um veículo cadastrado — nesta versão só é permitido 1 veículo por conta. Use ATUALIZAR para corrigir/completar os dados dele, em vez de cadastrar outro.",
+          ]);
+        }
       }
 
       const criado = await createVehicle(admin, companyId, userId, {
@@ -429,7 +436,7 @@ export const ferramentaGerenciarVeiculo: DefinicaoFerramenta<GerenciarVeiculoEnt
   nome: "gerenciar_veiculo",
   descricao: "Cadastra, lista e atualiza veículos da empresa (dados básicos, perfil de custo e perfil de pneu) a partir do que o cliente conta na conversa.",
   objetivo:
-    "Transformar dado de veículo mencionado na conversa (tipo, combustível, consumo, placa, custos, pneu) num registro estruturado reaproveitável pelas outras ferramentas, em vez de se perder a cada conversa nova. Nesta V1, cada conta tem no máximo 1 veículo — CRIAR só deve ser usado quando a conta ainda não tiver nenhum (LISTAR confirma); com um já existente, use ATUALIZAR/DEFINIR_CUSTO/DEFINIR_PNEU. Nunca inventa um valor não informado pelo usuário.",
+    "Transformar dado de veículo mencionado na conversa (tipo, combustível, consumo, placa, custos, pneu) num registro estruturado reaproveitável pelas outras ferramentas, em vez de se perder a cada conversa nova. Contas comuns têm no máximo 1 veículo — CRIAR só deve ser usado quando a conta ainda não tiver nenhum (LISTAR confirma); com um já existente, use ATUALIZAR/DEFINIR_CUSTO/DEFINIR_PNEU. Empresas do tipo transportadora (gestão de frota) podem ter vários veículos ativos — para essas, CRIAR pode ser chamado de novo mesmo já havendo veículo cadastrado. Nunca inventa um valor não informado pelo usuário.",
   parametros: PARAMETROS,
   executar,
 };

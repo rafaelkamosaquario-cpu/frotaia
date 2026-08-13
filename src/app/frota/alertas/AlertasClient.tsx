@@ -5,12 +5,8 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import type {
-  MaintenanceScheduleRow,
-  VehicleDocumentRow,
-  VehicleDocumentTypeEnum,
-  VehicleRow,
-} from "@/lib/supabase/tables";
+import type { MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
+import { computeFleetAlerts } from "@/services/supabase/fleetAlertsService";
 
 interface AlertasClientProps {
   veiculos: VehicleRow[];
@@ -18,79 +14,15 @@ interface AlertasClientProps {
   documentos: VehicleDocumentRow[];
 }
 
-interface AlertItem {
-  id: string;
-  descricao: string;
-  data: string;
-  vencido: boolean;
-  diasRestantes: number;
-  href: string;
-}
-
-const DOCUMENT_TYPE_LABEL: Record<VehicleDocumentTypeEnum, string> = {
-  tacografo: "Tacógrafo",
-  rntrc: "RNTRC",
-  cnh: "CNH",
-  toxicologico: "Toxicológico",
-};
-
-const LIMITE_DIAS = 30;
-
-function diasAte(iso: string): number {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const alvo = new Date(`${iso}T00:00:00`);
-  return Math.round((alvo.getTime() - hoje.getTime()) / 86_400_000);
-}
-
 function formatDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR");
 }
 
-function descricaoUrgencia(dias: number): string {
-  if (dias < 0) return `vencido há ${Math.abs(dias)} dia(s)`;
-  if (dias === 0) return "vence hoje";
-  return `vence em ${dias} dia(s)`;
-}
-
 export function AlertasClient({ veiculos, manutencoes, documentos }: AlertasClientProps) {
-  const veiculosPorId = useMemo(() => new Map(veiculos.map((v) => [v.id, v])), [veiculos]);
-
-  const itens = useMemo<AlertItem[]>(() => {
-    const deDocumentos: AlertItem[] = documentos
-      .filter((d): d is VehicleDocumentRow & { expiry_date: string } => !!d.expiry_date && diasAte(d.expiry_date) <= LIMITE_DIAS)
-      .map((d) => {
-        const dias = diasAte(d.expiry_date);
-        const veiculo = d.vehicle_id ? veiculosPorId.get(d.vehicle_id) : null;
-        const alvo = veiculo ? veiculo.name || veiculo.plate : "motorista vinculado";
-        return {
-          id: `doc-${d.id}`,
-          descricao: `${DOCUMENT_TYPE_LABEL[d.document_type]} — ${alvo} — ${descricaoUrgencia(dias)}`,
-          data: d.expiry_date,
-          vencido: dias < 0,
-          diasRestantes: dias,
-          href: "/frota/documentos",
-        };
-      });
-
-    const deManutencoes: AlertItem[] = manutencoes
-      .filter((m) => m.status !== "concluido" && diasAte(m.due_date) <= LIMITE_DIAS)
-      .map((m) => {
-        const dias = diasAte(m.due_date);
-        const veiculo = veiculosPorId.get(m.vehicle_id);
-        const alvo = veiculo ? veiculo.name || veiculo.plate : "veículo";
-        return {
-          id: `man-${m.id}`,
-          descricao: `${m.type} — ${alvo} — ${descricaoUrgencia(dias)}`,
-          data: m.due_date,
-          vencido: dias < 0,
-          diasRestantes: dias,
-          href: "/frota/manutencao",
-        };
-      });
-
-    return [...deDocumentos, ...deManutencoes].sort((a, b) => a.diasRestantes - b.diasRestantes);
-  }, [documentos, manutencoes, veiculosPorId]);
+  const itens = useMemo(
+    () => computeFleetAlerts({ veiculos, manutencoes, documentos }),
+    [veiculos, manutencoes, documentos]
+  );
 
   return (
     <div className="flex flex-1 flex-col p-4 sm:p-6">
