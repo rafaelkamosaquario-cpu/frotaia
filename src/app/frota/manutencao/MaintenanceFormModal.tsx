@@ -161,6 +161,7 @@ export function MaintenanceFormModal({ open, onClose, schedule, veiculosAtivos, 
             <option value="pendente">Pendente</option>
             <option value="agendado">Agendado</option>
             <option value="concluido">Concluído</option>
+            <option value="cancelado">Cancelado</option>
           </select>
         </div>
 

@@ -127,7 +127,7 @@ export const driverUpdateSchema = driverCreateSchema.partial();
 
 // ── maintenance schedule ─────────────────────────────────────────────────
 
-export const maintenanceStatusSchema = z.enum(["pendente", "agendado", "concluido"]);
+export const maintenanceStatusSchema = z.enum(["pendente", "agendado", "concluido", "cancelado"]);
 
 export const maintenanceScheduleCreateSchema = z.object({
   vehicleId: uuidSchema,
@@ -337,6 +337,7 @@ export const frotaIaToolNameSchema = z.enum([
   "gerenciar_noticias_setor",
   "gerenciar_assinatura",
   "gerenciar_motorista",
+  "gerenciar_manutencao",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

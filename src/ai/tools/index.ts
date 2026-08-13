@@ -44,6 +44,7 @@ export * from "./gerenciar-rota-salva";
 export * from "./gerenciar-noticias-setor";
 export * from "./gerenciar-assinatura";
 export * from "./gerenciar-motorista";
+export * from "./gerenciar-manutencao";
 
 import { ferramentaAnalisarFrete } from "./analisar-frete";
 import { ferramentaCalcularCombustivel } from "./calcular-combustivel";
@@ -70,6 +71,7 @@ import { ferramentaGerenciarRotaSalva } from "./gerenciar-rota-salva";
 import { ferramentaGerenciarNoticiasSetor } from "./gerenciar-noticias-setor";
 import { ferramentaGerenciarAssinatura } from "./gerenciar-assinatura";
 import { ferramentaGerenciarMotorista } from "./gerenciar-motorista";
+import { ferramentaGerenciarManutencao } from "./gerenciar-manutencao";
 import type { DefinicaoFerramenta, ResultadoFerramentaBase } from "./types";
 
 /**
@@ -108,4 +110,5 @@ export const FERRAMENTAS_FROTA_IA: ReadonlyArray<DefinicaoFerramenta<never, Resu
   ferramentaGerenciarNoticiasSetor,
   ferramentaGerenciarAssinatura,
   ferramentaGerenciarMotorista,
+  ferramentaGerenciarManutencao,
 ];

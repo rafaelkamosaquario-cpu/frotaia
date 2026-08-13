@@ -22,12 +22,14 @@ const STATUS_LABEL: Record<string, string> = {
   pendente: "Pendente",
   agendado: "Agendado",
   concluido: "Concluído",
+  cancelado: "Cancelado",
 };
 
 const STATUS_CLASS: Record<string, string> = {
   pendente: "bg-surface-muted text-muted-foreground",
   agendado: "bg-primary/10 text-primary",
   concluido: "bg-success/10 text-success",
+  cancelado: "bg-danger/10 text-danger",
 };
 
 export function ManutencaoClient({ manutencoesIniciais, veiculos }: ManutencaoClientProps) {

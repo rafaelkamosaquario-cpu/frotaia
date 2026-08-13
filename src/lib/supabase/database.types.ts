@@ -1844,6 +1844,7 @@ export type Database = {
         | "gerenciar_noticias_setor"
         | "gerenciar_assinatura"
         | "gerenciar_motorista"
+        | "gerenciar_manutencao"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -1857,7 +1858,7 @@ export type Database = {
         | "expired"
         | "revoked"
         | "error"
-      maintenance_status: "pendente" | "agendado" | "concluido"
+      maintenance_status: "pendente" | "agendado" | "concluido" | "cancelado"
       message_direction: "inbound" | "outbound" | "internal"
       message_role: "user" | "assistant" | "system" | "tool"
       onboarding_state:
@@ -2098,6 +2099,7 @@ export const Constants = {
         "gerenciar_noticias_setor",
         "gerenciar_assinatura",
         "gerenciar_motorista",
+        "gerenciar_manutencao",
       ],
       fuel_type: [
         "diesel_s10",
@@ -2114,7 +2116,7 @@ export const Constants = {
         "revoked",
         "error",
       ],
-      maintenance_status: ["pendente", "agendado", "concluido"],
+      maintenance_status: ["pendente", "agendado", "concluido", "cancelado"],
       message_direction: ["inbound", "outbound", "internal"],
       message_role: ["user", "assistant", "system", "tool"],
       onboarding_state: [

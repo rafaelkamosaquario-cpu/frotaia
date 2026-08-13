@@ -72,7 +72,7 @@ export function computeFleetAlerts(input: ComputeFleetAlertsInput, limiteDias: n
     });
 
   const deManutencoes: FleetAlertItem[] = input.manutencoes
-    .filter((m) => m.status !== "concluido" && diasAte(m.due_date) <= limiteDias)
+    .filter((m) => m.status !== "concluido" && m.status !== "cancelado" && diasAte(m.due_date) <= limiteDias)
     .map((m) => {
       const dias = diasAte(m.due_date);
       const veiculo = veiculosPorId.get(m.vehicle_id);

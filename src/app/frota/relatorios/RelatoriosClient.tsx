@@ -40,6 +40,7 @@ const MAINTENANCE_STATUS_LABEL: Record<string, string> = {
   pendente: "Pendente",
   agendado: "Agendado",
   concluido: "Concluído",
+  cancelado: "Cancelado",
 };
 
 function contarPor<T>(itens: T[], chave: (item: T) => string): Record<string, number> {
