@@ -7,11 +7,16 @@ import type { SupabaseDbClient } from "./types";
 /**
  * Lógica de "vencendo/atrasado" da frota (documentos + manutenções) —
  * extraída de `AlertasClient.tsx` (onde vivia presa a um componente client)
- * para ser reaproveitada por qualquer consumidor: a tela Alertas do painel,
- * um futuro job de disparo, e uma futura ferramenta de consulta via
- * WhatsApp. Puramente derivado — nenhuma tabela própria ainda (ver plano de
- * unificação V1+V2, Fase 5, pra quando isso passar a alimentar
- * `scheduled_alerts`).
+ * para ser reaproveitada por qualquer consumidor: a tela Alertas do painel
+ * e uma futura ferramenta de consulta via WhatsApp. A tela Alertas continua
+ * derivando ao vivo (`listFleetAlerts`) — sempre correta, sem risco de
+ * ficar desatualizada se algum caminho de escrita esquecer de sincronizar.
+ *
+ * `syncMaintenanceAlert`/`syncDocumentAlert` (Fase 5 do plano de unificação
+ * V1+V2) alimentam `scheduled_alerts` — a fila real que o cron de disparo
+ * (`/api/alerts/dispatch`) lê pra mandar aviso pelo WhatsApp. É a peça que
+ * fecha o caminho painel→WhatsApp: antes, vencimento de manutenção/
+ * documento só aparecia se o cliente abrisse a tela Alertas.
  */
 
 export interface FleetAlertItem {
@@ -105,4 +110,119 @@ export async function listFleetAlerts(
   ]);
 
   return computeFleetAlerts({ veiculos, manutencoes, documentos }, limiteDias);
+}
+
+/**
+ * Horário fixo de disparo (11h em Brasília) — não existe preferência de
+ * horário configurável ainda (fora do pedido desta fase, ver Configurações
+ * numa fase futura). `due_date`/`expiry_date` são só a data (sem hora).
+ */
+function horarioDoDisparo(dataIso: string): string {
+  return `${dataIso}T11:00:00-03:00`;
+}
+
+/**
+ * Mantém `scheduled_alerts` coerente com o estado atual de uma manutenção —
+ * chamada sempre que `gerenciar_manutencao`/`/api/frota/manutencao` cria ou
+ * atualiza uma linha. Nunca cria um 2º alerta pendente pra mesma manutenção
+ * (índice único parcial `scheduled_alerts_maintenance_pending_unique_idx`).
+ */
+export async function syncMaintenanceAlert(
+  client: SupabaseDbClient,
+  companyId: string,
+  userId: string,
+  schedule: MaintenanceScheduleRow
+): Promise<void> {
+  const { data: pendente, error: erroConsulta } = await client
+    .from("scheduled_alerts")
+    .select("id")
+    .eq("maintenance_schedule_id", schedule.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (erroConsulta) throw erroConsulta;
+
+  if (schedule.status === "concluido" || schedule.status === "cancelado") {
+    if (pendente) {
+      const { error } = await client
+        .from("scheduled_alerts")
+        .update({ status: schedule.status === "concluido" ? "resolved" : "cancelled" })
+        .eq("id", pendente.id);
+      if (error) throw error;
+    }
+    return;
+  }
+
+  const titulo = `Manutenção: ${schedule.type}`;
+  const agendadoPara = horarioDoDisparo(schedule.due_date);
+
+  if (pendente) {
+    const { error } = await client.from("scheduled_alerts").update({ title: titulo, scheduled_for: agendadoPara, vehicle_id: schedule.vehicle_id }).eq("id", pendente.id);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await client.from("scheduled_alerts").insert({
+    company_id: companyId,
+    user_id: userId,
+    maintenance_schedule_id: schedule.id,
+    vehicle_id: schedule.vehicle_id,
+    title: titulo,
+    category: "manutencao",
+    scheduled_for: agendadoPara,
+    status: "pending",
+  });
+  if (error) throw error;
+}
+
+/**
+ * Mesmo princípio de `syncMaintenanceAlert`, pra vencimento de documento
+ * (tacógrafo/RNTRC/CNH/toxicológico/seguro/licenciamento). Documento sem
+ * `expiry_date` não tem o que alertar — cancela um pendente existente, se
+ * houver (ex.: cliente apagou a data por engano).
+ */
+export async function syncDocumentAlert(
+  client: SupabaseDbClient,
+  companyId: string,
+  userId: string,
+  documento: VehicleDocumentRow
+): Promise<void> {
+  const { data: pendente, error: erroConsulta } = await client
+    .from("scheduled_alerts")
+    .select("id")
+    .eq("vehicle_document_id", documento.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (erroConsulta) throw erroConsulta;
+
+  if (!documento.expiry_date) {
+    if (pendente) {
+      const { error } = await client.from("scheduled_alerts").update({ status: "cancelled" }).eq("id", pendente.id);
+      if (error) throw error;
+    }
+    return;
+  }
+
+  const titulo = `${DOCUMENT_TYPE_LABEL[documento.document_type]} vencendo`;
+  const agendadoPara = horarioDoDisparo(documento.expiry_date);
+
+  if (pendente) {
+    const { error } = await client
+      .from("scheduled_alerts")
+      .update({ title: titulo, scheduled_for: agendadoPara, vehicle_id: documento.vehicle_id })
+      .eq("id", pendente.id);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await client.from("scheduled_alerts").insert({
+    company_id: companyId,
+    user_id: userId,
+    vehicle_document_id: documento.id,
+    vehicle_id: documento.vehicle_id,
+    title: titulo,
+    category: "documento",
+    scheduled_for: agendadoPara,
+    status: "pending",
+  });
+  if (error) throw error;
 }

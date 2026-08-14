@@ -5,6 +5,7 @@ import { replaceCostProfile } from "@/services/supabase/vehicleCostProfileServic
 import { createTireProfile } from "@/services/supabase/vehicleTireProfileService";
 import { getCompany } from "@/services/supabase/companyService";
 import { listVehicleDocumentsForPanel, upsertVehicleDocumentByType } from "@/services/supabase/vehicleDocumentService";
+import { syncDocumentAlert } from "@/services/supabase/fleetAlertsService";
 import type {
   VehicleRow,
   VehicleTypeEnum,
@@ -238,12 +239,19 @@ function respostaFalha(modo: ModoGerenciarVeiculo, alertas: string[], dadosFalta
 async function sincronizarESeguroLicenciamento(
   admin: ReturnType<typeof createAdminClient>,
   companyId: string,
+  userId: string,
   vehicleId: string,
   vencimentoSeguro: string | undefined,
   vencimentoLicenciamento: string | undefined
 ): Promise<VencimentosVeiculo> {
-  if (vencimentoSeguro) await upsertVehicleDocumentByType(admin, companyId, vehicleId, "seguro", vencimentoSeguro);
-  if (vencimentoLicenciamento) await upsertVehicleDocumentByType(admin, companyId, vehicleId, "licenciamento", vencimentoLicenciamento);
+  if (vencimentoSeguro) {
+    const doc = await upsertVehicleDocumentByType(admin, companyId, vehicleId, "seguro", vencimentoSeguro);
+    await syncDocumentAlert(admin, companyId, userId, doc);
+  }
+  if (vencimentoLicenciamento) {
+    const doc = await upsertVehicleDocumentByType(admin, companyId, vehicleId, "licenciamento", vencimentoLicenciamento);
+    await syncDocumentAlert(admin, companyId, userId, doc);
+  }
 
   const documentos = await listVehicleDocumentsForPanel(admin, companyId);
   return agruparVencimentosPorVeiculo(documentos).get(vehicleId) ?? { seguro: null, licenciamento: null };
@@ -290,7 +298,7 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         notes: entrada.observacoes,
       });
 
-      const vencimentos = await sincronizarESeguroLicenciamento(admin, companyId, criado.id, entrada.vencimentoSeguro, entrada.vencimentoLicenciamento);
+      const vencimentos = await sincronizarESeguroLicenciamento(admin, companyId, userId, criado.id, entrada.vencimentoSeguro, entrada.vencimentoLicenciamento);
 
       return {
         sucesso: true,
@@ -345,7 +353,7 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         notes: entrada.observacoes,
       });
 
-      const vencimentos = await sincronizarESeguroLicenciamento(admin, companyId, atualizado.id, entrada.vencimentoSeguro, entrada.vencimentoLicenciamento);
+      const vencimentos = await sincronizarESeguroLicenciamento(admin, companyId, userId, atualizado.id, entrada.vencimentoSeguro, entrada.vencimentoLicenciamento);
 
       return {
         sucesso: true,

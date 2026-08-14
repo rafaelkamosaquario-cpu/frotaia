@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { updateVehicleDocument } from "@/services/supabase/vehicleDocumentService";
+import { syncDocumentAlert } from "@/services/supabase/fleetAlertsService";
 
 function statusForAccessReason(reason: "unauthenticated" | "no_company" | "not_entitled") {
   return reason === "unauthenticated" ? 401 : 403;
@@ -20,6 +22,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   try {
     const documento = await updateVehicleDocument(supabase, id, access.company.id, body);
+    await syncDocumentAlert(createAdminClient(), access.company.id, access.userId, documento);
     return NextResponse.json({ documento });
   } catch (error) {
     if (error instanceof z.ZodError) {

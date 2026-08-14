@@ -2,6 +2,7 @@ import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerram
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listMaintenanceSchedulesForPanel, createMaintenanceSchedule, updateMaintenanceSchedule } from "@/services/supabase/maintenanceScheduleService";
 import { getVehicle } from "@/services/supabase/vehicleService";
+import { syncMaintenanceAlert } from "@/services/supabase/fleetAlertsService";
 import type { MaintenanceScheduleRow, MaintenanceStatusEnum } from "@/lib/supabase/tables";
 
 /**
@@ -104,6 +105,8 @@ async function executar(entrada: GerenciarManutencaoEntrada): Promise<GerenciarM
         notes: entrada.observacoes,
       });
 
+      await syncMaintenanceAlert(admin, companyId, userId, criada);
+
       return {
         sucesso: true,
         modo,
@@ -149,6 +152,8 @@ async function executar(entrada: GerenciarManutencaoEntrada): Promise<GerenciarM
         notes: entrada.observacoes,
       });
 
+      await syncMaintenanceAlert(admin, companyId, userId, atualizada);
+
       return {
         sucesso: true,
         modo,
@@ -162,6 +167,8 @@ async function executar(entrada: GerenciarManutencaoEntrada): Promise<GerenciarM
 
     const novoStatus: MaintenanceStatusEnum = modo === "CONCLUIR" ? "concluido" : "cancelado";
     const finalizada = await updateMaintenanceSchedule(admin, entrada.scheduleId, companyId, { status: novoStatus });
+
+    await syncMaintenanceAlert(admin, companyId, userId, finalizada);
 
     return {
       sucesso: true,

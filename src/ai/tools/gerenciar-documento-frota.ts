@@ -2,6 +2,7 @@ import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerram
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listVehicleDocumentsForPanel, createVehicleDocument, updateVehicleDocument } from "@/services/supabase/vehicleDocumentService";
 import { getVehicle } from "@/services/supabase/vehicleService";
+import { syncDocumentAlert } from "@/services/supabase/fleetAlertsService";
 import type { VehicleDocumentRow, VehicleDocumentTypeEnum } from "@/lib/supabase/tables";
 
 /**
@@ -110,6 +111,8 @@ async function executar(entrada: GerenciarDocumentoFrotaEntrada): Promise<Gerenc
         notes: entrada.observacoes,
       });
 
+      await syncDocumentAlert(admin, companyId, userId, criado);
+
       return {
         sucesso: true,
         modo,
@@ -153,6 +156,8 @@ async function executar(entrada: GerenciarDocumentoFrotaEntrada): Promise<Gerenc
       expiryDate: entrada.dataVencimento,
       notes: entrada.observacoes,
     });
+
+    await syncDocumentAlert(admin, companyId, userId, atualizado);
 
     return {
       sucesso: true,

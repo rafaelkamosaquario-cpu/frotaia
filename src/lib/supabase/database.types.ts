@@ -1156,6 +1156,7 @@ export type Database = {
           created_at: string
           error_message_safe: string | null
           id: string
+          maintenance_schedule_id: string | null
           notes: string | null
           scheduled_for: string
           sent_at: string | null
@@ -1163,6 +1164,7 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          vehicle_document_id: string | null
           vehicle_id: string | null
         }
         Insert: {
@@ -1172,6 +1174,7 @@ export type Database = {
           created_at?: string
           error_message_safe?: string | null
           id?: string
+          maintenance_schedule_id?: string | null
           notes?: string | null
           scheduled_for: string
           sent_at?: string | null
@@ -1179,6 +1182,7 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          vehicle_document_id?: string | null
           vehicle_id?: string | null
         }
         Update: {
@@ -1188,6 +1192,7 @@ export type Database = {
           created_at?: string
           error_message_safe?: string | null
           id?: string
+          maintenance_schedule_id?: string | null
           notes?: string | null
           scheduled_for?: string
           sent_at?: string | null
@@ -1195,6 +1200,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          vehicle_document_id?: string | null
           vehicle_id?: string | null
         }
         Relationships: [
@@ -1210,6 +1216,20 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_alerts_maintenance_schedule_id_fkey"
+            columns: ["maintenance_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_alerts_vehicle_document_id_fkey"
+            columns: ["vehicle_document_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_documents"
             referencedColumns: ["id"]
           },
           {
@@ -1877,7 +1897,12 @@ export type Database = {
         | "awaiting_intent"
       route_data_source: "manual" | "google_routes" | "outro"
       run_status: "started" | "completed" | "failed" | "cancelled"
-      scheduled_alert_status: "pending" | "sent" | "cancelled" | "failed"
+      scheduled_alert_status:
+        | "pending"
+        | "sent"
+        | "cancelled"
+        | "failed"
+        | "resolved"
       subscription_plan:
         | "TRIAL"
         | "MENSAL"
@@ -2143,7 +2168,13 @@ export const Constants = {
       ],
       route_data_source: ["manual", "google_routes", "outro"],
       run_status: ["started", "completed", "failed", "cancelled"],
-      scheduled_alert_status: ["pending", "sent", "cancelled", "failed"],
+      scheduled_alert_status: [
+        "pending",
+        "sent",
+        "cancelled",
+        "failed",
+        "resolved",
+      ],
       subscription_plan: [
         "TRIAL",
         "MENSAL",

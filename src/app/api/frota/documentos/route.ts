@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { createVehicleDocument, listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
+import { syncDocumentAlert } from "@/services/supabase/fleetAlertsService";
 
 function statusForAccessReason(reason: "unauthenticated" | "no_company" | "not_entitled") {
   return reason === "unauthenticated" ? 401 : 403;
@@ -30,6 +32,8 @@ export async function POST(request: Request) {
 
   try {
     const documento = await createVehicleDocument(supabase, access.company.id, body);
+    // scheduled_alerts não tem RLS de escrita pra sessão de navegador (só client admin) — mesmo padrão de segurança já usado em toda a tabela.
+    await syncDocumentAlert(createAdminClient(), access.company.id, access.userId, documento);
     return NextResponse.json({ documento }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
