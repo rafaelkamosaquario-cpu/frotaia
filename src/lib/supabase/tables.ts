@@ -115,6 +115,8 @@ export type SavedJourneyRow = PublicTables["saved_journeys"]["Row"];
 export type SavedJourneyInsert = PublicTables["saved_journeys"]["Insert"];
 export type SavedJourneyUpdate = PublicTables["saved_journeys"]["Update"];
 
+export type NewsDigestRow = PublicTables["news_digests"]["Row"];
+
 export type CompanyMemberRole = PublicEnums["company_member_role"];
 export type OnboardingState = PublicEnums["onboarding_state"];
 export type ScheduledAlertStatus = PublicEnums["scheduled_alert_status"];

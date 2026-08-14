@@ -942,6 +942,24 @@ export type Database = {
           },
         ]
       }
+      news_digests: {
+        Row: {
+          content: string
+          generated_at: string
+          id: string
+        }
+        Insert: {
+          content: string
+          generated_at?: string
+          id?: string
+        }
+        Update: {
+          content?: string
+          generated_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       onboarding_sessions: {
         Row: {
           channel: Database["public"]["Enums"]["channel_type"]

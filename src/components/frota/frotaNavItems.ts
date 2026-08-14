@@ -9,6 +9,7 @@ import {
   HandCoins,
   LayoutDashboard,
   MapPin,
+  Newspaper,
   Settings,
   Truck,
   Users,
@@ -39,5 +40,6 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/checklists", label: "Checklists", icon: ClipboardList, disponivel: true },
   { href: "/frota/alertas", label: "Alertas", icon: AlertTriangle, disponivel: true },
   { href: "/frota/relatorios", label: "Relatórios", icon: BarChart3, disponivel: true },
+  { href: "/frota/noticias", label: "Notícias", icon: Newspaper, disponivel: true },
   { href: "/frota/configuracoes", label: "Configurações", icon: Settings, disponivel: false },
 ];

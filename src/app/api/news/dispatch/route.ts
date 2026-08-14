@@ -6,6 +6,7 @@ import { isWhatsappConfigured } from "@/lib/whatsapp/config";
 import { listCompaniesDueForNewsDigest, markNewsDigestSent } from "@/services/supabase/companyPreferencesService";
 import { listChannelsForCompany } from "@/services/supabase/channelIdentityService";
 import { gerarResumoNoticias } from "@/services/news/newsDigestService";
+import { saveNewsDigest } from "@/services/supabase/newsDigestArchiveService";
 
 /**
  * Job de disparo do resumo diário de notícias do setor (opt-in — ver
@@ -56,6 +57,9 @@ export async function GET(request: Request) {
   if (!resumo) {
     return NextResponse.json({ error: "Não foi possível gerar o resumo de notícias agora." }, { status: 502 });
   }
+
+  // Fase 11 do plano de unificação V1+V2: persiste pro painel poder mostrar "notícias de hoje" sem precisar gerar de novo. Best-effort — falha aqui não deve impedir o envio real pelo WhatsApp.
+  await saveNewsDigest(admin, resumo).catch((erro) => console.error("[news-dispatch] falha ao persistir o resumo:", erro));
 
   let enviados = 0;
   let falhas = 0;
