@@ -73,18 +73,27 @@ export async function failAnalysisRun(
   return data;
 }
 
-export async function listAnalysisRuns(
-  client: SupabaseDbClient,
-  companyId: string,
-  limit = 20
-): Promise<AnalysisRunRow[]> {
-  const { data, error } = await client
+export interface ListAnalysisRunsFilter {
+  companyId: string;
+  /** Sem filtro = todos os tipos. Usado pela tela Fretes/Análises do painel pra restringir a analisar_frete. */
+  analysisTypes?: string[];
+  limit?: number;
+}
+
+export async function listAnalysisRuns(client: SupabaseDbClient, filter: ListAnalysisRunsFilter): Promise<AnalysisRunRow[]> {
+  let query = client
     .from("analysis_runs")
     .select("*")
-    .eq("company_id", companyId)
+    .eq("company_id", filter.companyId)
+    .eq("status", "completed")
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(filter.limit ?? 20);
 
+  if (filter.analysisTypes && filter.analysisTypes.length > 0) {
+    query = query.in("analysis_type", filter.analysisTypes);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
 }
