@@ -1,4 +1,5 @@
 import { loadCustomerContext } from "@/ai/context/customerContext";
+import { getSubscription, isFleetPanelAccessAllowed } from "./subscriptionService";
 import type { CompanyMemberRole, CompanyRow } from "@/lib/supabase/tables";
 import type { SupabaseDbClient } from "./types";
 
@@ -12,6 +13,14 @@ export type FleetPanelAccessResult =
  * com is_company_member). Usado tanto pelo layout de src/app/frota quanto
  * pelas rotas de src/app/api/frota — árvores separadas no App Router, cada
  * uma precisa checar por conta própria.
+ *
+ * Fase 15 do plano de unificação V1+V2: entitlement passa a considerar as
+ * DUAS fontes (OR) — `companies.fleet_panel_enabled` (boolean legado,
+ * setado manualmente antes desta fase) e `subscriptions.fleet_panel_included`
+ * (novo, dentro do fluxo de assinatura). Nenhuma empresa já liberada
+ * manualmente perde acesso; a fonte nova é aditiva, não substitui a
+ * antiga ainda — dropar `fleet_panel_enabled` fica pra quando todo mundo
+ * já tiver migrado pra assinatura real.
  */
 export async function loadFleetPanelAccess(client: SupabaseDbClient): Promise<FleetPanelAccessResult> {
   const { data } = await client.auth.getUser();
@@ -19,7 +28,10 @@ export async function loadFleetPanelAccess(client: SupabaseDbClient): Promise<Fl
 
   const context = await loadCustomerContext(client, data.user.id);
   if (!context.company) return { ok: false, reason: "no_company" };
-  if (!context.company.fleet_panel_enabled) return { ok: false, reason: "not_entitled" };
+
+  const subscription = await getSubscription(client, context.company.id);
+  const entitled = context.company.fleet_panel_enabled || isFleetPanelAccessAllowed(subscription);
+  if (!entitled) return { ok: false, reason: "not_entitled" };
 
   return { ok: true, userId: data.user.id, company: context.company, role: context.role! };
 }

@@ -27,6 +27,21 @@ export function isAccessAllowed(subscription: SubscriptionRow | null): boolean {
   return new Date(subscription.valido_ate).getTime() > Date.now();
 }
 
+/**
+ * Espelha isAccessAllowed, mas também exige fleet_panel_included=true —
+ * plano de unificação V1+V2, Fase 15. Entitlement do painel V2 é uma
+ * dimensão própria (o que o plano inclui), ortogonal a `plan` (cadência de
+ * cobrança): uma assinatura ATIVA/dentro do prazo sem fleet_panel_included
+ * não libera o painel. Preço/plano da V2 continuam não definidos — este
+ * campo é setado manualmente até existir checkout real.
+ */
+export function isFleetPanelAccessAllowed(subscription: SubscriptionRow | null): boolean {
+  if (!subscription || !subscription.fleet_panel_included) return false;
+  if (subscription.status === "CANCELADA" || subscription.status === "EXPIRADA" || subscription.status === "INADIMPLENTE") return false;
+  if (!subscription.valido_ate) return subscription.status === "ATIVA";
+  return new Date(subscription.valido_ate).getTime() > Date.now();
+}
+
 export interface CriarTesteGratisResultado {
   subscription: SubscriptionRow;
   testeJaUsadoNesteNumero: boolean;

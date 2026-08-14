@@ -1365,6 +1365,7 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          fleet_panel_included: boolean
           id: string
           iniciado_em: string | null
           mercadopago_payment_id: string | null
@@ -1381,6 +1382,7 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          fleet_panel_included?: boolean
           id?: string
           iniciado_em?: string | null
           mercadopago_payment_id?: string | null
@@ -1397,6 +1399,7 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          fleet_panel_included?: boolean
           id?: string
           iniciado_em?: string | null
           mercadopago_payment_id?: string | null
