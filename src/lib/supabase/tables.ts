@@ -111,6 +111,10 @@ export type ChecklistDispatchRow = PublicTables["checklist_dispatches"]["Row"];
 export type ChecklistDispatchInsert = PublicTables["checklist_dispatches"]["Insert"];
 export type ChecklistDispatchUpdate = PublicTables["checklist_dispatches"]["Update"];
 
+export type SavedJourneyRow = PublicTables["saved_journeys"]["Row"];
+export type SavedJourneyInsert = PublicTables["saved_journeys"]["Insert"];
+export type SavedJourneyUpdate = PublicTables["saved_journeys"]["Update"];
+
 export type CompanyMemberRole = PublicEnums["company_member_role"];
 export type OnboardingState = PublicEnums["onboarding_state"];
 export type ScheduledAlertStatus = PublicEnums["scheduled_alert_status"];
@@ -127,3 +131,4 @@ export type SubscriptionStatusEnum = PublicEnums["subscription_status"];
 export type VehicleDocumentTypeEnum = PublicEnums["vehicle_document_type"];
 export type MaintenanceStatusEnum = PublicEnums["maintenance_status"];
 export type ChecklistResponseStatusEnum = PublicEnums["checklist_response_status"];
+export type JourneyStatusEnum = PublicEnums["journey_status"];

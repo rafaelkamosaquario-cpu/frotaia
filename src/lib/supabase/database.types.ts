@@ -1052,6 +1052,108 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_journeys: {
+        Row: {
+          actual_arrival: string | null
+          actual_departure: string | null
+          analysis_run_id: string | null
+          company_id: string
+          conversation_id: string | null
+          created_at: string
+          created_by_user_id: string | null
+          destination: string | null
+          driver_id: string | null
+          duration_minutes: number | null
+          id: string
+          notes: string | null
+          origin: string | null
+          result_data: Json
+          scheduled_arrival: string | null
+          scheduled_departure: string | null
+          status: Database["public"]["Enums"]["journey_status"]
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          actual_arrival?: string | null
+          actual_departure?: string | null
+          analysis_run_id?: string | null
+          company_id: string
+          conversation_id?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          destination?: string | null
+          driver_id?: string | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          origin?: string | null
+          result_data?: Json
+          scheduled_arrival?: string | null
+          scheduled_departure?: string | null
+          status?: Database["public"]["Enums"]["journey_status"]
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          actual_arrival?: string | null
+          actual_departure?: string | null
+          analysis_run_id?: string | null
+          company_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          destination?: string | null
+          driver_id?: string | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          origin?: string | null
+          result_data?: Json
+          scheduled_arrival?: string | null
+          scheduled_departure?: string | null
+          status?: Database["public"]["Enums"]["journey_status"]
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_journeys_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_journeys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_journeys_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_journeys_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_journeys_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_routes: {
         Row: {
           active: boolean
@@ -1866,6 +1968,7 @@ export type Database = {
         | "gerenciar_motorista"
         | "gerenciar_manutencao"
         | "gerenciar_documento_frota"
+        | "gerenciar_jornada_salva"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -1879,6 +1982,7 @@ export type Database = {
         | "expired"
         | "revoked"
         | "error"
+      journey_status: "planejada" | "em_andamento" | "concluida" | "cancelada"
       maintenance_status: "pendente" | "agendado" | "concluido" | "cancelado"
       message_direction: "inbound" | "outbound" | "internal"
       message_role: "user" | "assistant" | "system" | "tool"
@@ -2133,6 +2237,7 @@ export const Constants = {
         "gerenciar_motorista",
         "gerenciar_manutencao",
         "gerenciar_documento_frota",
+        "gerenciar_jornada_salva",
       ],
       fuel_type: [
         "diesel_s10",
@@ -2149,6 +2254,7 @@ export const Constants = {
         "revoked",
         "error",
       ],
+      journey_status: ["planejada", "em_andamento", "concluida", "cancelada"],
       maintenance_status: ["pendente", "agendado", "concluido", "cancelado"],
       message_direction: ["inbound", "outbound", "internal"],
       message_role: ["user", "assistant", "system", "tool"],
