@@ -45,7 +45,7 @@ export function ChecklistsClient({ dispatches, motoristas, veiculos }: Checklist
           <EmptyState
             icon={ClipboardList}
             title="Nenhum checklist enviado ainda"
-            description="O envio automático de checklist diário via WhatsApp ainda não foi implementado — essa tela vai mostrar o histórico assim que existir."
+            description="O envio automático roda 1x por dia para motoristas com veículo e telefone cadastrados. Assim que o primeiro checklist for enviado e respondido, o histórico aparece aqui."
           />
         </Card>
       ) : (

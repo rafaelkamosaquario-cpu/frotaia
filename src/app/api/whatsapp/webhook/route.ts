@@ -21,6 +21,7 @@ import { gerarRespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
 import { getSubscription, isAccessAllowed } from "@/services/supabase/subscriptionService";
 import { AnthropicConfigError } from "@/lib/anthropic/client";
 import { isUniqueViolation } from "@/lib/supabase/errors";
+import { findPendingChecklistDispatchByPhone, recordChecklistResponse } from "@/services/supabase/checklistDispatchService";
 import type { MessageInsert } from "@/lib/supabase/tables";
 
 /**
@@ -216,6 +217,24 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+
+  // Resposta de checklist (Fase 6 do plano de unificação V1+V2) —
+  // interceptado ANTES de resolveOrCreateUserByPhone, porque motorista NÃO
+  // é conta de usuário: se deixasse cair no fluxo normal, o número do
+  // motorista entraria no onboarding como se fosse um cliente novo.
+  if (textoDireto) {
+    const pendente = await findPendingChecklistDispatchByPhone(admin, phoneE164);
+    if (pendente) {
+      const atualizado = await recordChecklistResponse(admin, pendente.dispatch.id, textoDireto);
+      const resposta =
+        atualizado.response_status === "ok"
+          ? "✅ Checklist registrado, tudo certo. Boa viagem!"
+          : "⚠️ Checklist registrado. Reportei o problema — a gestão vai avaliar. Se for algo grave, não saia com o veículo antes de confirmar com a empresa.";
+      await sendWhatsappText(phoneE164, resposta).catch(() => {});
+      return NextResponse.json({ ok: true });
+    }
+  }
+
   const { userId, channelId, isNew } = await resolveOrCreateUserByPhone(admin, body.phone, body.senderName);
 
   if (isNew) {
