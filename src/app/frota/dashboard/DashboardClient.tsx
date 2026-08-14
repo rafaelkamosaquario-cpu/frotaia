@@ -1,15 +1,21 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, Clock, Truck, Users, Wrench } from "lucide-react";
+import { AlertTriangle, Clock, Truck, Users, Wrench, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import type { DriverRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
+import type { DriverRow, ExpenseRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
 
 interface DashboardClientProps {
   veiculos: VehicleRow[];
   motoristas: DriverRow[];
   manutencoes: MaintenanceScheduleRow[];
   documentos: VehicleDocumentRow[];
+  /** Já vem filtrado aos últimos 30 dias — ver DashboardPage. */
+  despesasRecentes: ExpenseRow[];
+}
+
+function formatBRL(valor: number) {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 
 function diasAte(iso: string): number {
@@ -19,7 +25,7 @@ function diasAte(iso: string): number {
   return Math.round((alvo.getTime() - hoje.getTime()) / 86_400_000);
 }
 
-export function DashboardClient({ veiculos, motoristas, manutencoes, documentos }: DashboardClientProps) {
+export function DashboardClient({ veiculos, motoristas, manutencoes, documentos, despesasRecentes }: DashboardClientProps) {
   const hojeIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const kpis = useMemo(() => {
@@ -30,6 +36,8 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos 
     const documentosVencendo = documentos.filter(
       (d) => d.expiry_date && d.expiry_date >= hojeIso && diasAte(d.expiry_date) <= 30
     ).length;
+    // Só aparece quando há dado real registrado — nunca número artificial pra preencher layout (ver plano de unificação V1+V2, item Dashboard).
+    const custo30Dias = despesasRecentes.length > 0 ? despesasRecentes.reduce((soma, d) => soma + d.amount, 0) : null;
 
     return [
       { label: "Veículos ativos", value: veiculosAtivos, icon: Truck },
@@ -37,8 +45,9 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos 
       { label: "Manutenções pendentes", value: manutencoesPendentes, icon: Wrench },
       { label: "Documentos vencidos", value: documentosVencidos, icon: AlertTriangle },
       { label: "Vencendo em 30 dias", value: documentosVencendo, icon: Clock },
+      { label: "Custo nos últimos 30 dias", value: custo30Dias === null ? "—" : formatBRL(custo30Dias), icon: WalletCards },
     ];
-  }, [veiculos, motoristas, manutencoes, documentos, hojeIso]);
+  }, [veiculos, motoristas, manutencoes, documentos, despesasRecentes, hojeIso]);
 
   return (
     <div className="flex flex-1 flex-col p-4 sm:p-6">
@@ -47,7 +56,7 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos 
         <p className="text-sm text-muted-foreground">Visão geral da frota</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {kpis.map(({ label, value, icon: Icon }) => (
           <Card key={label} className="flex flex-col gap-3 p-5">
             <div className="flex size-9 items-center justify-center rounded-full bg-surface-muted">

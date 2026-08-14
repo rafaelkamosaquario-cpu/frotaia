@@ -63,3 +63,38 @@ export async function listExpenses(client: SupabaseDbClient, filter: ListExpense
   if (error) throw error;
   return data ?? [];
 }
+
+export interface UpdateExpenseInput {
+  vehicleId?: string | null;
+  expenseType?: ExpenseTypeEnum;
+  amount?: number;
+  expenseDate?: string;
+  vendor?: string;
+  description?: string;
+}
+
+/** companyId é filtro obrigatório (não só id) — mesmo princípio de updateMaintenanceSchedule/updateDriver. */
+export async function updateExpense(client: SupabaseDbClient, expenseId: string, companyId: string, input: UpdateExpenseInput): Promise<ExpenseRow> {
+  const { data, error } = await client
+    .from("expenses")
+    .update({
+      vehicle_id: input.vehicleId,
+      expense_type: input.expenseType,
+      amount: input.amount,
+      expense_date: input.expenseDate,
+      vendor: input.vendor,
+      description: input.description,
+    })
+    .eq("id", expenseId)
+    .eq("company_id", companyId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteExpense(client: SupabaseDbClient, expenseId: string, companyId: string): Promise<void> {
+  const { error } = await client.from("expenses").delete().eq("id", expenseId).eq("company_id", companyId);
+  if (error) throw error;
+}

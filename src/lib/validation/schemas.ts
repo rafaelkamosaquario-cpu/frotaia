@@ -125,6 +125,33 @@ export const driverCreateSchema = z.object({
 
 export const driverUpdateSchema = driverCreateSchema.partial();
 
+// ── expense ──────────────────────────────────────────────────────────────
+
+export const expenseTypeSchema = z.enum([
+  "combustivel",
+  "manutencao",
+  "pedagio",
+  "alimentacao",
+  "hospedagem",
+  "documentacao",
+  "pneu",
+  "seguro",
+  "multa",
+  "outro",
+]);
+
+const expenseFields = z.object({
+  vehicleId: uuidSchema.nullable().optional(),
+  expenseType: expenseTypeSchema,
+  amount: monetarySchema,
+  expenseDate: z.string().date(),
+  vendor: maxText(120, "Fornecedor").optional(),
+  description: maxText(2000, "Descrição").optional(),
+});
+
+export const expenseCreateSchema = expenseFields;
+export const expenseUpdateSchema = expenseFields.partial();
+
 // ── maintenance schedule ─────────────────────────────────────────────────
 
 export const maintenanceStatusSchema = z.enum(["pendente", "agendado", "concluido", "cancelado"]);
