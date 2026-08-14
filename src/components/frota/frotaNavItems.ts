@@ -21,7 +21,7 @@ export interface FrotaNavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  /** Só "Veículos" está implementada nesta fase — as demais levam a um placeholder "em breve". */
+  /** Todas as seções já têm escopo real implementado (ver plano de unificação V1+V2) — mantido pra suportar um placeholder futuro, se alguma seção nova entrar antes de ficar pronta. */
   disponivel: boolean;
 }
 
@@ -41,5 +41,5 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/alertas", label: "Alertas", icon: AlertTriangle, disponivel: true },
   { href: "/frota/relatorios", label: "Relatórios", icon: BarChart3, disponivel: true },
   { href: "/frota/noticias", label: "Notícias", icon: Newspaper, disponivel: true },
-  { href: "/frota/configuracoes", label: "Configurações", icon: Settings, disponivel: false },
+  { href: "/frota/configuracoes", label: "Configurações", icon: Settings, disponivel: true },
 ];
