@@ -3,8 +3,13 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import type {
+  AnalysisRunRow,
+  ChecklistDispatchRow,
   DriverRow,
+  ExpenseRow,
+  ExpenseTypeEnum,
   MaintenanceScheduleRow,
+  SavedJourneyRow,
   VehicleDocumentRow,
   VehicleRow,
 } from "@/lib/supabase/tables";
@@ -14,6 +19,42 @@ interface RelatoriosClientProps {
   motoristas: DriverRow[];
   manutencoes: MaintenanceScheduleRow[];
   documentos: VehicleDocumentRow[];
+  /** Já vem filtrado aos últimos 30 dias — ver RelatoriosPage. */
+  despesas: ExpenseRow[];
+  jornadas: SavedJourneyRow[];
+  checklistDispatches: ChecklistDispatchRow[];
+  /** Já vem filtrado a analysis_type='analisar_frete' — ver RelatoriosPage. */
+  analisesFrete: AnalysisRunRow[];
+}
+
+const EXPENSE_TYPE_LABEL: Record<ExpenseTypeEnum, string> = {
+  combustivel: "Combustível",
+  manutencao: "Manutenção",
+  pedagio: "Pedágio",
+  alimentacao: "Alimentação",
+  hospedagem: "Hospedagem",
+  documentacao: "Documentação",
+  pneu: "Pneu",
+  seguro: "Seguro",
+  multa: "Multa",
+  outro: "Outro",
+};
+
+const JOURNEY_STATUS_LABEL: Record<string, string> = {
+  planejada: "Planejada",
+  em_andamento: "Em andamento",
+  concluida: "Concluída",
+  cancelada: "Cancelada",
+};
+
+const CHECKLIST_STATUS_LABEL: Record<string, string> = {
+  pendente: "Pendente",
+  ok: "OK",
+  atencao: "Atenção",
+};
+
+function formatBRL(valor: number): string {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 const VEHICLE_TYPE_LABEL: Record<string, string> = {
@@ -56,9 +97,10 @@ function contarPor<T>(itens: T[], chave: (item: T) => string): Record<string, nu
 interface ResumoBlocoProps {
   titulo: string;
   linhas: { label: string; valor: number }[];
+  formatarValor?: (valor: number) => string;
 }
 
-function ResumoBloco({ titulo, linhas }: ResumoBlocoProps) {
+function ResumoBloco({ titulo, linhas, formatarValor }: ResumoBlocoProps) {
   return (
     <Card className="p-5">
       <h2 className="mb-3 text-sm font-semibold text-foreground">{titulo}</h2>
@@ -66,7 +108,7 @@ function ResumoBloco({ titulo, linhas }: ResumoBlocoProps) {
         {linhas.map(({ label, valor }) => (
           <div key={label} className="flex items-center justify-between text-sm">
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="font-medium text-foreground">{valor}</dd>
+            <dd className="font-medium text-foreground">{formatarValor ? formatarValor(valor) : valor}</dd>
           </div>
         ))}
       </dl>
@@ -74,7 +116,16 @@ function ResumoBloco({ titulo, linhas }: ResumoBlocoProps) {
   );
 }
 
-export function RelatoriosClient({ veiculos, motoristas, manutencoes, documentos }: RelatoriosClientProps) {
+export function RelatoriosClient({
+  veiculos,
+  motoristas,
+  manutencoes,
+  documentos,
+  despesas,
+  jornadas,
+  checklistDispatches,
+  analisesFrete,
+}: RelatoriosClientProps) {
   const veiculosPorTipo = useMemo(() => {
     const contagem = contarPor(veiculos, (v) => v.vehicle_type ?? "nao_informado");
     return Object.entries(contagem).map(([tipo, valor]) => ({
@@ -101,6 +152,26 @@ export function RelatoriosClient({ veiculos, motoristas, manutencoes, documentos
     return Object.entries(MAINTENANCE_STATUS_LABEL).map(([status, label]) => ({ label, valor: contagem[status] ?? 0 }));
   }, [manutencoes]);
 
+  const custoPorTipoDespesa = useMemo(() => {
+    const somaPorTipo = despesas.reduce<Record<string, number>>((acc, d) => {
+      acc[d.expense_type] = (acc[d.expense_type] ?? 0) + d.amount;
+      return acc;
+    }, {});
+    return Object.entries(somaPorTipo)
+      .map(([tipo, valor]) => ({ label: EXPENSE_TYPE_LABEL[tipo as ExpenseTypeEnum] ?? tipo, valor }))
+      .sort((a, b) => b.valor - a.valor);
+  }, [despesas]);
+
+  const jornadasPorStatus = useMemo(() => {
+    const contagem = contarPor(jornadas, (j) => j.status);
+    return Object.entries(JOURNEY_STATUS_LABEL).map(([status, label]) => ({ label, valor: contagem[status] ?? 0 }));
+  }, [jornadas]);
+
+  const checklistsPorStatus = useMemo(() => {
+    const contagem = contarPor(checklistDispatches, (c) => c.response_status);
+    return Object.entries(CHECKLIST_STATUS_LABEL).map(([status, label]) => ({ label, valor: contagem[status] ?? 0 }));
+  }, [checklistDispatches]);
+
   return (
     <div className="flex flex-1 flex-col p-4 sm:p-6">
       <div className="mb-5">
@@ -113,6 +184,10 @@ export function RelatoriosClient({ veiculos, motoristas, manutencoes, documentos
         <ResumoBloco titulo="Motoristas por status" linhas={motoristasPorStatus} />
         <ResumoBloco titulo="Documentos por tipo" linhas={documentosPorTipo} />
         <ResumoBloco titulo="Manutenções por status" linhas={manutencoesPorStatus} />
+        {custoPorTipoDespesa.length > 0 && <ResumoBloco titulo="Despesas por tipo (últimos 30 dias)" linhas={custoPorTipoDespesa} formatarValor={formatBRL} />}
+        {jornadas.length > 0 && <ResumoBloco titulo="Jornadas por status" linhas={jornadasPorStatus} />}
+        {checklistDispatches.length > 0 && <ResumoBloco titulo="Checklists por status" linhas={checklistsPorStatus} />}
+        {analisesFrete.length > 0 && <ResumoBloco titulo="Fretes analisados (últimos 30 dias)" linhas={[{ label: "Total de análises", valor: analisesFrete.length }]} />}
       </div>
     </div>
   );

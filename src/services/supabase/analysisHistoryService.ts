@@ -77,6 +77,8 @@ export interface ListAnalysisRunsFilter {
   companyId: string;
   /** Sem filtro = todos os tipos. Usado pela tela Fretes/Análises do painel pra restringir a analisar_frete. */
   analysisTypes?: string[];
+  /** Filtra por created_at >= dataInicio (YYYY-MM-DD) — usado pelo bloco de Relatórios ("últimos 30 dias"). */
+  dateFrom?: string;
   limit?: number;
 }
 
@@ -91,6 +93,9 @@ export async function listAnalysisRuns(client: SupabaseDbClient, filter: ListAna
 
   if (filter.analysisTypes && filter.analysisTypes.length > 0) {
     query = query.in("analysis_type", filter.analysisTypes);
+  }
+  if (filter.dateFrom) {
+    query = query.gte("created_at", filter.dateFrom);
   }
 
   const { data, error } = await query;
