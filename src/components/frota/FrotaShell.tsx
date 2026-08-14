@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FrotaHeader } from "./FrotaHeader";
 import { FrotaSidebar } from "./FrotaSidebar";
 import { FrotaMobileSidebar } from "./FrotaMobileSidebar";
+import { FrotaAiWidget } from "./FrotaAiWidget";
 import type { CompanyMemberRole } from "@/lib/supabase/tables";
 
 interface FrotaShellProps {
@@ -23,6 +24,7 @@ export function FrotaShell({ companyName, role, children }: FrotaShellProps) {
         <FrotaMobileSidebar open={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">{children}</main>
       </div>
+      <FrotaAiWidget />
     </div>
   );
 }
