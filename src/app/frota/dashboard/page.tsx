@@ -5,6 +5,7 @@ import { listDriversForPanel } from "@/services/supabase/driverService";
 import { listMaintenanceSchedulesForPanel } from "@/services/supabase/maintenanceScheduleService";
 import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
 import { listExpenses } from "@/services/supabase/expenseService";
+import { listChecklistDispatchesForPanel } from "@/services/supabase/checklistDispatchService";
 import { DashboardClient } from "./DashboardClient";
 
 /** O layout de src/app/frota já garante o acesso. Só leitura — os KPIs agregam dados que as telas de Veículos/Motoristas/Manutenção/Documentos/Despesas já buscam. */
@@ -17,12 +18,13 @@ export default async function DashboardPage() {
   const trintaDiasAtras = new Date();
   trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
 
-  const [veiculos, motoristas, manutencoes, documentos, despesasRecentes] = await Promise.all([
+  const [veiculos, motoristas, manutencoes, documentos, despesasRecentes, checklistDispatches] = await Promise.all([
     listVehiclesForPanel(supabase, access.company.id),
     listDriversForPanel(supabase, access.company.id),
     listMaintenanceSchedulesForPanel(supabase, access.company.id),
     listVehicleDocumentsForPanel(supabase, access.company.id),
     listExpenses(supabase, { companyId: access.company.id, dateFrom: trintaDiasAtras.toISOString().slice(0, 10), limit: 500 }),
+    listChecklistDispatchesForPanel(supabase, access.company.id),
   ]);
 
   return (
@@ -32,6 +34,7 @@ export default async function DashboardPage() {
       manutencoes={manutencoes}
       documentos={documentos}
       despesasRecentes={despesasRecentes}
+      checklistDispatches={checklistDispatches}
     />
   );
 }

@@ -17,6 +17,7 @@
   --danger: #dc2626;
   --danger-foreground: #ffffff;
   --success: #16a34a;
+  --warning: #d97706;
   --radius: 0.75rem;
 }
 
@@ -35,6 +36,7 @@
   --danger: #f87171;
   --danger-foreground: #1a0505;
   --success: #4ade80;
+  --warning: #fbbf24;
 }
 
 @theme inline {
@@ -52,6 +54,7 @@
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
   --color-success: var(--success);
+  --color-warning: var(--warning);
   --radius-lg: var(--radius);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
