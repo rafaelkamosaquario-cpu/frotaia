@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { Logo } from "@/components/icons/Logo";
+import { FrotaBrand } from "./FrotaBrand";
 import { cn } from "@/lib/utils";
 import { useHasMounted } from "@/hooks/useHasMounted";
 import { FrotaSidebarContent } from "./FrotaSidebarContent";
@@ -42,7 +42,7 @@ export function FrotaMobileSidebar({ open, onClose }: FrotaMobileSidebarProps) {
         aria-label="Menu de gestão de frota"
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-          <Logo iconClassName="size-7" />
+          <FrotaBrand compact />
           <button
             type="button"
             onClick={onClose}

@@ -22,7 +22,6 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
         <ul className="flex flex-col gap-0.5">
           {FROTA_NAV_ITEMS.map((item) => {
             const isActive = pathname?.startsWith(item.href);
-            const Icon = item.icon;
             return (
               <li key={item.href}>
                 <Link
@@ -33,7 +32,9 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                     isActive ? "bg-surface-muted font-medium text-foreground" : "text-muted-foreground hover:bg-surface-muted hover:text-foreground"
                   )}
                 >
-                  <Icon className="size-4 shrink-0" aria-hidden />
+                  <span className="flex size-4 shrink-0 items-center justify-center text-[13px] leading-none" aria-hidden>
+                    {item.emoji}
+                  </span>
                   <span className="flex-1 truncate">{item.label}</span>
                   {!item.disponivel && (
                     <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { LogOut, Menu } from "lucide-react";
-import { Logo, LogoMark } from "@/components/icons/Logo";
+import { FrotaBrand } from "./FrotaBrand";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { signOut } from "@/services/supabase/authService";
@@ -29,8 +29,8 @@ export function FrotaHeader({ onOpenSidebar, companyName, role }: FrotaHeaderPro
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenSidebar} aria-label="Abrir menu">
           <Menu className="size-5" aria-hidden />
         </Button>
-        <LogoMark className="size-7 lg:hidden" />
-        <Logo className="hidden lg:flex" />
+        <FrotaBrand compact className="lg:hidden" />
+        <FrotaBrand className="hidden lg:flex" />
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
