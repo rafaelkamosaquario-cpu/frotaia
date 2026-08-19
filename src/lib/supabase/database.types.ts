@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -439,6 +439,8 @@ export type Database = {
           created_at: string
           daily_news_enabled: boolean
           daily_news_last_sent_at: string | null
+          dashboard_insight_generated_at: string | null
+          dashboard_insight_text: string | null
           default_average_speed_kmh: number | null
           default_currency: string
           default_fuel_price: number | null
@@ -460,6 +462,8 @@ export type Database = {
           created_at?: string
           daily_news_enabled?: boolean
           daily_news_last_sent_at?: string | null
+          dashboard_insight_generated_at?: string | null
+          dashboard_insight_text?: string | null
           default_average_speed_kmh?: number | null
           default_currency?: string
           default_fuel_price?: number | null
@@ -481,6 +485,8 @@ export type Database = {
           created_at?: string
           daily_news_enabled?: boolean
           daily_news_last_sent_at?: string | null
+          dashboard_insight_generated_at?: string | null
+          dashboard_insight_text?: string | null
           default_average_speed_kmh?: number | null
           default_currency?: string
           default_fuel_price?: number | null
@@ -2346,3 +2352,4 @@ export const Constants = {
     },
   },
 } as const
+

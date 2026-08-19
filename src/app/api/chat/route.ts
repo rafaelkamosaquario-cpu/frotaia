@@ -1,9 +1,22 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { AnthropicConfigError } from "@/lib/anthropic/client";
 import { loadCustomerContext, loadVehicleContext } from "@/ai/context/customerContext";
 import { getConversationById, getOrCreateOpenConversation } from "@/services/supabase/conversationService";
 import { gerarRespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
+
+/** Mesmo conjunto aceito pelo webhook do WhatsApp (ver TIPOS_IMAGEM_SUPORTADOS em src/app/api/whatsapp/webhook/route.ts). */
+const TIPOS_IMAGEM_SUPORTADOS = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+interface ChatRequestBody {
+  conversationId?: string;
+  message?: string;
+  /** Rótulo da tela do painel de onde a pergunta foi feita (ex.: "Manutenção") — ver Fase de contexto de página do widget. Nunca persiste no histórico como texto do usuário. */
+  pageContext?: string;
+  /** Foto/documento anexado no widget do painel — mesmo pipeline de visão já usado pelo WhatsApp. */
+  image?: { mimeType?: string; data?: string };
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -13,7 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  let body: { conversationId?: string; message?: string };
+  let body: ChatRequestBody;
   try {
     body = await request.json();
   } catch {
@@ -43,6 +56,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
   }
 
+  if (body.image?.data && (!body.image.mimeType || !TIPOS_IMAGEM_SUPORTADOS.has(body.image.mimeType))) {
+    return NextResponse.json({ error: "Formato de imagem não suportado (use JPEG, PNG, GIF ou WebP)." }, { status: 400 });
+  }
+
+  const conteudoMultimodal: Anthropic.ContentBlockParam[] = [];
+  if (body.pageContext) {
+    conteudoMultimodal.push({ type: "text", text: `Contexto: o usuário está na tela "${body.pageContext}" do painel de gestão.` });
+  }
+  if (body.image?.data && body.image.mimeType) {
+    conteudoMultimodal.push({
+      type: "image",
+      source: { type: "base64", media_type: body.image.mimeType as "image/jpeg", data: body.image.data },
+    });
+  }
+
   try {
     const resposta = await gerarRespostaAssistente({
       client: supabase,
@@ -52,6 +80,7 @@ export async function POST(request: Request) {
       customerContext,
       vehicleContext,
       mensagemUsuario,
+      conteudoMultimodal: conteudoMultimodal.length > 0 ? conteudoMultimodal : undefined,
     });
 
     return NextResponse.json(resposta);

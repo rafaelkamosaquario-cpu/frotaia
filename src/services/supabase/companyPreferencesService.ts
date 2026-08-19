@@ -91,3 +91,13 @@ export async function markNewsDigestSent(client: SupabaseDbClient, companyId: st
 
   if (error) throw error;
 }
+
+/** Salva o insight gerado pro Dashboard (V2) — cache lido/gravado por dashboardInsightService.ts. */
+export async function saveDashboardInsight(client: SupabaseDbClient, companyId: string, texto: string): Promise<void> {
+  const { error } = await client
+    .from("company_preferences")
+    .update({ dashboard_insight_text: texto, dashboard_insight_generated_at: new Date().toISOString() })
+    .eq("company_id", companyId);
+
+  if (error) throw error;
+}

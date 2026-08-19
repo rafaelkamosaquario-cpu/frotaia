@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Truck, Users, Wrench, WalletCards } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Sparkles, Truck, Users, Wrench, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import type { ChecklistDispatchRow, DriverRow, ExpenseRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
 import { computeFleetAlerts } from "@/services/supabase/fleetAlertsService";
@@ -16,6 +16,8 @@ interface DashboardClientProps {
   /** Já vem filtrado aos últimos 30 dias — ver DashboardPage. */
   despesasRecentes: ExpenseRow[];
   checklistDispatches: ChecklistDispatchRow[];
+  /** Gerado por IA a partir dos dados acima, cacheado em company_preferences — ver DashboardPage. null se nunca gerado ou se a chamada falhou. */
+  insight: string | null;
 }
 
 const MAX_ALERTAS_PREVIEW = 5;
@@ -43,7 +45,7 @@ function diasAte(iso: string): number {
   return Math.round((alvo.getTime() - hoje.getTime()) / 86_400_000);
 }
 
-export function DashboardClient({ veiculos, motoristas, manutencoes, documentos, despesasRecentes, checklistDispatches }: DashboardClientProps) {
+export function DashboardClient({ veiculos, motoristas, manutencoes, documentos, despesasRecentes, checklistDispatches, insight }: DashboardClientProps) {
   const hojeIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const kpis = useMemo(() => {
@@ -80,6 +82,18 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
         <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Visão geral da frota</p>
       </div>
+
+      {insight && (
+        <Card className="mb-4 flex items-start gap-3 p-4">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Sparkles className="size-4" aria-hidden />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Frota IA sugere</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{insight}</p>
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {kpis.map(({ label, value, icon: Icon, color }) => (
