@@ -435,6 +435,9 @@ export type Database = {
           allow_automatic_memory: boolean
           allow_tool_history: boolean
           ask_before_saving_memory: boolean
+          checklist_enabled: boolean
+          checklist_item_keys: string[]
+          checklist_send_hour: number
           company_id: string
           created_at: string
           daily_news_enabled: boolean
@@ -458,6 +461,9 @@ export type Database = {
           allow_automatic_memory?: boolean
           allow_tool_history?: boolean
           ask_before_saving_memory?: boolean
+          checklist_enabled?: boolean
+          checklist_item_keys?: string[]
+          checklist_send_hour?: number
           company_id: string
           created_at?: string
           daily_news_enabled?: boolean
@@ -481,6 +487,9 @@ export type Database = {
           allow_automatic_memory?: boolean
           allow_tool_history?: boolean
           ask_before_saving_memory?: boolean
+          checklist_enabled?: boolean
+          checklist_item_keys?: string[]
+          checklist_send_hour?: number
           company_id?: string
           created_at?: string
           daily_news_enabled?: boolean
@@ -1996,6 +2005,8 @@ export type Database = {
         | "gerenciar_manutencao"
         | "gerenciar_documento_frota"
         | "gerenciar_jornada_salva"
+        | "vincular_painel"
+        | "consultar_checklist"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -2265,6 +2276,8 @@ export const Constants = {
         "gerenciar_manutencao",
         "gerenciar_documento_frota",
         "gerenciar_jornada_salva",
+        "vincular_painel",
+        "consultar_checklist",
       ],
       fuel_type: [
         "diesel_s10",

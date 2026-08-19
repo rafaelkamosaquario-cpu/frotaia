@@ -50,6 +50,11 @@ export async function GET(request: Request) {
     companyId = context.company?.id ?? null;
   }
 
+  // Calendar é uma integração por empresa (não por usuário) — sem empresa não há onde gravar a conexão.
+  if (!companyId) {
+    return NextResponse.redirect(`${appOrigin}/?calendar_erro=sem_empresa`);
+  }
+
   const state = createSignedToken({ userId, companyId }, STATE_TTL_SECONDS);
   return NextResponse.redirect(buildAuthorizationUrl(state));
 }

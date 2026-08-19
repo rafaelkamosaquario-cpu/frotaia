@@ -50,6 +50,9 @@ export async function updatePreferences(
       allow_analysis_history: parsed.allowAnalysisHistory,
       allow_tool_history: parsed.allowToolHistory,
       daily_news_enabled: parsed.dailyNewsEnabled,
+      checklist_enabled: parsed.checklistEnabled,
+      checklist_send_hour: parsed.checklistSendHour,
+      checklist_item_keys: parsed.checklistItemKeys,
       updated_by: userId,
     })
     .eq("company_id", companyId)

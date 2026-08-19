@@ -41,6 +41,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appOrigin}/?calendar_erro=state_invalido`);
   }
 
+  // Calendar é uma integração por empresa — connect/route.ts já bloqueia o caso sem empresa, isso é defesa em profundidade.
+  if (!payload.companyId) {
+    return NextResponse.redirect(`${appOrigin}/?calendar_erro=sem_empresa`);
+  }
+
   try {
     await connectGoogleCalendar({ userId: payload.userId, companyId: payload.companyId, code });
   } catch (err) {

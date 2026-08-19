@@ -26,10 +26,16 @@ export { GoogleCalendarNotConnectedError, GoogleCalendarApiError };
  * deve chamar `@/lib/google/calendarClient` diretamente — sempre por aqui,
  * para que autenticação, log em calendar_action_logs e tratamento de erro
  * fiquem em um único lugar.
+ *
+ * A conexão é POR EMPRESA (`companyId`), não por usuário — ver comentário em
+ * `googleIntegrationService.ts`. `userId` continua presente nas funções de
+ * escrita (criar/alterar/excluir evento) só para registro em
+ * `calendar_action_logs` (quem, dos possivelmente vários usuários da
+ * empresa, pediu a ação), nunca para localizar a integração.
  */
 
-async function requireConnectedIntegration(admin: SupabaseDbClient, userId: string): Promise<GoogleIntegrationRow> {
-  const integration = await getGoogleIntegration(admin, userId);
+async function requireConnectedIntegration(admin: SupabaseDbClient, companyId: string): Promise<GoogleIntegrationRow> {
+  const integration = await getGoogleIntegration(admin, companyId);
   if (!integration || integration.connection_status !== "connected") {
     throw new GoogleCalendarNotConnectedError();
   }
@@ -56,7 +62,7 @@ async function logAction(
 
 export interface ConnectGoogleCalendarInput {
   userId: string;
-  companyId: string | null;
+  companyId: string;
   code: string;
 }
 
@@ -85,16 +91,16 @@ export async function connectGoogleCalendar(input: ConnectGoogleCalendarInput): 
   return integration;
 }
 
-export async function disconnectGoogleCalendar(userId: string): Promise<void> {
+export async function disconnectGoogleCalendar(companyId: string): Promise<void> {
   const admin = createAdminClient();
-  const integration = await getGoogleIntegration(admin, userId);
+  const integration = await getGoogleIntegration(admin, companyId);
   if (!integration) return;
   await revokeAndDeleteToken(admin, integration.id);
 }
 
-export async function refreshGoogleAccessToken(userId: string): Promise<string> {
+export async function refreshGoogleAccessToken(companyId: string): Promise<string> {
   const admin = createAdminClient();
-  const integration = await requireConnectedIntegration(admin, userId);
+  const integration = await requireConnectedIntegration(admin, companyId);
   return getValidAccessToken(admin, integration.id);
 }
 
@@ -106,9 +112,9 @@ export interface CalendarConnectionStatus {
   lastSyncedAt: string | null;
 }
 
-export async function checkCalendarConnection(userId: string): Promise<CalendarConnectionStatus> {
+export async function checkCalendarConnection(companyId: string): Promise<CalendarConnectionStatus> {
   const admin = createAdminClient();
-  const integration = await getGoogleIntegration(admin, userId);
+  const integration = await getGoogleIntegration(admin, companyId);
 
   if (!integration) {
     return { connected: false, email: null, defaultCalendarId: null, scopes: [], lastSyncedAt: null };
@@ -125,22 +131,22 @@ export async function checkCalendarConnection(userId: string): Promise<CalendarC
 
 // ── calendário padrão ────────────────────────────────────────────────────
 
-export async function listCalendars(userId: string): Promise<GoogleCalendarListEntry[]> {
+export async function listCalendars(companyId: string): Promise<GoogleCalendarListEntry[]> {
   const admin = createAdminClient();
-  const integration = await requireConnectedIntegration(admin, userId);
+  const integration = await requireConnectedIntegration(admin, companyId);
   const accessToken = await getValidAccessToken(admin, integration.id);
   return listCalendarList(accessToken);
 }
 
-export async function getDefaultCalendar(userId: string): Promise<string> {
+export async function getDefaultCalendar(companyId: string): Promise<string> {
   const admin = createAdminClient();
-  const integration = await getGoogleIntegration(admin, userId);
+  const integration = await getGoogleIntegration(admin, companyId);
   return integration?.default_calendar_id ?? "primary";
 }
 
-export async function setDefaultCalendar(userId: string, calendarId: string): Promise<void> {
+export async function setDefaultCalendar(companyId: string, calendarId: string): Promise<void> {
   const admin = createAdminClient();
-  const integration = await requireConnectedIntegration(admin, userId);
+  const integration = await requireConnectedIntegration(admin, companyId);
 
   const { error } = await admin
     .from("google_integrations")
@@ -153,7 +159,7 @@ export async function setDefaultCalendar(userId: string, calendarId: string): Pr
 // ── consulta ─────────────────────────────────────────────────────────────
 
 export interface ListUpcomingEventsInput {
-  userId: string;
+  companyId: string;
   calendarId?: string;
   from?: string;
   to?: string;
@@ -165,7 +171,7 @@ export async function listUpcomingEvents(
   input: ListUpcomingEventsInput
 ): Promise<{ items: GoogleCalendarEvent[]; nextPageToken?: string; calendarId: string }> {
   const admin = createAdminClient();
-  const integration = await requireConnectedIntegration(admin, input.userId);
+  const integration = await requireConnectedIntegration(admin, input.companyId);
   const accessToken = await getValidAccessToken(admin, integration.id);
   const calendarId = resolveCalendarId(integration, input.calendarId);
 
@@ -180,14 +186,14 @@ export async function listUpcomingEvents(
 }
 
 export interface GetEventInput {
-  userId: string;
+  companyId: string;
   calendarId?: string;
   eventId: string;
 }
 
 export async function getEvent(input: GetEventInput): Promise<GoogleCalendarEvent> {
   const admin = createAdminClient();
-  const integration = await requireConnectedIntegration(admin, input.userId);
+  const integration = await requireConnectedIntegration(admin, input.companyId);
   const accessToken = await getValidAccessToken(admin, integration.id);
   return apiGetEvent(accessToken, resolveCalendarId(integration, input.calendarId), input.eventId);
 }
@@ -209,7 +215,7 @@ export interface CreateEventInput {
 
 export async function createEvent(input: CreateEventInput): Promise<GoogleCalendarEvent> {
   const admin = createAdminClient();
-  const integration = await requireConnectedIntegration(admin, input.userId);
+  const integration = await requireConnectedIntegration(admin, input.companyId);
   const accessToken = await getValidAccessToken(admin, integration.id);
   const calendarId = resolveCalendarId(integration, input.calendarId);
 
@@ -266,7 +272,7 @@ export interface UpdateEventInput {
 
 export async function updateEvent(input: UpdateEventInput): Promise<GoogleCalendarEvent> {
   const admin = createAdminClient();
-  const integration = await requireConnectedIntegration(admin, input.userId);
+  const integration = await requireConnectedIntegration(admin, input.companyId);
   const accessToken = await getValidAccessToken(admin, integration.id);
   const calendarId = resolveCalendarId(integration, input.calendarId);
 
@@ -323,7 +329,7 @@ export interface DeleteEventInput {
  */
 export async function deleteEvent(input: DeleteEventInput): Promise<void> {
   const admin = createAdminClient();
-  const integration = await requireConnectedIntegration(admin, input.userId);
+  const integration = await requireConnectedIntegration(admin, input.companyId);
   const accessToken = await getValidAccessToken(admin, integration.id);
   const calendarId = resolveCalendarId(integration, input.calendarId);
 

@@ -47,6 +47,29 @@ export async function removeMember(client: SupabaseDbClient, memberId: string): 
   if (error) throw error;
 }
 
+/**
+ * Vincula um usuário já existente a uma empresa já existente, via client
+ * ADMIN (service role) — usado pelo fluxo de vínculo de identidade
+ * WhatsApp↔Painel (`/auth/account/link`), onde o usuário ainda não é membro
+ * da empresa (portanto não passaria pela checagem de RLS que `inviteMember`
+ * exige). Mesmo formato de insert de `createCompanyWithOwner`.
+ */
+export async function linkUserToCompany(
+  client: SupabaseDbClient,
+  companyId: string,
+  userId: string,
+  role: CompanyMemberRole,
+  isDefault: boolean
+): Promise<CompanyMemberRow> {
+  const { data, error } = await client
+    .from("company_members")
+    .insert({ company_id: companyId, user_id: userId, role, is_default: isDefault })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 /** Marca companyId como empresa padrão do usuário (o trigger cuida de zerar os outros is_default). */
 export async function setDefaultCompany(
   client: SupabaseDbClient,

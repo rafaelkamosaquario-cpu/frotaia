@@ -279,6 +279,9 @@ export const companyPreferencesUpdateSchema = z.object({
   allowAnalysisHistory: z.boolean().optional(),
   allowToolHistory: z.boolean().optional(),
   dailyNewsEnabled: z.boolean().optional(),
+  checklistEnabled: z.boolean().optional(),
+  checklistSendHour: z.number().int().min(0).max(23).optional(),
+  checklistItemKeys: z.array(maxText(32, "Item do checklist")).min(1).optional(),
 });
 
 // ── ai memory ────────────────────────────────────────────────────────────
@@ -367,6 +370,8 @@ export const frotaIaToolNameSchema = z.enum([
   "gerenciar_manutencao",
   "gerenciar_documento_frota",
   "gerenciar_jornada_salva",
+  "vincular_painel",
+  "consultar_checklist",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Newspaper } from "lucide-react";
+import { Newspaper, ClipboardList } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
@@ -19,34 +19,85 @@ const ESTILOS: { valor: string; label: string; descricao: string }[] = [
   { valor: "objetivo", label: "Objetivo", descricao: "Padrão — direto, sem ser nem simples nem técnico." },
 ];
 
+const ITENS_CHECKLIST: { chave: string; label: string }[] = [
+  { chave: "oleo", label: "Óleo" },
+  { chave: "agua", label: "Água" },
+  { chave: "pneus", label: "Pneus" },
+  { chave: "luzes", label: "Luzes" },
+];
+
+const HORAS = Array.from({ length: 24 }, (_, h) => h);
+
 export function ConfiguracoesClient({ preferenciasIniciais, podeEditar }: ConfiguracoesClientProps) {
   const { showToast } = useToast();
   const [estilo, setEstilo] = useState(preferenciasIniciais.preferred_response_style ?? "objetivo");
   const [isSaving, setIsSaving] = useState(false);
 
-  async function handleSelecionar(novoEstilo: string) {
-    if (novoEstilo === estilo || isSaving) return;
-    setIsSaving(true);
+  const [checklistEnabled, setChecklistEnabled] = useState(preferenciasIniciais.checklist_enabled);
+  const [checklistSendHour, setChecklistSendHour] = useState(preferenciasIniciais.checklist_send_hour);
+  const [checklistItemKeys, setChecklistItemKeys] = useState<string[]>(preferenciasIniciais.checklist_item_keys);
+  const [isSavingChecklist, setIsSavingChecklist] = useState(false);
+
+  async function salvarPreferencias(body: Record<string, unknown>, sucesso: string): Promise<boolean> {
     try {
       const response = await fetch("/api/frota/configuracoes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferredResponseStyle: novoEstilo }),
+        body: JSON.stringify(body),
       });
       const data = await response.json();
 
       if (!response.ok) {
         showToast({ title: "Não foi possível alterar", description: data.error ?? "Tente novamente.", variant: "error" });
-        return;
+        return false;
       }
 
-      setEstilo(novoEstilo);
-      showToast({ title: "Estilo de resposta atualizado", variant: "success" });
+      showToast({ title: sucesso, variant: "success" });
+      return true;
     } catch {
       showToast({ title: "Não foi possível alterar", description: "Verifique sua conexão e tente novamente.", variant: "error" });
-    } finally {
-      setIsSaving(false);
+      return false;
     }
+  }
+
+  async function handleSelecionar(novoEstilo: string) {
+    if (novoEstilo === estilo || isSaving) return;
+    setIsSaving(true);
+    const ok = await salvarPreferencias({ preferredResponseStyle: novoEstilo }, "Estilo de resposta atualizado");
+    if (ok) setEstilo(novoEstilo);
+    setIsSaving(false);
+  }
+
+  async function handleToggleChecklist() {
+    if (isSavingChecklist) return;
+    const novoValor = !checklistEnabled;
+    setIsSavingChecklist(true);
+    const ok = await salvarPreferencias({ checklistEnabled: novoValor }, novoValor ? "Checklist diário ativado" : "Checklist diário desativado");
+    if (ok) setChecklistEnabled(novoValor);
+    setIsSavingChecklist(false);
+  }
+
+  async function handleHoraChange(novaHora: number) {
+    if (novaHora === checklistSendHour || isSavingChecklist) return;
+    setIsSavingChecklist(true);
+    const ok = await salvarPreferencias({ checklistSendHour: novaHora }, "Horário de envio atualizado");
+    if (ok) setChecklistSendHour(novaHora);
+    setIsSavingChecklist(false);
+  }
+
+  async function handleToggleItem(chave: string) {
+    if (isSavingChecklist) return;
+    const novosItens = checklistItemKeys.includes(chave)
+      ? checklistItemKeys.filter((i) => i !== chave)
+      : [...checklistItemKeys, chave];
+    if (novosItens.length === 0) {
+      showToast({ title: "Deixe pelo menos 1 item ativo", variant: "error" });
+      return;
+    }
+    setIsSavingChecklist(true);
+    const ok = await salvarPreferencias({ checklistItemKeys: novosItens }, "Itens do checklist atualizados");
+    if (ok) setChecklistItemKeys(novosItens);
+    setIsSavingChecklist(false);
   }
 
   return (
@@ -90,6 +141,79 @@ export function ConfiguracoesClient({ preferenciasIniciais, podeEditar }: Config
               </button>
             ))}
           </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <ClipboardList className="size-4 text-muted-foreground" aria-hidden />
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Checklist diário</h2>
+                <p className="text-xs text-muted-foreground">Envio automático aos motoristas ativos, todo dia, no horário abaixo.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={checklistEnabled}
+              disabled={!podeEditar || isSavingChecklist}
+              onClick={handleToggleChecklist}
+              className={cn(
+                "relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                checklistEnabled ? "bg-primary" : "bg-surface-muted"
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 size-5 rounded-full bg-white transition-transform",
+                  checklistEnabled ? "translate-x-[22px]" : "translate-x-0.5"
+                )}
+              />
+            </button>
+          </div>
+
+          {checklistEnabled && (
+            <div className="flex flex-col gap-3 border-t border-border pt-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Horário de envio (Brasília)</label>
+                <select
+                  value={checklistSendHour}
+                  disabled={!podeEditar || isSavingChecklist}
+                  onChange={(e) => handleHoraChange(Number(e.target.value))}
+                  className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {HORAS.map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, "0")}:00
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">Itens do checklist</p>
+                <div className="flex flex-wrap gap-2">
+                  {ITENS_CHECKLIST.map((item) => {
+                    const ativo = checklistItemKeys.includes(item.chave);
+                    return (
+                      <button
+                        key={item.chave}
+                        type="button"
+                        disabled={!podeEditar || isSavingChecklist}
+                        onClick={() => handleToggleItem(item.chave)}
+                        className={cn(
+                          "rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                          ativo ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface-muted"
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card className="flex items-center justify-between gap-4 p-4">

@@ -9,6 +9,7 @@ import type {
   VehicleDocumentRow,
   VehicleRow,
 } from "@/lib/supabase/tables";
+import { computeChecklistAdherence } from "./checklistAdherence";
 
 /**
  * Agregações da tela Relatórios — extraído de RelatoriosClient.tsx pra ser
@@ -134,6 +135,13 @@ export function computeRelatoriosBlocos(input: RelatoriosInput): RelatoriosBloco
   const contagemChecklists = contarPor(input.checklistDispatches, (c) => c.response_status);
   const checklistsPorStatus = Object.entries(CHECKLIST_STATUS_LABEL).map(([status, label]) => ({ label, valor: contagemChecklists[status] ?? 0 }));
 
+  const aderenciaPorMotorista = computeChecklistAdherence(input.checklistDispatches, input.motoristas);
+  const aderenciaMedia =
+    aderenciaPorMotorista.length > 0
+      ? Math.round(aderenciaPorMotorista.reduce((soma, m) => soma + m.aderenciaPercent, 0) / aderenciaPorMotorista.length)
+      : 0;
+  const pioresAderencias = [...aderenciaPorMotorista].sort((a, b) => a.aderenciaPercent - b.aderenciaPercent).slice(0, 3);
+
   const blocos: RelatoriosBloco[] = [
     { titulo: "Veículos por tipo", linhas: veiculosPorTipo },
     { titulo: "Motoristas por status", linhas: motoristasPorStatus },
@@ -143,7 +151,18 @@ export function computeRelatoriosBlocos(input: RelatoriosInput): RelatoriosBloco
 
   if (input.despesas.length > 0) blocos.push({ titulo: "Despesas por tipo (últimos 30 dias)", linhas: custoPorTipoDespesa, formatarValor: formatBRL });
   if (input.jornadas.length > 0) blocos.push({ titulo: "Jornadas por status", linhas: jornadasPorStatus });
-  if (input.checklistDispatches.length > 0) blocos.push({ titulo: "Checklists por status", linhas: checklistsPorStatus });
+  if (input.checklistDispatches.length > 0) {
+    blocos.push({ titulo: "Checklists por status", linhas: checklistsPorStatus });
+    blocos.push({
+      // Sem recorte de data — checklistDispatches chega sem filtro de período (mesmo escopo do bloco "Checklists por status" acima).
+      titulo: "Aderência ao checklist",
+      linhas: [
+        { label: "Aderência média", valor: aderenciaMedia },
+        ...pioresAderencias.map((m, i) => ({ label: `${i + 1}º menor aderência: ${m.driverName}`, valor: m.aderenciaPercent })),
+      ],
+      formatarValor: (v) => `${v}%`,
+    });
+  }
   if (input.analisesFrete.length > 0) {
     blocos.push({ titulo: "Fretes analisados (últimos 30 dias)", linhas: [{ label: "Total de análises", valor: input.analisesFrete.length }] });
   }

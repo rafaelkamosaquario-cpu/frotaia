@@ -15,6 +15,7 @@ const MENSAGEM_ERRO_CALENDAR: Record<string, string> = {
   parametros_ausentes: "O Google não devolveu os dados esperados. Tente novamente.",
   state_invalido: "A conexão expirou no meio do processo. Peça um novo link direto pelo WhatsApp.",
   falha_conexao: "Não foi possível concluir a conexão com o Google agora.",
+  sem_empresa: "Sua conta ainda não tem uma empresa cadastrada no Frota IA — finalize o cadastro antes de conectar a Agenda Google.",
 };
 
 /** Retorno do OAuth do Google Calendar (/auth/calendar/callback). Renderizado ANTES de qualquer redirect de login/painel porque quem conecta a Agenda pelo link do WhatsApp normalmente nunca teve sessão no painel (V1 é WhatsApp-only) — sem isso, cai direto no /login sem ver nenhum resultado (bug real encontrado em 06/08/2026: o usuário concluía o login no Google e via uma tela sem feedback nenhum). */
@@ -78,7 +79,7 @@ export default async function Home({
   // precisar — ver systemPrompt.ts). Nunca gatear a entrada no painel por
   // ele existir ou nao, senao "Cadastrar depois" (skipVehicleAction) vira
   // um loop infinito com o redirect de onboarding/page.tsx.
-  const calendarConnected = await checkCalendarConnection(data.user.id)
+  const calendarConnected = await checkCalendarConnection(context.company.id)
     .then((status) => status.connected)
     .catch(() => false);
 

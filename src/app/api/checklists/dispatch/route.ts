@@ -3,23 +3,34 @@ import { timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendWhatsappText } from "@/lib/whatsapp/zapiClient";
 import { isWhatsappConfigured } from "@/lib/whatsapp/config";
-import { listDriversDueForChecklist, createChecklistDispatch } from "@/services/supabase/checklistDispatchService";
+import {
+  listDriversDueForChecklist,
+  createChecklistDispatch,
+  listChecklistItemKeysByCompany,
+  CHECKLIST_ITEM_LABELS,
+} from "@/services/supabase/checklistDispatchService";
 import { getVehicle } from "@/services/supabase/vehicleService";
 
 /**
- * Job de disparo do checklist diário (Fase 6 do plano de unificação V1+V2)
- * — mesmo padrão de /api/alerts/dispatch e /api/news/dispatch: rota
- * protegida por token, chamada por um cron externo ao processo do
- * Next.js (segundo "Cron Job" no Railway, 1x/dia, ex.: 06:00 America/Sao_Paulo).
+ * Job de disparo do checklist diário (Fase 6 do plano de unificação V1+V2,
+ * ampliado no Checklist V2 — B.2) — mesmo padrão de /api/alerts/dispatch e
+ * /api/news/dispatch: rota protegida por token, chamada por um cron externo
+ * ao processo do Next.js. Diferente das outras 3 rotas de dispatch, esta
+ * precisa rodar em intervalos curtos (ex.: a cada 15-30min, mesmo horário
+ * do cron de alertas) em vez de 1x/dia fixo — `listDriversDueForChecklist`
+ * já filtra por empresa+horário configurado, então rodar de novo antes da
+ * hora simplesmente não acha ninguém elegível ainda (idempotente).
  * `curl -fsS "$APP_URL/api/checklists/dispatch?token=$CHECKLIST_DISPATCH_SECRET"`.
  *
- * Perguntas fixas em código por enquanto (pneu/freio/luz/combustível) —
- * mesma decisão já documentada na migration que criou `checklist_dispatches`
- * (Fase 1 da V2), sem tabela de template ainda.
+ * Itens do checklist vêm de `company_preferences.checklist_item_keys`
+ * (B.1) — sem editor de formulário livre, só as 4 chaves fixas
+ * (`CHECKLIST_ITEM_LABELS`) que a empresa liga/desliga em Configurações.
  */
 
-const TEXTO_CHECKLIST =
-  "🔧 Checklist diário — {veiculo}\n\nAntes de sair, confira: pneus, freios, luzes e combustível.\n\nEstá tudo OK? Responda \"OK\" ou descreva o problema encontrado.";
+function montarTextoChecklist(nomeVeiculo: string, itemKeys: string[]): string {
+  const itens = itemKeys.map((chave) => CHECKLIST_ITEM_LABELS[chave] ?? chave).join(", ");
+  return `🔧 Checklist diário — ${nomeVeiculo}\n\nAntes de sair, confira: ${itens}.\n\nEstá tudo OK? Responda "OK" ou descreva o problema encontrado.`;
+}
 
 function tokensMatch(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -44,6 +55,7 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient();
   const motoristas = await listDriversDueForChecklist(admin);
+  const itemKeysPorEmpresa = await listChecklistItemKeysByCompany(admin, [...new Set(motoristas.map((m) => m.company_id))]);
 
   let enviados = 0;
   let falhas = 0;
@@ -54,6 +66,7 @@ export async function GET(request: Request) {
     try {
       const veiculo = await getVehicle(admin, motorista.vehicle_id);
       const nomeVeiculo = veiculo ? veiculo.name || veiculo.plate || "veículo" : "veículo";
+      const itemKeys = itemKeysPorEmpresa.get(motorista.company_id) ?? ["oleo", "agua", "pneus", "luzes"];
 
       await createChecklistDispatch(admin, {
         companyId: motorista.company_id,
@@ -61,7 +74,7 @@ export async function GET(request: Request) {
         vehicleId: motorista.vehicle_id,
       });
 
-      await sendWhatsappText(motorista.phone_e164, TEXTO_CHECKLIST.replace("{veiculo}", nomeVeiculo));
+      await sendWhatsappText(motorista.phone_e164, montarTextoChecklist(nomeVeiculo, itemKeys));
       enviados += 1;
     } catch (erro) {
       console.error(`[checklist-dispatch] falha ao enviar para motorista ${motorista.id}:`, erro);

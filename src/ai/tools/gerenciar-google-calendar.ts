@@ -205,17 +205,21 @@ async function executar(entradaBruta: GerenciarGoogleCalendarEntrada): Promise<G
     ...entradaBruta,
     eventos: normalizarPossivelJson(entradaBruta.eventos),
   };
-  const { modo, userId } = entrada;
+  const { modo, userId, companyId } = entrada;
 
-  if (!userId) {
-    return respostaFalha(modo, ["userId é obrigatório — a ferramenta não sabe de quem é a Agenda sem isso."], ["userId"]);
+  if (!userId || !companyId) {
+    return respostaFalha(
+      modo,
+      ["userId e companyId são obrigatórios — a ferramenta não sabe de quem/qual empresa é a Agenda sem isso."],
+      [!userId ? "userId" : "companyId"].filter(Boolean)
+    );
   }
 
   try {
     switch (modo) {
       case "VERIFICAR_CONEXAO": {
-        const status = await checkCalendarConnection(userId);
-        const linkConexao = status.connected ? undefined : linkConexaoSeDisponivel(userId, entrada.companyId);
+        const status = await checkCalendarConnection(companyId);
+        const linkConexao = status.connected ? undefined : linkConexaoSeDisponivel(userId, companyId);
         return {
           sucesso: true,
           modo,
@@ -233,7 +237,7 @@ async function executar(entradaBruta: GerenciarGoogleCalendarEntrada): Promise<G
       }
 
       case "LISTAR_CALENDARIOS": {
-        const [calendarios, padraoId] = await Promise.all([listCalendars(userId), getDefaultCalendar(userId)]);
+        const [calendarios, padraoId] = await Promise.all([listCalendars(companyId), getDefaultCalendar(companyId)]);
         const resumo = calendarios.map((c) => mapaCalendario(c, padraoId));
         return {
           sucesso: true,
@@ -251,7 +255,7 @@ async function executar(entradaBruta: GerenciarGoogleCalendarEntrada): Promise<G
         if (!entrada.novoCalendarioPadraoId) {
           return respostaFalha(modo, ["Falta informar qual calendário deve ser o padrão."], ["novoCalendarioPadraoId"]);
         }
-        await setDefaultCalendar(userId, entrada.novoCalendarioPadraoId);
+        await setDefaultCalendar(companyId, entrada.novoCalendarioPadraoId);
         return {
           sucesso: true,
           modo,
@@ -265,7 +269,7 @@ async function executar(entradaBruta: GerenciarGoogleCalendarEntrada): Promise<G
 
       case "CONSULTAR": {
         const { items, calendarId } = await listUpcomingEvents({
-          userId,
+          companyId,
           calendarId: entrada.calendarId,
           from: entrada.dateFrom,
           to: entrada.dateTo,
@@ -482,7 +486,7 @@ async function executar(entradaBruta: GerenciarGoogleCalendarEntrada): Promise<G
       alertas: [alerta],
       premissas: [],
       dadosFaltantes: [],
-      linkConexao: foiDesconectado ? linkConexaoSeDisponivel(userId, entrada.companyId) : undefined,
+      linkConexao: foiDesconectado ? linkConexaoSeDisponivel(userId, companyId) : undefined,
       mensagemResumo: alerta,
     };
   }
