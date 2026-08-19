@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -451,6 +451,7 @@ export type Database = {
           default_target_margin_percent: number | null
           default_vehicle_id: string | null
           distance_unit: string
+          freight_radar_analysis_mode: string
           id: string
           preferred_response_style: string
           updated_at: string
@@ -477,6 +478,7 @@ export type Database = {
           default_target_margin_percent?: number | null
           default_vehicle_id?: string | null
           distance_unit?: string
+          freight_radar_analysis_mode?: string
           id?: string
           preferred_response_style?: string
           updated_at?: string
@@ -503,6 +505,7 @@ export type Database = {
           default_target_margin_percent?: number | null
           default_vehicle_id?: string | null
           distance_unit?: string
+          freight_radar_analysis_mode?: string
           id?: string
           preferred_response_style?: string
           updated_at?: string
@@ -712,6 +715,284 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      freight_opportunities: {
+        Row: {
+          body_type: Database["public"]["Enums"]["vehicle_body_type"] | null
+          captured_at: string
+          contact_text: string | null
+          created_at: string
+          destination_city: string | null
+          destination_state: string | null
+          expires_at: string
+          extraction_confidence: Json
+          freight_value_cents: number | null
+          id: string
+          origin_city: string | null
+          origin_state: string | null
+          original_message_id: string | null
+          original_text: string
+          pickup_date: string | null
+          raw_payload: Json | null
+          source: Database["public"]["Enums"]["freight_opportunity_source"]
+          source_group_id: string | null
+          source_group_name: string | null
+          status: Database["public"]["Enums"]["freight_opportunity_status"]
+          weight_kg: number | null
+        }
+        Insert: {
+          body_type?: Database["public"]["Enums"]["vehicle_body_type"] | null
+          captured_at?: string
+          contact_text?: string | null
+          created_at?: string
+          destination_city?: string | null
+          destination_state?: string | null
+          expires_at: string
+          extraction_confidence?: Json
+          freight_value_cents?: number | null
+          id?: string
+          origin_city?: string | null
+          origin_state?: string | null
+          original_message_id?: string | null
+          original_text: string
+          pickup_date?: string | null
+          raw_payload?: Json | null
+          source: Database["public"]["Enums"]["freight_opportunity_source"]
+          source_group_id?: string | null
+          source_group_name?: string | null
+          status?: Database["public"]["Enums"]["freight_opportunity_status"]
+          weight_kg?: number | null
+        }
+        Update: {
+          body_type?: Database["public"]["Enums"]["vehicle_body_type"] | null
+          captured_at?: string
+          contact_text?: string | null
+          created_at?: string
+          destination_city?: string | null
+          destination_state?: string | null
+          expires_at?: string
+          extraction_confidence?: Json
+          freight_value_cents?: number | null
+          id?: string
+          origin_city?: string | null
+          origin_state?: string | null
+          original_message_id?: string | null
+          original_text?: string
+          pickup_date?: string | null
+          raw_payload?: Json | null
+          source?: Database["public"]["Enums"]["freight_opportunity_source"]
+          source_group_id?: string | null
+          source_group_name?: string | null
+          status?: Database["public"]["Enums"]["freight_opportunity_status"]
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
+      freight_opportunity_matches: {
+        Row: {
+          analysis_run_id: string | null
+          company_id: string
+          compatibility_score: number
+          created_at: string
+          decision: string | null
+          id: string
+          notified_at: string | null
+          opportunity_id: string
+          radar_id: string
+          status: Database["public"]["Enums"]["freight_match_status"]
+          updated_at: string
+          vehicle_id: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          analysis_run_id?: string | null
+          company_id: string
+          compatibility_score: number
+          created_at?: string
+          decision?: string | null
+          id?: string
+          notified_at?: string | null
+          opportunity_id: string
+          radar_id: string
+          status?: Database["public"]["Enums"]["freight_match_status"]
+          updated_at?: string
+          vehicle_id?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          analysis_run_id?: string | null
+          company_id?: string
+          compatibility_score?: number
+          created_at?: string
+          decision?: string | null
+          id?: string
+          notified_at?: string | null
+          opportunity_id?: string
+          radar_id?: string
+          status?: Database["public"]["Enums"]["freight_match_status"]
+          updated_at?: string
+          vehicle_id?: string | null
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freight_opportunity_matches_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_opportunity_matches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_opportunity_matches_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "freight_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_opportunity_matches_radar_id_fkey"
+            columns: ["radar_id"]
+            isOneToOne: false
+            referencedRelation: "freight_radars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_opportunity_matches_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      freight_radars: {
+        Row: {
+          available_from: string | null
+          available_until: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          destination_city: string | null
+          destination_region_label: string | null
+          destination_state: string | null
+          expires_at: string
+          id: string
+          notes: string | null
+          origin_city: string | null
+          origin_state: string | null
+          status: Database["public"]["Enums"]["freight_radar_status"]
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          available_from?: string | null
+          available_until?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          destination_city?: string | null
+          destination_region_label?: string | null
+          destination_state?: string | null
+          expires_at: string
+          id?: string
+          notes?: string | null
+          origin_city?: string | null
+          origin_state?: string | null
+          status?: Database["public"]["Enums"]["freight_radar_status"]
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          available_from?: string | null
+          available_until?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          destination_city?: string | null
+          destination_region_label?: string | null
+          destination_state?: string | null
+          expires_at?: string
+          id?: string
+          notes?: string | null
+          origin_city?: string | null
+          origin_state?: string | null
+          status?: Database["public"]["Enums"]["freight_radar_status"]
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freight_radars_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_radars_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      freight_sources: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          group_external_id: string
+          group_name: string | null
+          id: string
+          source_type: Database["public"]["Enums"]["freight_source_type"]
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          group_external_id: string
+          group_name?: string | null
+          id?: string
+          source_type?: Database["public"]["Enums"]["freight_source_type"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          group_external_id?: string
+          group_name?: string | null
+          id?: string
+          source_type?: Database["public"]["Enums"]["freight_source_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freight_sources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1829,6 +2110,7 @@ export type Database = {
           average_consumption_km_l: number | null
           average_speed_kmh: number | null
           axle_count: number | null
+          body_type: Database["public"]["Enums"]["vehicle_body_type"] | null
           brand: string | null
           company_id: string
           created_at: string
@@ -1854,6 +2136,7 @@ export type Database = {
           average_consumption_km_l?: number | null
           average_speed_kmh?: number | null
           axle_count?: number | null
+          body_type?: Database["public"]["Enums"]["vehicle_body_type"] | null
           brand?: string | null
           company_id: string
           created_at?: string
@@ -1879,6 +2162,7 @@ export type Database = {
           average_consumption_km_l?: number | null
           average_speed_kmh?: number | null
           axle_count?: number | null
+          body_type?: Database["public"]["Enums"]["vehicle_body_type"] | null
           brand?: string | null
           company_id?: string
           created_at?: string
@@ -1976,6 +2260,27 @@ export type Database = {
         | "seguro"
         | "multa"
         | "outro"
+      freight_match_status:
+        | "new"
+        | "notified"
+        | "viewed"
+        | "analyzed"
+        | "favorited"
+        | "ignored"
+        | "expired"
+      freight_opportunity_source:
+        | "direct_whatsapp"
+        | "whatsapp_group"
+        | "fretebras"
+        | "truckpad"
+        | "api_partner"
+      freight_opportunity_status: "new" | "incomplete" | "expired" | "discarded"
+      freight_radar_status: "active" | "paused" | "expired" | "cancelled"
+      freight_source_type:
+        | "whatsapp_group"
+        | "fretebras"
+        | "truckpad"
+        | "api_partner"
       frota_ia_tool_name:
         | "analisar_frete"
         | "calcular_combustivel"
@@ -2008,6 +2313,8 @@ export type Database = {
         | "vincular_painel"
         | "consultar_checklist"
         | "gerenciar_memoria"
+        | "gerenciar_radar_frete"
+        | "consultar_oportunidades_frete"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -2063,6 +2370,16 @@ export type Database = {
         | "novo_importado"
         | "recapado"
         | "misto"
+        | "outro"
+      vehicle_body_type:
+        | "sider"
+        | "graneleiro"
+        | "bau"
+        | "cacamba"
+        | "tanque"
+        | "grade_baixa"
+        | "prancha"
+        | "frigorifico"
         | "outro"
       vehicle_document_type:
         | "tacografo"
@@ -2248,6 +2565,30 @@ export const Constants = {
         "multa",
         "outro",
       ],
+      freight_match_status: [
+        "new",
+        "notified",
+        "viewed",
+        "analyzed",
+        "favorited",
+        "ignored",
+        "expired",
+      ],
+      freight_opportunity_source: [
+        "direct_whatsapp",
+        "whatsapp_group",
+        "fretebras",
+        "truckpad",
+        "api_partner",
+      ],
+      freight_opportunity_status: ["new", "incomplete", "expired", "discarded"],
+      freight_radar_status: ["active", "paused", "expired", "cancelled"],
+      freight_source_type: [
+        "whatsapp_group",
+        "fretebras",
+        "truckpad",
+        "api_partner",
+      ],
       frota_ia_tool_name: [
         "analisar_frete",
         "calcular_combustivel",
@@ -2280,6 +2621,8 @@ export const Constants = {
         "vincular_painel",
         "consultar_checklist",
         "gerenciar_memoria",
+        "gerenciar_radar_frete",
+        "consultar_oportunidades_frete",
       ],
       fuel_type: [
         "diesel_s10",
@@ -2344,6 +2687,17 @@ export const Constants = {
         "misto",
         "outro",
       ],
+      vehicle_body_type: [
+        "sider",
+        "graneleiro",
+        "bau",
+        "cacamba",
+        "tanque",
+        "grade_baixa",
+        "prancha",
+        "frigorifico",
+        "outro",
+      ],
       vehicle_document_type: [
         "tacografo",
         "rntrc",
@@ -2367,4 +2721,3 @@ export const Constants = {
     },
   },
 } as const
-

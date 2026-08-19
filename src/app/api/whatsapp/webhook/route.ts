@@ -22,6 +22,7 @@ import { getSubscription, isAccessAllowed } from "@/services/supabase/subscripti
 import { AnthropicConfigError } from "@/lib/anthropic/client";
 import { isUniqueViolation } from "@/lib/supabase/errors";
 import { findPendingChecklistDispatchByPhone, recordChecklistResponse } from "@/services/supabase/checklistDispatchService";
+import { processarMensagemDeGrupo } from "@/services/freight/groupMessageIntake";
 import type { MessageInsert } from "@/lib/supabase/tables";
 
 /**
@@ -51,6 +52,12 @@ interface ZApiWebhookBody {
   fromMe?: boolean;
   messageId?: string;
   senderName?: string;
+  /** true para mensagem de grupo — nesse caso `phone` é o id do grupo (sufixo "-group"), não um telefone de pessoa. Campos confirmados na documentação oficial do Z-API, nunca presumidos. */
+  isGroup?: boolean;
+  /** Nome do grupo (só quando isGroup=true). */
+  chatName?: string;
+  /** Telefone de quem mandou a mensagem DENTRO do grupo (só quando isGroup=true) — nunca usado pra identidade de conta, só pra log/contexto do Radar de Fretes. */
+  participantPhone?: string;
   text?: { message?: string };
   image?: { imageUrl?: string; caption?: string; mimeType?: string };
   document?: { documentUrl?: string; fileName?: string; mimeType?: string; caption?: string };
@@ -204,6 +211,21 @@ export async function POST(request: Request) {
 
   // Ignora eco de mensagens que o próprio número enviou e callbacks sem telefone.
   if (body.fromMe || !body.phone) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // Radar de Fretes (MVP): mensagem de GRUPO nunca passa por
+  // resolveOrCreateUserByPhone/onboarding/conversation — desvia 100% pro
+  // pipeline do Radar (pré-filtro → extração → matching), ou é ignorada se
+  // o grupo não estiver na whitelist. Nunca responde no grupo.
+  if (body.isGroup) {
+    const textoGrupo = body.text?.message?.trim();
+    if (textoGrupo) {
+      const adminGrupo = createAdminClient();
+      processarMensagemDeGrupo(adminGrupo, body.phone, body.chatName, textoGrupo, body.messageId, body).catch((err) => {
+        console.error(`[whatsapp-webhook] Falha ao processar mensagem de grupo: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
     return NextResponse.json({ ok: true });
   }
 

@@ -8,12 +8,14 @@ import { listTireProfiles } from "@/services/supabase/vehicleTireProfileService"
 import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
 import { saveMemory, listMemoriesForPrompt } from "@/services/supabase/memoryService";
 import { recordToolExecution } from "@/services/supabase/toolExecutionService";
+import { listActiveRadarsForPrompt } from "@/services/supabase/freightRadarService";
 import type { SupabaseDbClient } from "@/services/supabase/types";
 import type {
   AiMemoryRow,
   CompanyMemberRole,
   CompanyPreferencesRow,
   CompanyRow,
+  FreightRadarRow,
   ProfileRow,
   VehicleCostProfileRow,
   VehicleRow,
@@ -53,6 +55,7 @@ export interface CustomerContext {
   role: CompanyMemberRole | null;
   preferences: CompanyPreferencesRow | null;
   memories: AiMemoryRow[];
+  activeRadars: FreightRadarRow[];
 }
 
 export async function loadCustomerContext(client: SupabaseDbClient, userId: string): Promise<CustomerContext> {
@@ -69,16 +72,17 @@ export async function loadCustomerContext(client: SupabaseDbClient, userId: stri
   if (error) throw error;
 
   if (!membership || !membership.companies) {
-    return { profile, company: null, role: null, preferences: null, memories: [] };
+    return { profile, company: null, role: null, preferences: null, memories: [], activeRadars: [] };
   }
 
   const company = membership.companies as CompanyRow;
   const preferences = await getOrCreatePreferences(client, company.id);
   const memories = await listMemoriesForPrompt(client, company.id, userId);
+  const activeRadars = await listActiveRadarsForPrompt(client, company.id);
   // Log mínimo por desenho: só a contagem, nunca o conteúdo da memória (pode ter dado sensível do cliente).
-  console.log(`[customerContext] memórias carregadas para o prompt: ${memories.length}`);
+  console.log(`[customerContext] memórias carregadas para o prompt: ${memories.length}, radares ativos: ${activeRadars.length}`);
 
-  return { profile, company, role: membership.role, preferences, memories };
+  return { profile, company, role: membership.role, preferences, memories, activeRadars };
 }
 
 export interface VehicleContext {

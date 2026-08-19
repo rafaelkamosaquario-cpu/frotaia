@@ -13,6 +13,7 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/veiculos", label: "Veículos", emoji: "🚚", disponivel: true },
   { href: "/frota/motoristas", label: "Motoristas", emoji: "🧑‍✈️", disponivel: true },
   { href: "/frota/fretes", label: "Fretes / Análises", emoji: "📦", disponivel: true },
+  { href: "/frota/oportunidades", label: "Oportunidades", emoji: "⚡", disponivel: true },
   { href: "/frota/manutencao", label: "Manutenção", emoji: "🔧", disponivel: true },
   { href: "/frota/documentos", label: "Documentos", emoji: "📄", disponivel: true },
   { href: "/frota/despesas", label: "Despesas", emoji: "🧾", disponivel: true },

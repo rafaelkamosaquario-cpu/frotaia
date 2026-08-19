@@ -117,6 +117,22 @@ export type SavedJourneyUpdate = PublicTables["saved_journeys"]["Update"];
 
 export type NewsDigestRow = PublicTables["news_digests"]["Row"];
 
+export type FreightSourceRow = PublicTables["freight_sources"]["Row"];
+export type FreightSourceInsert = PublicTables["freight_sources"]["Insert"];
+export type FreightSourceUpdate = PublicTables["freight_sources"]["Update"];
+
+export type FreightRadarRow = PublicTables["freight_radars"]["Row"];
+export type FreightRadarInsert = PublicTables["freight_radars"]["Insert"];
+export type FreightRadarUpdate = PublicTables["freight_radars"]["Update"];
+
+export type FreightOpportunityRow = PublicTables["freight_opportunities"]["Row"];
+export type FreightOpportunityInsert = PublicTables["freight_opportunities"]["Insert"];
+export type FreightOpportunityUpdate = PublicTables["freight_opportunities"]["Update"];
+
+export type FreightOpportunityMatchRow = PublicTables["freight_opportunity_matches"]["Row"];
+export type FreightOpportunityMatchInsert = PublicTables["freight_opportunity_matches"]["Insert"];
+export type FreightOpportunityMatchUpdate = PublicTables["freight_opportunity_matches"]["Update"];
+
 export type CompanyMemberRole = PublicEnums["company_member_role"];
 export type OnboardingState = PublicEnums["onboarding_state"];
 export type ScheduledAlertStatus = PublicEnums["scheduled_alert_status"];
@@ -134,3 +150,9 @@ export type VehicleDocumentTypeEnum = PublicEnums["vehicle_document_type"];
 export type MaintenanceStatusEnum = PublicEnums["maintenance_status"];
 export type ChecklistResponseStatusEnum = PublicEnums["checklist_response_status"];
 export type JourneyStatusEnum = PublicEnums["journey_status"];
+export type VehicleBodyTypeEnum = PublicEnums["vehicle_body_type"];
+export type FreightSourceTypeEnum = PublicEnums["freight_source_type"];
+export type FreightRadarStatusEnum = PublicEnums["freight_radar_status"];
+export type FreightOpportunitySourceEnum = PublicEnums["freight_opportunity_source"];
+export type FreightOpportunityStatusEnum = PublicEnums["freight_opportunity_status"];
+export type FreightMatchStatusEnum = PublicEnums["freight_match_status"];

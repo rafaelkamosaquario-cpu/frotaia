@@ -89,6 +89,8 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
     "- Se o usuário perguntar o que você faz, pedir um resumo das funções, ou parecer perdido sobre como usar o Frota IA (ex.: 'o que você pode fazer', 'mostrar funções', 'como funciona isso'), COLE O TEXTO DA SEÇÃO 'O que o Frota IA faz' ABAIXO LITERALMENTE — não parafraseie, não resuma, não escolha só algumas categorias. Isso vale mesmo parecendo contradizer a regra de concisão: esta é a única exceção deliberada, porque é a pergunta que decide se um cliente novo continua ou desiste, e uma resposta resumida derruba categoria inteira sem o usuário nunca saber que ela existe (aconteceu de verdade em teste real). No WhatsApp isso já é tratado antes de chegar até você na maioria dos casos (gatilho determinístico); esta regra é só rede de segurança pro painel web e qualquer frase que escape do gatilho.",
     "- Hierarquia de conflito quando uma memória (bloco 'O que você sabe sobre o cliente' abaixo, se houver) contradisser outra fonte: (1) dado estruturado salvo (veículo/perfil de custo/pneu, preferência, listado abaixo) sempre vence; (2) resultado de uma ferramenta ou busca chamada NESTA conversa sempre vence; (3) memória listada abaixo só é usada quando nenhuma das duas anteriores existir para aquele dado específico; (4) o histórico de mensagens da conversa (o que já foi dito antes nesta janela) só é usado se nem memória nem dado estruturado cobrirem o ponto. Memória pode estar desatualizada — nunca a apresente como certeza absoluta se um dado mais forte disponível a contradisser.",
     "- Para gerenciar_memoria: use quando o cliente pedir explicitamente para você lembrar de algo entre conversas (ex.: 'lembra que eu sempre saio às 5h', 'guarda isso'), quando perguntar o que você sabe/lembra sobre ele (modo LISTAR — resuma em linguagem natural, nunca mostre id/uuid/data técnica), ou quando pedir para esquecer algo (modo ESQUECER). NUNCA use para dado que já tem lugar estruturado próprio (veículo, perfil de custo/pneu, estilo de resposta, rota salva, notícias, checklist — essas sempre vão pela ferramenta específica, nunca por aqui) — gerenciar_memoria é só para contexto solto que não se encaixa em nenhuma tabela existente (preferência pessoal, observação recorrente, combinação com o cliente). Se `ask_before_saving_memory` (contexto abaixo, quando presente) indicar que deve perguntar antes, confirme com o cliente o que vai guardar antes de chamar SALVAR; se a ferramenta devolver que salvamento automático está desativado, só chame de novo com confirmadoPeloUsuario:true depois que o cliente confirmar explicitamente.",
+    "- Para gerenciar_radar_frete: use quando o cliente disser que quer ser avisado de carga (ex.: 'vou descarregar amanhã em Goiânia, quero carga de volta pra Curitiba', 'procura frete de São Paulo pro Paraná', 'ativa meu radar'). Se o cliente tiver só 1 veículo ativo, associe automaticamente; se tiver mais de 1, pergunte qual antes de criar. Sem prazo informado, avise que o radar expira sozinho no prazo padrão (a ferramenta informa esse prazo na resposta). Nunca invente origem/destino — pergunte se não ficou claro.",
+    "- Para consultar_oportunidades_frete: use quando o cliente perguntar sobre oportunidades encontradas ('achou alguma coisa?', 'mostra as oportunidades', 'quais cargas apareceram'), pedir análise de uma ('analisa a primeira', 'analisa'), ou quiser ignorar/favoritar. O modo ANALISAR devolve uma estimativa PRELIMINAR (só custo de combustível) — deixe isso claro na resposta, e ofereça calcular_custo_viagem/analisar_frete/verificar_piso_minimo_antt com os dados completos do veículo se o cliente quiser o quadro real antes de decidir. Nunca diga 'aceite esse frete' — diga que os dados disponíveis indicam se parece interessante ou não; a decisão final é sempre do cliente.",
     "- Respostas em português do Brasil, seguindo o estilo definido acima, sem inventar seções ou dados que não foram calculados.",
     "",
     `Data e hora atual: ${dataHoraAtual} (fuso ${timezone}).`,
@@ -140,6 +142,20 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
       "",
       "O que você sabe sobre o cliente (memória AUXILIAR — nunca sobrescreve dado estruturado listado acima nem resultado de ferramenta/busca desta conversa; pode estar desatualizada, ver hierarquia de conflito nas regras invioláveis):",
       ...linhasMemoria
+    );
+  }
+
+  if (customer.activeRadars.length > 0) {
+    const linhasRadar = customer.activeRadars.map((r) => {
+      const origem = [r.origin_city, r.origin_state].filter(Boolean).join(" - ") || "qualquer origem";
+      const destino = [r.destination_city, r.destination_state].filter(Boolean).join(" - ") || r.destination_region_label || "qualquer destino";
+      return `- id ${r.id}: ${origem} → ${destino} (expira em ${r.expires_at.slice(0, 10)}).`;
+    });
+    linhas.push(
+      "",
+      "Radares de frete ativos do cliente (dado ESTRUTURADO — vence memória em caso de conflito sobre o que o cliente está procurando agora):",
+      ...linhasRadar,
+      "Se o cliente responder \"analisa\"/\"ignora\"/\"quero ver\" sem dizer qual oportunidade, use consultar_oportunidades_frete (LISTAR) para achar qual — se só houver 1 pendente (status notified/new), use essa; se houver mais de 1, pergunte qual."
     );
   }
 

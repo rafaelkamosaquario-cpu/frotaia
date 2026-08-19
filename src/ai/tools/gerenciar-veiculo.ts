@@ -9,6 +9,7 @@ import { syncDocumentAlert } from "@/services/supabase/fleetAlertsService";
 import type {
   VehicleRow,
   VehicleTypeEnum,
+  VehicleBodyTypeEnum,
   FuelTypeEnum,
   TireCategoryEnum,
   VehicleCostProfileRow,
@@ -69,6 +70,18 @@ const TIPOS_VEICULO: VehicleTypeEnum[] = [
 
 const TIPOS_COMBUSTIVEL: FuelTypeEnum[] = ["diesel_s10", "diesel_s500", "gasolina", "etanol", "eletrico", "outro"];
 
+const TIPOS_CARROCERIA: VehicleBodyTypeEnum[] = [
+  "sider",
+  "graneleiro",
+  "bau",
+  "cacamba",
+  "tanque",
+  "grade_baixa",
+  "prancha",
+  "frigorifico",
+  "outro",
+];
+
 const CATEGORIAS_PNEU: TireCategoryEnum[] = ["novo_nacional", "novo_importado", "recapado", "misto", "outro"];
 
 export interface GerenciarVeiculoEntrada {
@@ -83,6 +96,7 @@ export interface GerenciarVeiculoEntrada {
   nome?: string;
   placa?: string;
   tipo?: VehicleTypeEnum;
+  carroceria?: VehicleBodyTypeEnum;
   marca?: string;
   modelo?: string;
   anoModelo?: number;
@@ -124,6 +138,7 @@ export interface VeiculoResumo {
   nome: string | null;
   placa: string | null;
   tipo: VehicleTypeEnum | null;
+  carroceria: VehicleBodyTypeEnum | null;
   marca: string | null;
   modelo: string | null;
   anoModelo: number | null;
@@ -192,6 +207,7 @@ function mapaVeiculo(row: VehicleRow, vencimentos?: VencimentosVeiculo): Veiculo
     nome: row.name,
     placa: row.plate,
     tipo: row.vehicle_type,
+    carroceria: row.body_type,
     marca: row.brand,
     modelo: row.model,
     anoModelo: row.model_year,
@@ -286,6 +302,7 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         name: entrada.nome,
         plate: entrada.placa,
         vehicleType: entrada.tipo,
+        bodyType: entrada.carroceria,
         brand: entrada.marca,
         model: entrada.modelo,
         modelYear: entrada.anoModelo,
@@ -341,6 +358,7 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         name: entrada.nome,
         plate: entrada.placa,
         vehicleType: entrada.tipo,
+        bodyType: entrada.carroceria,
         brand: entrada.marca,
         model: entrada.modelo,
         modelYear: entrada.anoModelo,
@@ -464,6 +482,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
   { nome: "nome", tipo: "string", obrigatorio: false, descricao: "Nome/apelido do veículo (ex.: \"Volvo FH branco\")." },
   { nome: "placa", tipo: "string", obrigatorio: false, descricao: "Placa do veículo." },
   { nome: "tipo", tipo: "enum", obrigatorio: false, descricao: "Tipo do veículo/implemento.", valoresPossiveis: TIPOS_VEICULO },
+  { nome: "carroceria", tipo: "enum", obrigatorio: false, descricao: "Carroceria do veículo/conjunto (sider, graneleiro, baú, caçamba, tanque, grade baixa, prancha, frigorífico) — usada pelo Radar de Fretes pra achar carga compatível.", valoresPossiveis: TIPOS_CARROCERIA },
   { nome: "marca", tipo: "string", obrigatorio: false, descricao: "Marca (ex.: Volvo, Scania, Mercedes)." },
   { nome: "modelo", tipo: "string", obrigatorio: false, descricao: "Modelo (ex.: FH 540)." },
   { nome: "anoModelo", tipo: "number", obrigatorio: false, descricao: "Ano do modelo." },

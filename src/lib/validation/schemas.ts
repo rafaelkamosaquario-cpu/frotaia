@@ -91,10 +91,23 @@ export const vehicleTypeSchema = z.enum([
 
 export const fuelTypeSchema = z.enum(["diesel_s10", "diesel_s500", "gasolina", "etanol", "eletrico", "outro"]);
 
+export const vehicleBodyTypeSchema = z.enum([
+  "sider",
+  "graneleiro",
+  "bau",
+  "cacamba",
+  "tanque",
+  "grade_baixa",
+  "prancha",
+  "frigorifico",
+  "outro",
+]);
+
 export const vehicleCreateSchema = z.object({
   name: maxText(120, "Nome do veículo").optional(),
   plate: plateSchema.optional(),
   vehicleType: vehicleTypeSchema.optional(),
+  bodyType: vehicleBodyTypeSchema.optional(),
   brand: maxText(80, "Marca").optional(),
   model: maxText(80, "Modelo").optional(),
   modelYear: z.number().int().min(1970).max(2100).optional(),
@@ -373,6 +386,8 @@ export const frotaIaToolNameSchema = z.enum([
   "vincular_painel",
   "consultar_checklist",
   "gerenciar_memoria",
+  "gerenciar_radar_frete",
+  "consultar_oportunidades_frete",
 ]);
 
 export const toolExecutionCreateSchema = z.object({
@@ -383,4 +398,36 @@ export const toolExecutionCreateSchema = z.object({
   toolName: frotaIaToolNameSchema,
   toolVersion: maxText(32, "toolVersion").optional(),
   inputData: z.record(z.string(), z.unknown()),
+});
+
+// ── Radar de Fretes (MVP) ──────────────────────────────────────────────────
+
+const ufSchema = z.string().trim().toUpperCase().length(2, "UF deve ter 2 letras.").nullable();
+
+export const freightRadarCreateSchema = z.object({
+  vehicleId: uuidSchema.nullable().optional(),
+  originCity: maxText(120, "Cidade de origem").nullable().optional(),
+  originState: ufSchema.optional(),
+  destinationCity: maxText(120, "Cidade de destino").nullable().optional(),
+  destinationState: ufSchema.optional(),
+  destinationRegionLabel: maxText(120, "Região de destino").nullable().optional(),
+  availableFrom: z.string().date().nullable().optional(),
+  availableUntil: z.string().date().nullable().optional(),
+  notes: maxText(500, "Observações").nullable().optional(),
+});
+
+export const freightRadarUpdateSchema = freightRadarCreateSchema.partial();
+
+/** Saída da extração estruturada por IA (opportunityExtraction.ts) — nunca inventa campo ausente, sempre null. */
+export const freightOpportunityExtractionSchema = z.object({
+  pareceOfertaDeFrete: z.boolean(),
+  originCity: z.string().nullable(),
+  originState: z.string().length(2).nullable(),
+  destinationCity: z.string().nullable(),
+  destinationState: z.string().length(2).nullable(),
+  pickupDate: z.string().date().nullable(),
+  bodyType: vehicleBodyTypeSchema.nullable(),
+  weightKg: z.number().finite().nonnegative().nullable(),
+  freightValueCents: z.number().finite().nonnegative().nullable(),
+  contactText: z.string().nullable(),
 });
