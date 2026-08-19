@@ -2315,6 +2315,8 @@ export type Database = {
         | "gerenciar_memoria"
         | "gerenciar_radar_frete"
         | "consultar_oportunidades_frete"
+        | "gerenciar_empresa"
+        | "gerenciar_checklist_config"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -2623,6 +2625,8 @@ export const Constants = {
         "gerenciar_memoria",
         "gerenciar_radar_frete",
         "consultar_oportunidades_frete",
+        "gerenciar_empresa",
+        "gerenciar_checklist_config",
       ],
       fuel_type: [
         "diesel_s10",

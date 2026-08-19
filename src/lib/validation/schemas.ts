@@ -388,6 +388,8 @@ export const frotaIaToolNameSchema = z.enum([
   "gerenciar_memoria",
   "gerenciar_radar_frete",
   "consultar_oportunidades_frete",
+  "gerenciar_empresa",
+  "gerenciar_checklist_config",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

@@ -1,7 +1,7 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
 import { arredondar } from "./utils";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { recordExpense, listExpenses } from "@/services/supabase/expenseService";
+import { recordExpense, listExpenses, updateExpense, deleteExpense } from "@/services/supabase/expenseService";
 import type { ExpenseRow, ExpenseTypeEnum } from "@/lib/supabase/tables";
 
 /**
@@ -25,7 +25,7 @@ import type { ExpenseRow, ExpenseTypeEnum } from "@/lib/supabase/tables";
  * soma automaticamente dentro delas.
  */
 
-export type ModoRegistrarDespesa = "REGISTRAR" | "CONSULTAR";
+export type ModoRegistrarDespesa = "REGISTRAR" | "CONSULTAR" | "ATUALIZAR" | "EXCLUIR";
 
 const TIPOS_DESPESA: ExpenseTypeEnum[] = [
   "combustivel",
@@ -49,7 +49,7 @@ export interface RegistrarDespesaEntrada {
   sourceMessageId?: string;
   vehicleId?: string;
 
-  // REGISTRAR
+  // REGISTRAR / ATUALIZAR
   tipo?: ExpenseTypeEnum;
   valor?: number;
   /** Data da despesa em YYYY-MM-DD (não a data/hora de registro) — resolvida pela IA a partir da nota ou da data atual informada no system prompt. */
@@ -61,6 +61,11 @@ export interface RegistrarDespesaEntrada {
   dataInicio?: string;
   dataFim?: string;
   limite?: number;
+
+  // ATUALIZAR / EXCLUIR
+  despesaId?: string;
+  /** Obrigatório true em EXCLUIR — só depois que o cliente confirmar explicitamente, nunca excluir por decisão própria da IA. */
+  confirmacao?: boolean;
 }
 
 export interface DespesaResumo {
@@ -188,6 +193,60 @@ async function executar(entrada: RegistrarDespesaEntrada): Promise<RegistrarDesp
         };
       }
 
+      case "ATUALIZAR": {
+        if (!entrada.despesaId) {
+          return respostaFalha(modo, ["Preciso saber exatamente qual despesa (despesaId) — use CONSULTAR antes se houver dúvida sobre qual é."], ["despesaId"]);
+        }
+        if (entrada.tipo && !TIPOS_DESPESA.includes(entrada.tipo)) {
+          return respostaFalha(modo, [`Tipo de despesa inválido: "${entrada.tipo}". Use um de: ${TIPOS_DESPESA.join(", ")}.`]);
+        }
+        if (entrada.valor !== undefined && entrada.valor <= 0) {
+          return respostaFalha(modo, ["O valor da despesa precisa ser maior que zero."]);
+        }
+        if (entrada.data && !DATA_REGEX.test(entrada.data)) {
+          return respostaFalha(modo, ['A data da despesa precisa estar em "YYYY-MM-DD" (ex.: 2026-07-31) — nunca uma expressão relativa.']);
+        }
+
+        const atualizada = await updateExpense(admin, entrada.despesaId, companyId, {
+          vehicleId: entrada.vehicleId,
+          expenseType: entrada.tipo,
+          amount: entrada.valor,
+          expenseDate: entrada.data,
+          vendor: entrada.fornecedor,
+          description: entrada.descricao,
+        });
+
+        return {
+          sucesso: true,
+          modo,
+          alertas: [],
+          premissas: [],
+          dadosFaltantes: [],
+          despesa: mapaDespesa(atualizada),
+          mensagemResumo: `Despesa atualizada.`,
+        };
+      }
+
+      case "EXCLUIR": {
+        if (!entrada.despesaId) {
+          return respostaFalha(modo, ["Preciso saber exatamente qual despesa (despesaId) — use CONSULTAR antes se houver dúvida sobre qual é."], ["despesaId"]);
+        }
+        if (!entrada.confirmacao) {
+          return respostaFalha(modo, ["Antes de excluir, confirme com o cliente qual despesa exatamente e só então chame de novo com confirmacao:true."], ["confirmacao"]);
+        }
+
+        await deleteExpense(admin, entrada.despesaId, companyId);
+
+        return {
+          sucesso: true,
+          modo,
+          alertas: [],
+          premissas: [],
+          dadosFaltantes: [],
+          mensagemResumo: "Despesa excluída.",
+        };
+      }
+
       default: {
         const modoNuncaVisto: never = modo;
         return respostaFalha(modoNuncaVisto as ModoRegistrarDespesa, [`Modo desconhecido: ${String(modoNuncaVisto)}.`]);
@@ -199,7 +258,7 @@ async function executar(entrada: RegistrarDespesaEntrada): Promise<RegistrarDesp
 }
 
 const PARAMETROS: DefinicaoParametroFerramenta[] = [
-  { nome: "modo", tipo: "enum", obrigatorio: true, descricao: "Operação a executar.", valoresPossiveis: ["REGISTRAR", "CONSULTAR"] },
+  { nome: "modo", tipo: "enum", obrigatorio: true, descricao: "Operação a executar.", valoresPossiveis: ["REGISTRAR", "CONSULTAR", "ATUALIZAR", "EXCLUIR"] },
   { nome: "userId", tipo: "string", obrigatorio: true, descricao: "Usuário dono da despesa (do contexto da conversa, nunca da mensagem)." },
   { nome: "companyId", tipo: "string", obrigatorio: true, descricao: "Empresa dona da despesa (do contexto da conversa)." },
   { nome: "conversationId", tipo: "string", obrigatorio: false, descricao: "Conversa de origem." },
@@ -212,13 +271,15 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
   { nome: "dataInicio", tipo: "string", obrigatorio: false, descricao: "Início do período em YYYY-MM-DD (CONSULTAR), já resolvido a partir da data atual." },
   { nome: "dataFim", tipo: "string", obrigatorio: false, descricao: "Fim do período em YYYY-MM-DD (CONSULTAR)." },
   { nome: "limite", tipo: "number", obrigatorio: false, descricao: "Máximo de resultados em CONSULTAR (padrão 50, limite 200)." },
+  { nome: "despesaId", tipo: "string", obrigatorio: false, descricao: "Id da despesa — obrigatório em ATUALIZAR/EXCLUIR. Use CONSULTAR antes se não tiver certeza de qual é." },
+  { nome: "confirmacao", tipo: "boolean", obrigatorio: false, descricao: "EXCLUIR: só true depois que o cliente confirmou explicitamente qual despesa excluir." },
 ];
 
 export const ferramentaRegistrarDespesa: DefinicaoFerramenta<RegistrarDespesaEntrada, RegistrarDespesaResultado> = {
   nome: "registrar_despesa",
-  descricao: "Registra uma despesa estruturada (combustível, manutenção, pedágio etc.) e consulta/soma despesas já registradas por período, veículo ou tipo.",
+  descricao: "Registra uma despesa estruturada (combustível, manutenção, pedágio etc.), consulta/soma despesas já registradas, e permite corrigir ou excluir um lançamento errado.",
   objetivo:
-    "Transformar o que o Claude lê numa foto de nota/cupom fiscal (ou o que o usuário informa em texto) num registro estruturado vinculado ao veículo/empresa, em vez de ficar só mencionado na conversa. O modo CONSULTAR permite somar despesas de um período para alimentar calcular_cpk/calcular_custo_dia por decisão explícita da IA — nunca some despesas de cabeça, sempre via este modo.",
+    "Transformar o que o Claude lê numa foto de nota/cupom fiscal (ou o que o usuário informa em texto) num registro estruturado vinculado ao veículo/empresa, em vez de ficar só mencionado na conversa. O modo CONSULTAR permite somar despesas de um período para alimentar calcular_cpk/calcular_custo_dia por decisão explícita da IA — nunca some despesas de cabeça, sempre via este modo. ATUALIZAR/EXCLUIR corrigem um lançamento errado (ex.: valor lido errado de uma nota) sem precisar abrir o painel.",
   parametros: PARAMETROS,
   executar,
 };

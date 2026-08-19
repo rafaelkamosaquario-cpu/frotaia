@@ -109,6 +109,8 @@ export interface GerenciarVeiculoEntrada {
   vencimentoSeguro?: string;
   vencimentoLicenciamento?: string;
   observacoes?: string;
+  /** ATUALIZAR apenas — ativa/desativa o veículo (ex.: "vendi o caminhão"/"voltei a usar esse veículo"). Nunca usado em CRIAR (veículo novo já nasce ativo). */
+  ativo?: boolean;
 
   // DEFINIR_CUSTO — campo não informado carrega o valor já salvo do perfil ativo, nunca apaga silenciosamente.
   precoCombustivelLitro?: number;
@@ -369,6 +371,7 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
         currentOdometerKm: entrada.hodometroAtualKm,
         axleCount: entrada.numeroEixos,
         notes: entrada.observacoes,
+        active: entrada.ativo,
       });
 
       const vencimentos = await sincronizarESeguroLicenciamento(admin, companyId, userId, atualizado.id, entrada.vencimentoSeguro, entrada.vencimentoLicenciamento);
@@ -495,6 +498,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
   { nome: "vencimentoSeguro", tipo: "string", obrigatorio: false, descricao: "Data de vencimento do seguro do veículo, formato YYYY-MM-DD — lida de foto do comprovante ou informada pelo cliente." },
   { nome: "vencimentoLicenciamento", tipo: "string", obrigatorio: false, descricao: "Data de vencimento do licenciamento/CRLV, formato YYYY-MM-DD — lida de foto do documento ou informada pelo cliente." },
   { nome: "observacoes", tipo: "string", obrigatorio: false, descricao: "Observações livres sobre o veículo." },
+  { nome: "ativo", tipo: "boolean", obrigatorio: false, descricao: "ATUALIZAR: true reativa, false desativa o veículo (ex.: cliente vendeu o caminhão ou voltou a usá-lo). Contas não-transportadora só podem ter 1 veículo ativo por vez — se der erro de limite, avise o cliente." },
   { nome: "precoCombustivelLitro", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: preço do combustível por litro." },
   { nome: "custoFixoDia", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: custo fixo diário." },
   { nome: "custoFixoMes", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: custo fixo mensal." },

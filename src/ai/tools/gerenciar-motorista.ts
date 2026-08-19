@@ -21,7 +21,7 @@ import type { DriverRow } from "@/lib/supabase/tables";
  * antes de vincular — nunca confia só no id que o modelo mandou.
  */
 
-export type ModoGerenciarMotorista = "CRIAR" | "LISTAR" | "ATUALIZAR" | "DESATIVAR";
+export type ModoGerenciarMotorista = "CRIAR" | "LISTAR" | "ATUALIZAR" | "DESATIVAR" | "ATIVAR";
 
 export interface GerenciarMotoristaEntrada {
   modo: ModoGerenciarMotorista;
@@ -125,7 +125,7 @@ async function executar(entrada: GerenciarMotoristaEntrada): Promise<GerenciarMo
       };
     }
 
-    // ATUALIZAR / DESATIVAR exigem driverId, sempre verificado contra a empresa (via filtro company_id no update).
+    // ATUALIZAR / DESATIVAR / ATIVAR exigem driverId, sempre verificado contra a empresa (via filtro company_id no update).
     if (!entrada.driverId) {
       return respostaFalha(modo, ["Preciso saber exatamente qual motorista (driverId) — use LISTAR antes se houver dúvida sobre qual é."], ["driverId"]);
     }
@@ -150,16 +150,16 @@ async function executar(entrada: GerenciarMotoristaEntrada): Promise<GerenciarMo
       };
     }
 
-    // DESATIVAR
-    const desativado = await updateDriver(admin, entrada.driverId, companyId, { active: false });
+    // DESATIVAR / ATIVAR
+    const atualizadoStatus = await updateDriver(admin, entrada.driverId, companyId, { active: modo === "ATIVAR" });
     return {
       sucesso: true,
       modo,
       alertas: [],
       premissas: [],
       dadosFaltantes: [],
-      motorista: mapaMotorista(desativado),
-      mensagemResumo: `Motorista "${desativado.name}" desativado.`,
+      motorista: mapaMotorista(atualizadoStatus),
+      mensagemResumo: modo === "ATIVAR" ? `Motorista "${atualizadoStatus.name}" reativado.` : `Motorista "${atualizadoStatus.name}" desativado.`,
     };
   } catch {
     return respostaFalha(modo, ["Não foi possível concluir a ação de motorista agora. Confira os dados e tente novamente."]);
@@ -167,11 +167,11 @@ async function executar(entrada: GerenciarMotoristaEntrada): Promise<GerenciarMo
 }
 
 const PARAMETROS: DefinicaoParametroFerramenta[] = [
-  { nome: "modo", tipo: "enum", obrigatorio: true, descricao: "Operação a executar.", valoresPossiveis: ["CRIAR", "LISTAR", "ATUALIZAR", "DESATIVAR"] },
+  { nome: "modo", tipo: "enum", obrigatorio: true, descricao: "Operação a executar.", valoresPossiveis: ["CRIAR", "LISTAR", "ATUALIZAR", "DESATIVAR", "ATIVAR"] },
   { nome: "userId", tipo: "string", obrigatorio: true, descricao: "Usuário dono da empresa (do contexto da conversa, nunca da mensagem)." },
   { nome: "companyId", tipo: "string", obrigatorio: true, descricao: "Empresa dona do(s) motorista(s) (do contexto da conversa)." },
   { nome: "conversationId", tipo: "string", obrigatorio: false, descricao: "Conversa de origem." },
-  { nome: "driverId", tipo: "string", obrigatorio: false, descricao: "Id do motorista — obrigatório em ATUALIZAR/DESATIVAR. Use LISTAR antes se não tiver certeza de qual é." },
+  { nome: "driverId", tipo: "string", obrigatorio: false, descricao: "Id do motorista — obrigatório em ATUALIZAR/DESATIVAR/ATIVAR. Use LISTAR antes se não tiver certeza de qual é." },
   { nome: "nome", tipo: "string", obrigatorio: false, descricao: "Nome do motorista." },
   { nome: "telefone", tipo: "string", obrigatorio: false, descricao: "Telefone do motorista, formato E.164 (ex.: +5541999998888)." },
   { nome: "veiculoId", tipo: "string", obrigatorio: false, descricao: "Id do veículo a vincular — use LISTAR de veículos (gerenciar_veiculo) antes se não tiver certeza. Omitir mantém o vínculo atual; não é possível desvincular por aqui (só pelo painel)." },
@@ -181,7 +181,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
 
 export const ferramentaGerenciarMotorista: DefinicaoFerramenta<GerenciarMotoristaEntrada, GerenciarMotoristaResultado> = {
   nome: "gerenciar_motorista",
-  descricao: "Cadastra, lista, atualiza e desativa motoristas da empresa (nome, telefone, veículo vinculado, vencimento de CNH/toxicológico) a partir do que o cliente conta na conversa.",
+  descricao: "Cadastra, lista, atualiza, desativa e reativa motoristas da empresa (nome, telefone, veículo vinculado, vencimento de CNH/toxicológico) a partir do que o cliente conta na conversa.",
   objetivo:
     "Transformar dado de motorista mencionado na conversa num registro estruturado reaproveitável (mesma tabela `drivers` que o painel de gestão de frota usa) — nunca inventa um valor não informado pelo usuário. Motorista aqui é só um registro operacional, não uma conta de usuário.",
   parametros: PARAMETROS,

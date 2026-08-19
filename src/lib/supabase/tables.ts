@@ -133,6 +133,7 @@ export type FreightOpportunityMatchRow = PublicTables["freight_opportunity_match
 export type FreightOpportunityMatchInsert = PublicTables["freight_opportunity_matches"]["Insert"];
 export type FreightOpportunityMatchUpdate = PublicTables["freight_opportunity_matches"]["Update"];
 
+export type CompanyTypeEnum = PublicEnums["company_type"];
 export type CompanyMemberRole = PublicEnums["company_member_role"];
 export type OnboardingState = PublicEnums["onboarding_state"];
 export type ScheduledAlertStatus = PublicEnums["scheduled_alert_status"];
