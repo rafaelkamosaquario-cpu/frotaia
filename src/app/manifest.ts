@@ -10,7 +10,8 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Frota IA Assistente",
     short_name: "Frota IA",
     description: "Especialista virtual em transporte e gestão de frotas: fretes, CPK, consumo, pneus e custos.",
-    start_url: "/",
+    // Painel de gestão de frota (Rafael usa isso, não o chat simples da raiz "/") — só afeta Android/Chrome ("Instalar app"); no iOS quem decide é a página em que o cliente estava ao tocar "Adicionar à Tela de Início".
+    start_url: "/frota/dashboard",
     display: "standalone",
     background_color: "#0e0f13",
     theme_color: "#0e0f13",
