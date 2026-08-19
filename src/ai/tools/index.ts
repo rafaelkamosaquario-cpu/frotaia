@@ -49,6 +49,7 @@ export * from "./gerenciar-documento-frota";
 export * from "./gerenciar-jornada-salva";
 export * from "./vincular-painel";
 export * from "./consultar-checklist";
+export * from "./gerenciar-memoria";
 
 import { ferramentaAnalisarFrete } from "./analisar-frete";
 import { ferramentaCalcularCombustivel } from "./calcular-combustivel";
@@ -80,6 +81,7 @@ import { ferramentaGerenciarDocumentoFrota } from "./gerenciar-documento-frota";
 import { ferramentaGerenciarJornadaSalva } from "./gerenciar-jornada-salva";
 import { ferramentaVincularPainel } from "./vincular-painel";
 import { ferramentaConsultarChecklist } from "./consultar-checklist";
+import { ferramentaGerenciarMemoria } from "./gerenciar-memoria";
 import type { DefinicaoFerramenta, ResultadoFerramentaBase } from "./types";
 
 /**
@@ -123,4 +125,5 @@ export const FERRAMENTAS_FROTA_IA: ReadonlyArray<DefinicaoFerramenta<never, Resu
   ferramentaGerenciarJornadaSalva,
   ferramentaVincularPainel,
   ferramentaConsultarChecklist,
+  ferramentaGerenciarMemoria,
 ];

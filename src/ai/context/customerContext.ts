@@ -6,10 +6,11 @@ import { getVehicle, resolveDefaultVehicle as resolveDefaultVehicleRow } from "@
 import { getActiveCostProfile } from "@/services/supabase/vehicleCostProfileService";
 import { listTireProfiles } from "@/services/supabase/vehicleTireProfileService";
 import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
-import { saveMemory } from "@/services/supabase/memoryService";
+import { saveMemory, listMemoriesForPrompt } from "@/services/supabase/memoryService";
 import { recordToolExecution } from "@/services/supabase/toolExecutionService";
 import type { SupabaseDbClient } from "@/services/supabase/types";
 import type {
+  AiMemoryRow,
   CompanyMemberRole,
   CompanyPreferencesRow,
   CompanyRow,
@@ -36,6 +37,14 @@ import type { FrotaIaToolName } from "@/lib/supabase/tables";
  * 6. perguntar ao usuário.
  * Esse merge é responsabilidade de quem monta a entrada da ferramenta —
  * este módulo só entrega os dados brutos de cada camada.
+ *
+ * `memories` (nível 5 acima) é sempre AUXILIAR: nunca sobrescreve um dado
+ * estruturado (perfil de veículo/custo/pneu, preferência) quando os dois
+ * existirem — ver a regra de hierarquia de fontes no system prompt
+ * (construirSystemPrompt). O merge automático de dado estruturado dentro de
+ * ai_memories nunca acontece aqui nem em lugar nenhum — é dado
+ * complementar, guardado só pela ferramenta gerenciar_memoria ou pelo
+ * onboarding (finalizeOnboarding.ts).
  */
 
 export interface CustomerContext {
@@ -43,6 +52,7 @@ export interface CustomerContext {
   company: CompanyRow | null;
   role: CompanyMemberRole | null;
   preferences: CompanyPreferencesRow | null;
+  memories: AiMemoryRow[];
 }
 
 export async function loadCustomerContext(client: SupabaseDbClient, userId: string): Promise<CustomerContext> {
@@ -59,13 +69,16 @@ export async function loadCustomerContext(client: SupabaseDbClient, userId: stri
   if (error) throw error;
 
   if (!membership || !membership.companies) {
-    return { profile, company: null, role: null, preferences: null };
+    return { profile, company: null, role: null, preferences: null, memories: [] };
   }
 
   const company = membership.companies as CompanyRow;
   const preferences = await getOrCreatePreferences(client, company.id);
+  const memories = await listMemoriesForPrompt(client, company.id, userId);
+  // Log mínimo por desenho: só a contagem, nunca o conteúdo da memória (pode ter dado sensível do cliente).
+  console.log(`[customerContext] memórias carregadas para o prompt: ${memories.length}`);
 
-  return { profile, company, role: membership.role, preferences };
+  return { profile, company, role: membership.role, preferences, memories };
 }
 
 export interface VehicleContext {

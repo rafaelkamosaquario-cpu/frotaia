@@ -2007,6 +2007,7 @@ export type Database = {
         | "gerenciar_jornada_salva"
         | "vincular_painel"
         | "consultar_checklist"
+        | "gerenciar_memoria"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -2278,6 +2279,7 @@ export const Constants = {
         "gerenciar_jornada_salva",
         "vincular_painel",
         "consultar_checklist",
+        "gerenciar_memoria",
       ],
       fuel_type: [
         "diesel_s10",

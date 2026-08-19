@@ -372,6 +372,7 @@ export const frotaIaToolNameSchema = z.enum([
   "gerenciar_jornada_salva",
   "vincular_painel",
   "consultar_checklist",
+  "gerenciar_memoria",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

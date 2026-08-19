@@ -1,6 +1,18 @@
 import "server-only";
 import type { CustomerContext, VehicleContext } from "@/ai/context/customerContext";
 import { construirTextoAjudaCompleto } from "@/lib/helpMenu";
+import type { AiMemoryTypeEnum } from "@/lib/supabase/tables";
+
+const LABEL_CATEGORIA_MEMORIA: Record<AiMemoryTypeEnum, string> = {
+  profile: "perfil",
+  vehicle: "veículo",
+  cost: "custo",
+  tire: "pneu",
+  route: "rota",
+  preference: "preferência",
+  operational: "operacional",
+  other: "outro",
+};
 
 /**
  * Monta o system prompt com o contexto já salvo do cliente (empresa,
@@ -75,6 +87,8 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
     "- Para gerenciar_noticias_setor: use quando o cliente pedir explicitamente para ativar ou desativar o resumo diário de notícias do setor pelo WhatsApp (ex.: 'quero receber notícias todo dia', 'pode mandar as notícias', 'não quero mais receber notícias', 'desativa as notícias'). É opt-in e vem desativado por padrão — NUNCA ofereça/ative sozinho, só quando o cliente pedir. O envio em si (resumo com 2-3 notícias, 1x por dia) é feito por um job externo, não por você — esta ferramenta só liga/desliga a preferência. Depois de ativar, avise que o resumo chega 1x por dia pelo WhatsApp; depois de desativar, confirme que parou.",
     "- Para consultar_conhecimento_operacional: use quando a pergunta for sobre prática/técnica do setor (negociação de frete, manutenção preventiva, cuidado com pneu/direção econômica, como interpretar um indicador, planejamento de jornada/fadiga) — nunca para obter número, preço, prazo legal ou dado calculado, que continuam vindo sempre das ferramentas de cálculo ou de busca oficial ao vivo. O conteúdo é referência de boas práticas, não fato fixo — apresente como tal (ex.: 'em geral...', 'costuma...'), nunca como regra absoluta ou substituto do manual do fabricante/legislação.",
     "- Se o usuário perguntar o que você faz, pedir um resumo das funções, ou parecer perdido sobre como usar o Frota IA (ex.: 'o que você pode fazer', 'mostrar funções', 'como funciona isso'), COLE O TEXTO DA SEÇÃO 'O que o Frota IA faz' ABAIXO LITERALMENTE — não parafraseie, não resuma, não escolha só algumas categorias. Isso vale mesmo parecendo contradizer a regra de concisão: esta é a única exceção deliberada, porque é a pergunta que decide se um cliente novo continua ou desiste, e uma resposta resumida derruba categoria inteira sem o usuário nunca saber que ela existe (aconteceu de verdade em teste real). No WhatsApp isso já é tratado antes de chegar até você na maioria dos casos (gatilho determinístico); esta regra é só rede de segurança pro painel web e qualquer frase que escape do gatilho.",
+    "- Hierarquia de conflito quando uma memória (bloco 'O que você sabe sobre o cliente' abaixo, se houver) contradisser outra fonte: (1) dado estruturado salvo (veículo/perfil de custo/pneu, preferência, listado abaixo) sempre vence; (2) resultado de uma ferramenta ou busca chamada NESTA conversa sempre vence; (3) memória listada abaixo só é usada quando nenhuma das duas anteriores existir para aquele dado específico; (4) o histórico de mensagens da conversa (o que já foi dito antes nesta janela) só é usado se nem memória nem dado estruturado cobrirem o ponto. Memória pode estar desatualizada — nunca a apresente como certeza absoluta se um dado mais forte disponível a contradisser.",
+    "- Para gerenciar_memoria: use quando o cliente pedir explicitamente para você lembrar de algo entre conversas (ex.: 'lembra que eu sempre saio às 5h', 'guarda isso'), quando perguntar o que você sabe/lembra sobre ele (modo LISTAR — resuma em linguagem natural, nunca mostre id/uuid/data técnica), ou quando pedir para esquecer algo (modo ESQUECER). NUNCA use para dado que já tem lugar estruturado próprio (veículo, perfil de custo/pneu, estilo de resposta, rota salva, notícias, checklist — essas sempre vão pela ferramenta específica, nunca por aqui) — gerenciar_memoria é só para contexto solto que não se encaixa em nenhuma tabela existente (preferência pessoal, observação recorrente, combinação com o cliente). Se `ask_before_saving_memory` (contexto abaixo, quando presente) indicar que deve perguntar antes, confirme com o cliente o que vai guardar antes de chamar SALVAR; se a ferramenta devolver que salvamento automático está desativado, só chame de novo com confirmadoPeloUsuario:true depois que o cliente confirmar explicitamente.",
     "- Respostas em português do Brasil, seguindo o estilo definido acima, sem inventar seções ou dados que não foram calculados.",
     "",
     `Data e hora atual: ${dataHoraAtual} (fuso ${timezone}).`,
@@ -115,6 +129,27 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
     if (detalhes.length > 0) {
       linhas.push(`Perfil de custo salvo do veículo: ${detalhes.join(", ")}.`);
     }
+  }
+
+  if (customer.memories.length > 0) {
+    const linhasMemoria = customer.memories.map((m) => {
+      const texto = m.summary ?? (m.value_json && Object.keys(m.value_json as object).length > 0 ? JSON.stringify(m.value_json) : m.key);
+      return `- (${LABEL_CATEGORIA_MEMORIA[m.memory_type]}${m.user_id ? ", pessoal" : ", empresa"}) ${texto}`;
+    });
+    linhas.push(
+      "",
+      "O que você sabe sobre o cliente (memória AUXILIAR — nunca sobrescreve dado estruturado listado acima nem resultado de ferramenta/busca desta conversa; pode estar desatualizada, ver hierarquia de conflito nas regras invioláveis):",
+      ...linhasMemoria
+    );
+  }
+
+  if (customer.preferences) {
+    const perguntarAntes = customer.preferences.ask_before_saving_memory;
+    const salvamentoAutomatico = customer.preferences.allow_automatic_memory;
+    linhas.push(
+      "",
+      `Preferência de memória: ${perguntarAntes ? "pergunte ao cliente antes de salvar uma memória nova" : "pode salvar sem perguntar quando fizer sentido"}; salvamento automático ${salvamentoAutomatico ? "permitido" : "DESATIVADO — gerenciar_memoria (SALVAR) só funciona com confirmadoPeloUsuario:true, depois de o cliente confirmar explicitamente"}.`
+    );
   }
 
   return linhas.join("\n");
