@@ -82,7 +82,7 @@ Confirmado nos 4: o código trata sucesso da chamada HTTP ao Z-API como "enviado
 
 | # | Risco | Endpoint(s) | Severidade sugerida |
 |---|---|---|---|
-| 1 | Sem lock/constraint única para evitar duplo processamento concorrente | Todos os 4 | P2 — nunca observado em produção (só 1 execução por vez via Railway), mas é uma garantia ausente |
+| 1 | ✅ CORRIGIDO (alertas) — Sem lock/constraint única para evitar duplo processamento concorrente | Todos os 4 | P2 — `markAlertSent`/`markAlertFailed` agora fazem `UPDATE ... WHERE status='pending'` (compare-and-swap): uma segunda execução concorrente vira update de 0 linhas em vez de sobrescrever o resultado já gravado. Checklist/notícias/trial warnings continuam sem lock — não corrigidos nesta rodada (mudança de schema/lógica maior, fora do escopo pontual pedido) |
 | 2 | Checklist sem `LIMIT` de lote | `/api/checklists/dispatch` | P3 — hoje o volume é pequeno (3 empresas reais) |
 | 3 | Checklist grava dispatch antes de confirmar envio (registro fantasma em caso de falha Z-API) | `/api/checklists/dispatch` | P3 |
 | 4 | Alertas com falha ficam `failed` permanentemente, sem retry | `/api/alerts/dispatch` | P3 |

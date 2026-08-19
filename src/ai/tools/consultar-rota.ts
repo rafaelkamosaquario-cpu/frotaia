@@ -90,8 +90,21 @@ function semGoogleMapsConfigurado(modo: ModoConsultarRota): ConsultarRotaResulta
   };
 }
 
+/**
+ * Nunca repassa `err.message` cru ao cliente: pode conter status técnico da
+ * API do Google (ex. "Geocoding API retornou status inesperado:
+ * OVER_QUERY_LIMIT.") — mesmo padrão de mensagem genérica das outras
+ * ferramentas de integração, com o detalhe real só no log do servidor. A
+ * única exceção é "não encontrou rota entre os pontos" (httpStatus e
+ * googleStatus ambos ausentes — único throw de GoogleMapsApiError sem
+ * nenhum dos dois), que é informação útil e segura pro usuário, não um
+ * detalhe técnico da integração.
+ */
 function erroSeguro(err: unknown): string {
-  if (err instanceof GoogleMapsApiError) return err.message;
+  if (err instanceof GoogleMapsApiError) {
+    if (err.httpStatus === undefined && err.googleStatus === undefined) return err.message;
+    console.error(`[consultar-rota] Falha na integração com o Google Maps: ${err.name}: ${err.message}`);
+  }
   return "Não consegui consultar o Google Maps agora. Tente novamente em instantes, ou informe a distância diretamente.";
 }
 

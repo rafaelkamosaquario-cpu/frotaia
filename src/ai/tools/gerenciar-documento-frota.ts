@@ -2,6 +2,7 @@ import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerram
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listVehicleDocumentsForPanel, createVehicleDocument, updateVehicleDocument } from "@/services/supabase/vehicleDocumentService";
 import { getVehicle } from "@/services/supabase/vehicleService";
+import { getDriver } from "@/services/supabase/driverService";
 import { syncDocumentAlert } from "@/services/supabase/fleetAlertsService";
 import type { VehicleDocumentRow, VehicleDocumentTypeEnum } from "@/lib/supabase/tables";
 
@@ -103,6 +104,13 @@ async function executar(entrada: GerenciarDocumentoFrotaEntrada): Promise<Gerenc
         }
       }
 
+      if (entrada.motoristaId) {
+        const motorista = await getDriver(admin, entrada.motoristaId, companyId);
+        if (!motorista) {
+          return respostaFalha(modo, ["Não encontrei esse motorista para esta empresa — use LISTAR de motoristas antes se houver dúvida sobre qual é."], ["motoristaId"]);
+        }
+      }
+
       const criado = await createVehicleDocument(admin, companyId, {
         documentType: entrada.tipo,
         vehicleId: entrada.veiculoId,
@@ -146,6 +154,13 @@ async function executar(entrada: GerenciarDocumentoFrotaEntrada): Promise<Gerenc
       const veiculo = await getVehicle(admin, entrada.veiculoId);
       if (!veiculo || veiculo.company_id !== companyId) {
         return respostaFalha(modo, ["Não encontrei esse veículo para esta empresa — use LISTAR de veículos antes se houver dúvida sobre qual é."], ["veiculoId"]);
+      }
+    }
+
+    if (entrada.motoristaId) {
+      const motorista = await getDriver(admin, entrada.motoristaId, companyId);
+      if (!motorista) {
+        return respostaFalha(modo, ["Não encontrei esse motorista para esta empresa — use LISTAR de motoristas antes se houver dúvida sobre qual é."], ["motoristaId"]);
       }
     }
 

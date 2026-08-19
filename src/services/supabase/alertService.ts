@@ -75,11 +75,19 @@ export async function listDueAlerts(client: SupabaseDbClient, limit = 50): Promi
   return data ?? [];
 }
 
+/**
+ * `.eq("status", "pending")` no WHERE (compare-and-swap): se duas execuções
+ * concorrentes do cron pegarem o mesmo alerta em listDueAlerts, só a
+ * primeira a chegar aqui realmente muda o status — a segunda vira um
+ * update de 0 linhas em vez de sobrescrever silenciosamente um resultado
+ * já gravado pela primeira.
+ */
 export async function markAlertSent(client: SupabaseDbClient, alertId: string): Promise<void> {
   const { error } = await client
     .from("scheduled_alerts")
     .update({ status: "sent", sent_at: new Date().toISOString() })
-    .eq("id", alertId);
+    .eq("id", alertId)
+    .eq("status", "pending");
 
   if (error) throw error;
 }
@@ -88,7 +96,8 @@ export async function markAlertFailed(client: SupabaseDbClient, alertId: string,
   const { error } = await client
     .from("scheduled_alerts")
     .update({ status: "failed", error_message_safe: errorMessageSafe })
-    .eq("id", alertId);
+    .eq("id", alertId)
+    .eq("status", "pending");
 
   if (error) throw error;
 }

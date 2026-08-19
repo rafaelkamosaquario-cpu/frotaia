@@ -2,6 +2,13 @@ import { driverCreateSchema, driverUpdateSchema } from "@/lib/validation/schemas
 import type { DriverRow } from "@/lib/supabase/tables";
 import type { SupabaseDbClient } from "./types";
 
+/** Busca um motorista já confirmando posse (company_id no filtro da própria query, não em checagem separada depois). */
+export async function getDriver(client: SupabaseDbClient, driverId: string, companyId: string): Promise<DriverRow | null> {
+  const { data, error } = await client.from("drivers").select("*").eq("id", driverId).eq("company_id", companyId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 /** Todos os motoristas da empresa (ativos e inativos) — painel V2, mesmo espírito de listVehiclesForPanel. */
 export async function listDriversForPanel(client: SupabaseDbClient, companyId: string): Promise<DriverRow[]> {
   const { data, error } = await client
