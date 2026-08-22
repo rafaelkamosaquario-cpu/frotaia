@@ -2,6 +2,10 @@
 
 Especialista virtual em transporte e gestão de frotas.
 
+**Infraestrutura de produção** (Railway, Supabase, Google, Z-API, domínios,
+variáveis de ambiente — o que faz tudo funcionar e o que quebra se algo
+mudar): [`docs/FROTA_IA_INFRAESTRUTURA_PRODUCAO.md`](./docs/FROTA_IA_INFRAESTRUTURA_PRODUCAO.md).
+
 Projeto construído do zero (não reaproveita código do ZapFlow que vive na raiz
 deste repositório — inclusive tem projeto Supabase próprio e isolado).
 
