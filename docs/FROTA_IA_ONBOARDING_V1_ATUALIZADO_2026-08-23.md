@@ -1,15 +1,30 @@
 ---
-title: "Frota IA — Onboarding V1 Atualizado"
-subtitle: "Como ficou o cadastro pelo WhatsApp depois da atualização de 23/08/2026"
+title: "Frota IA — Os Dois Onboardings"
+subtitle: "Onboarding 1 (V1, WhatsApp) e Onboarding 2 (Gestão, Painel) — como ficaram depois da atualização de 23/08/2026"
 ---
 
-# FROTA IA — ONBOARDING V1 (WHATSAPP), COMO FICOU AGORA
+# FROTA IA — OS DOIS ONBOARDINGS, COMO FICARAM AGORA
 
-**Branch** `claude/frota-ia-assistente-setup-qlrbac` · **commit** `902deee` · **em produção** desde 2026-08-23 (deploy automático via Railway, confirmado no ar).
+**Branch** `claude/frota-ia-assistente-setup-qlrbac` · **commits** `902deee` (Onboarding 1) e `92d6dc3` (Onboarding 2) · **em produção** desde 2026-08-23 (deploy automático via Railway).
 
-> Todo texto marcado *"texto atual do sistema"* é cópia literal do código (`src/ai/whatsapp/onboardingConversation.ts`). Nada neste documento é ilustrativo.
+> Todo texto marcado *"texto atual do sistema"* é cópia literal do código. Nada neste documento é ilustrativo.
+
+## Dois onboardings, um produto só
+
+| | Onboarding 1 — V1 | Onboarding 2 — Gestão |
+|---|---|---|
+| Canal | WhatsApp | Painel web (`/frota-ativacao`) |
+| Quem entra | Qualquer número novo | Quem já fez o Onboarding 1 **e** tem entitlement de Painel de Gestão |
+| Cria empresa? | Sim, do zero | **Nunca** — reaproveita a empresa/veículo já criados pelo Onboarding 1 |
+| Veículos | 1 | Até 10 (herda o 1º da V1 + permite adicionar mais) |
+| Google | Fora do onboarding, sob demanda depois | Pré-requisito **antes** de chegar no onboarding (login + Calendar obrigatórios) |
+| Etapas obrigatórias | 11 fixas + 1 condicional | Nenhuma além de reconhecer o que já existe — tudo mais é opcional |
+
+Os dois onboardings escrevem no **mesmo banco**, alimentam a **mesma IA** e nunca duplicam empresa ou veículo entre si — o cliente nunca sente que está começando do zero ao migrar de um pro outro.
 
 ---
+
+# ONBOARDING 1 — V1 (WHATSAPP)
 
 ## O que mudou
 
@@ -201,3 +216,86 @@ O último item sempre mostra o catálogo completo por texto fixo — nunca é re
 ## Compatibilidade
 
 Clientes que já tinham o cadastro concluído antes de 23/08/2026 **não são afetados** — o sistema nunca reabre o onboarding pra quem já terminou. O fluxo novo vale só para quem inicia o cadastro a partir de agora.
+
+---
+
+# ONBOARDING 2 — FROTA IA GESTÃO (PAINEL)
+
+## Quem entra
+
+Só chega aqui quem já tem, via Onboarding 1:
+- uma conta/empresa criada;
+- **entitlement** de Painel de Gestão (liberado manualmente hoje — não existe checkout automático ainda);
+- login Google vinculado à mesma empresa do WhatsApp (`vincular_painel`);
+- Google Calendar da empresa conectado.
+
+```
+sessão → empresa → entitlement → Google Calendar conectado → onboarding de ativação concluído? → painel
+```
+
+**Mensal e anual usam exatamente o mesmo onboarding** — a diferença entre os dois planos é só comercial/billing, nunca chega a influenciar o fluxo.
+
+## Google — pré-requisito, não etapa
+
+Diferente da V1, no Painel de Gestão o Google (login + Calendar) é **obrigatório antes** de chegar no onboarding — por isso o wizard abaixo nunca pede login nem verifica Agenda: os dois já estão garantidos quando o cliente chega lá.
+
+## Reaproveitamento — nunca duplica
+
+A primeira tela já mostra a empresa e o veículo **que já existem**, criados pelo Onboarding 1. Nenhuma empresa nova é criada, nenhum veículo é duplicado — o wizard só lê o que já existe e permite completar/adicionar.
+
+## O fluxo do wizard (`/frota-ativacao`)
+
+```mermaid
+flowchart TD
+    A[Passo 1 — Encontramos sua conta] --> A1[Confirma/edita nome da empresa]
+    A1 --> A2[Mostra Veículo 1 já existente]
+    A2 --> B[Passo 2 — Veículos, até 10]
+    B --> C[Passo 3 — Motoristas, opcional]
+    C --> D[Passo 4 — Checklist, opcional]
+    D --> E[Passo 5 — Resumo]
+    E --> F[fleet_onboarding_completed_at = agora]
+    F --> G[Dashboard]
+```
+
+### Passo 1 — Encontramos sua conta — *texto atual do sistema*
+> Encontramos sua conta Frota IA. Vamos preparar seu Painel de Gestão com os dados que você já cadastrou pelo WhatsApp.
+
+Campo editável: "Como você quer identificar sua empresa ou operação?" (pré-preenchido com o nome já existente). Card mostrando o Veículo 1 (nome/placa, tipo, eixos, carroceria — os mesmos dados coletados no Onboarding 1).
+
+### Passo 2 — Veículos — *texto atual do sistema*
+> Seu plano permite gerenciar até 10 veículos. Você já tem {N} cadastrado(s).
+
+Lista dos veículos já cadastrados + botão "Adicionar veículo" (mesmo formulário completo do painel — placa, marca, modelo, ano, tipo, eixos, carroceria, consumo). Desabilita ao atingir 10. **Opcional** — pode terminar só com o primeiro veículo.
+
+### Passo 3 — Motoristas — *texto atual do sistema*
+> Quer cadastrar seus motoristas agora? Isso não é obrigatório para concluir.
+
+Mesmo formulário do painel (nome, telefone, veículo vinculado, CNH, toxicológico). Opcional.
+
+### Passo 4 — Checklist — *texto atual do sistema*
+> Quer ativar o checklist diário dos motoristas? Envio automático, todo dia, no horário escolhido.
+
+Liga/desliga + horário (0-23h, Brasília) + os mesmos 4 itens fixos já existentes (óleo, água, pneus, luzes). Opcional.
+
+### Passo 5 — Tudo pronto — *texto atual do sistema*
+> Seu Painel Frota IA está pronto. Seu WhatsApp e seu painel trabalham juntos sobre a mesma operação. Você pode adicionar ou editar veículos, motoristas, checklists e outras configurações quando quiser.
+
+Resumo (empresa, nº de veículos, nº de motoristas, checklist ativo/inativo, Agenda conectada) + botão "Ir para o Dashboard" — só aqui o onboarding é marcado como concluído.
+
+## Limite de veículos — 1 (V1) vs. 10 (Gestão)
+
+Antes, o limite vinha de um rótulo que o próprio cliente escolhia no cadastro (`company_type`). Agora vem do **entitlement real** — mesma fonte que libera o painel:
+
+| | Sem Painel de Gestão | Com Painel de Gestão |
+|---|---|---|
+| Veículos ativos | 1 | até 10 |
+
+Imposto em 3 lugares (banco, ferramenta de IA, API do painel) — se o cliente pedir pra IA cadastrar um 11º veículo pelo WhatsApp, ela recusa do mesmo jeito que o painel recusaria.
+
+## Compatibilidade
+
+Quem já usava o Painel de Gestão antes de 23/08/2026 foi automaticamente marcado como "onboarding já concluído" — não vê o wizard novo.
+
+## O que NÃO faz parte desta etapa
+
+Preços, checkout, upsell, plano Empresas, cobrança por veículo, mais de 10 veículos — nada disso existe ainda. O onboarding depende só de já ter o direito de acesso (entitlement), nunca de valor comercial.
