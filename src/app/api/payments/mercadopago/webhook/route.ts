@@ -128,6 +128,13 @@ export async function POST(request: Request) {
           status: statusMapeado,
           fleetPanelIncluded: statusMapeado === "ATIVA" ? CATALOGO_OFERTAS[referencia.plano].painel : false,
           mercadopagoSubscriptionId: resourceId,
+          // Ao ativar um plano recorrente, limpa validade residual do TRIAL
+          // (criarAssinaturaTeste grava valido_ate = +7 dias) — sem isso,
+          // isAccessAllowed cai no ramo de comparação de data e bloqueia o
+          // cliente pago ~7 dias após o cadastro original, mesmo com a
+          // assinatura ATIVA. Planos recorrentes não usam valido_ate como
+          // controle de expiração (isso é exclusivo dos planos anuais).
+          validoAte: statusMapeado === "ATIVA" ? null : undefined,
         });
       }
     }

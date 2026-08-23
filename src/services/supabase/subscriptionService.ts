@@ -127,7 +127,8 @@ export interface AtualizarAssinaturaPorPagamentoInput {
   valorCentavos?: number;
   mercadopagoSubscriptionId?: string;
   mercadopagoPaymentId?: string;
-  validoAte?: string;
+  /** string = define validade explícita (planos anuais); null = limpa validade residual (ex.: trial→recorrente ATIVA); undefined = não mexe no campo. */
+  validoAte?: string | null;
 }
 
 /** Usado pelo webhook do Mercado Pago pra refletir um pagamento confirmado — inclui o entitlement do Painel de Gestão (08/2026, nova estrutura comercial), que antes desta mudança nunca era gravado aqui. */

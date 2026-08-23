@@ -141,36 +141,54 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
   });
 
-  it("preapproval authorized ativa o plano mensal (Individual), sem painel", async () => {
+  it("preapproval authorized ativa o plano mensal (Individual), sem painel, e limpa valido_ate residual do trial", async () => {
     buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-2|MENSAL" });
 
     await chamarWebhook({ dataId: "sub-1", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-1" } } })();
 
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ companyId: "empresa-2", plan: "MENSAL", status: "ATIVA", fleetPanelIncluded: false, mercadopagoSubscriptionId: "sub-1" })
+      expect.objectContaining({
+        companyId: "empresa-2",
+        plan: "MENSAL",
+        status: "ATIVA",
+        fleetPanelIncluded: false,
+        mercadopagoSubscriptionId: "sub-1",
+        validoAte: null, // regressão: sem isso, a validade de +7 dias do trial ficaria intocada e bloquearia o cliente pago depois
+      })
     );
   });
 
-  it("preapproval authorized de GESTAO_MENSAL ativa o plano certo (não mais hardcoded como MENSAL) e libera o painel", async () => {
+  it("preapproval authorized de GESTAO_MENSAL ativa o plano certo (não mais hardcoded como MENSAL), libera o painel e limpa valido_ate residual do trial", async () => {
     buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-3|GESTAO_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-3", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-3" } } })();
 
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ companyId: "empresa-3", plan: "GESTAO_MENSAL", status: "ATIVA", fleetPanelIncluded: true })
+      expect.objectContaining({ companyId: "empresa-3", plan: "GESTAO_MENSAL", status: "ATIVA", fleetPanelIncluded: true, validoAte: null })
     );
   });
 
-  it("preapproval cancelled cancela a assinatura e revoga o painel", async () => {
+  it("preapproval de mesmo id + status já processado não reaplica a assinatura (idempotência)", async () => {
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-3|GESTAO_MENSAL" });
+    eventoPagamentoJaProcessado.mockResolvedValue(true);
+
+    const resposta = await chamarWebhook({ dataId: "sub-3", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-3" } } })();
+
+    expect(resposta.status).toBe(200);
+    expect(registrarEventoPagamento).toHaveBeenCalled(); // continua logando, só não reaplica
+    expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
+  });
+
+  it("preapproval cancelled cancela a assinatura, revoga o painel e não mexe em valido_ate", async () => {
     buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-2|GESTAO_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-2", type: "preapproval", body: { type: "preapproval", data: { id: "sub-2" } } })();
 
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ status: "CANCELADA", fleetPanelIncluded: false })
+      expect.objectContaining({ status: "CANCELADA", fleetPanelIncluded: false, validoAte: undefined })
     );
   });
 
