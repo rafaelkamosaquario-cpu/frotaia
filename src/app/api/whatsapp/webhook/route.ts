@@ -282,6 +282,16 @@ export async function POST(request: Request) {
   }
 
   if (session.state !== "completed") {
+    // Proteção mínima contra reentrega do mesmo webhook durante o
+    // onboarding (a auditoria apontou que, diferente do chat pós-onboarding,
+    // esta fase não tinha nenhuma checagem de idempotência): se a última
+    // mensagem processada com sucesso tiver o mesmo messageId, não
+    // reprocessa — evita avançar o estado duas vezes com a mesma resposta.
+    const ultimoMessageIdProcessado = (session.collected_data as Record<string, unknown> | null)?.__lastMessageId;
+    if (body.messageId && ultimoMessageIdProcessado === body.messageId) {
+      return NextResponse.json({ ok: true, deduped: true });
+    }
+
     if (!entradaOnboarding) {
       await sendWhatsappText(phoneE164, "Por enquanto, durante o cadastro, preciso que você responda em texto ou toque numa das opções.").catch(() => {});
       return NextResponse.json({ ok: true });
@@ -295,7 +305,10 @@ export async function POST(request: Request) {
 
     await updateOnboardingSession(admin, userId, {
       state: resultado.nextState,
-      collectedData: resultado.collectedData as Record<string, unknown>,
+      collectedData: {
+        ...(resultado.collectedData as Record<string, unknown>),
+        ...(body.messageId ? { __lastMessageId: body.messageId } : {}),
+      },
     });
 
     if (resultado.finalize) {
@@ -306,7 +319,10 @@ export async function POST(request: Request) {
           phoneE164,
           "Tive um problema ao salvar seu cadastro agora. Pode mandar novamente sua última resposta?"
         ).catch(() => {});
-        await updateOnboardingSession(admin, userId, { state: "awaiting_primary_vehicle" });
+        // Volta pra última pergunta antes da finalização (não pro início do
+        // veículo) — reaproveita os dados já coletados e só pede a última
+        // resposta de novo, retentando finalizeOnboarding a partir dali.
+        await updateOnboardingSession(admin, userId, { state: "awaiting_consumption" });
         return NextResponse.json({ ok: true });
       }
 
@@ -404,6 +420,26 @@ export async function POST(request: Request) {
     await updateOnboardingSession(admin, userId, {
       collectedData: { ...(session.collected_data as Record<string, unknown>), awaitingNumberedMenuSelection: false },
     }).catch(() => {});
+  }
+
+  // "Ver tudo que o Frota IA faz" (toque na lista ou escolha numerada no
+  // fallback) recebe o mesmo tratamento determinístico do texto digitado
+  // "o que você faz" (ver ehPedidoDeFuncionalidades acima) — nunca deixa a
+  // IA resumir livremente o catálogo completo.
+  const idSugestaoVerTudo = (sugestaoSelecionada ?? selecaoNumerada)?.id === "ver_tudo";
+  if (idSugestaoVerTudo) {
+    await appendMessage(admin, {
+      conversation_id: conversation.id,
+      company_id: companyId,
+      user_id: userId,
+      role: "user",
+      direction: "inbound",
+      content: (sugestaoSelecionada ?? selecaoNumerada)!.whatsappDescription,
+      content_type: "text",
+      ...inboundBase,
+    });
+    await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch(() => {});
+    return NextResponse.json({ ok: true });
   }
 
   // Resolve o conteúdo desta mensagem: texto direto, ou mídia (Fase F).

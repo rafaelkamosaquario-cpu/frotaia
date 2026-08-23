@@ -1,6 +1,7 @@
 import "server-only";
 import { createCompanyWithOwner } from "@/services/supabase/companyService";
 import { createVehicle, setDefaultVehicle } from "@/services/supabase/vehicleService";
+import { createRoute } from "@/services/supabase/savedRouteService";
 import { saveMemory } from "@/services/supabase/memoryService";
 import { criarAssinaturaTeste } from "@/services/supabase/subscriptionService";
 import { setCompanyForUserChannels } from "@/services/supabase/channelIdentityService";
@@ -18,8 +19,17 @@ import { truncate } from "@/lib/utils";
  * vehicleConfigClassifier.ts, sempre presentes quando finalize=true — é
  * pergunta obrigatória) vão direto pras colunas reais de `vehicles`, em
  * vez de ficarem só como texto solto. `primaryVehicleRaw` (marca/modelo,
- * opcional) continua indo pra `name`/`notes` em texto livre — sem parsing
- * arriscado em campos separados.
+ * agora obrigatório na V1 "1 usuário + 1 veículo") continua indo pra
+ * `name`/`notes` em texto livre — sem parsing arriscado em campos
+ * separados (marca/modelo/ano não são quebrados em colunas próprias).
+ *
+ * V1 "1 usuário + 1 veículo" (08/2026): placa, carroceria e consumo médio
+ * (novas etapas do onboarding) vão direto pras colunas já existentes de
+ * `vehicles` (plate/body_type/average_consumption_km_l — nenhuma coluna
+ * nova precisou ser criada). Quando o cliente informa uma rota principal,
+ * o texto completo sempre vira uma memória (nunca perdido, mesmo com mais
+ * de uma rota mencionada) e, se o parser conseguiu separar origem/destino,
+ * também vira uma `saved_routes` estruturada vinculada ao veículo.
  */
 export async function finalizeOnboarding(
   admin: SupabaseDbClient,
@@ -77,20 +87,55 @@ export async function finalizeOnboarding(
     });
   }
 
+  // Preserva o texto completo mesmo quando o cliente menciona mais de uma
+  // rota ("Curitiba → São Paulo e Curitiba → Campinas") — só a primeira
+  // vira saved_routes estruturada (abaixo, junto com o veículo), então
+  // sem esta memória o restante do texto se perderia.
+  if (collectedData.primaryRouteRaw) {
+    await saveMemory(admin, company.id, userId, {
+      memoryType: "operational",
+      key: "recurring_route_text",
+      valueJson: { text: collectedData.primaryRouteRaw },
+      summary: `Rota principal informada no onboarding: ${collectedData.primaryRouteRaw}.`,
+      sourceType: "user_explicit",
+      confirmedByUser: true,
+    });
+  }
+
   if (collectedData.vehicleType) {
-    const temMarcaModelo = collectedData.primaryVehicleRaw && !collectedData.primaryVehicleSkipped;
     try {
       const veiculo = await createVehicle(admin, company.id, userId, {
-        name: temMarcaModelo ? truncate(collectedData.primaryVehicleRaw!, 120) : undefined,
-        notes: temMarcaModelo ? collectedData.primaryVehicleRaw : undefined,
+        name: collectedData.primaryVehicleRaw ? truncate(collectedData.primaryVehicleRaw, 120) : undefined,
+        notes: collectedData.primaryVehicleRaw,
         vehicleType: collectedData.vehicleType,
         axleCount: collectedData.axleCount ?? undefined,
+        plate: collectedData.plate,
+        bodyType: collectedData.bodyType,
+        averageConsumptionKmL: collectedData.averageConsumptionKmL,
       });
       // Nesta V1 é sempre o único veículo da conta — marcar como padrão
       // agora é o que faz a IA reaproveitar tipo/eixos/marca depois, sem
       // perguntar de novo (ver regra no system prompt). Sem isso, o
       // veículo existe no banco mas fica invisível pra IA.
       await setDefaultVehicle(admin, veiculo.id, company.id, userId);
+
+      // Dado estruturado (saved_routes) só quando o parser conseguiu
+      // separar origem/destino — a memória acima já garante que o texto
+      // bruto nunca se perde, mesmo quando isso não acontece.
+      if (collectedData.primaryRouteOrigin && collectedData.primaryRouteDestination) {
+        try {
+          await createRoute(admin, company.id, userId, {
+            vehicleId: veiculo.id,
+            name: truncate(`${collectedData.primaryRouteOrigin} → ${collectedData.primaryRouteDestination}`, 120),
+            originName: truncate(collectedData.primaryRouteOrigin, 120),
+            destinationName: truncate(collectedData.primaryRouteDestination, 120),
+            isFavorite: true,
+          });
+        } catch {
+          // Rota estruturada é um bônus sobre a memória já salva acima —
+          // falha aqui não pode travar a conclusão do onboarding.
+        }
+      }
     } catch {
       // Onboarding já concluiu do ponto de vista do usuário — se a
       // gravação do veículo falhar (ex.: texto livre não passa no schema

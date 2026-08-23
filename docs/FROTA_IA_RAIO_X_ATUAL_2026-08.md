@@ -28,7 +28,7 @@ O código **não usa mais a nomenclatura "Camada 3/4/5/6"** dos docs antigos com
 - **Finalidade**: canal principal e default. Cliente novo cria conta e faz onboarding **inteiramente pela conversa**, sem precisar de painel.
 - **Interface**: WhatsApp (Z-API).
 - **Gate de acesso**: nenhum — qualquer número novo que manda mensagem já é atendido (cria `auth.users` via Admin API na hora, `src/services/supabase/userIdentityService.ts:41-69`).
-- **Status**: ✅ **IMPLEMENTADO E UTILIZADO** — onboarding de 8 etapas (ver documento de onboarding), 35 ferramentas de IA disponíveis, multimodal (texto/áudio/foto/PDF/planilha/localização/contato), checklist de motorista, Radar de Fretes via grupos.
+- **Status**: ✅ **IMPLEMENTADO E UTILIZADO** — onboarding de 12 etapas (11 sempre perguntadas + 1 condicional, atualizado em 2026-08-23 sob o princípio "1 usuário + 1 veículo" — ver documento de onboarding), 35 ferramentas de IA disponíveis, multimodal (texto/áudio/foto/PDF/planilha/localização/contato), checklist de motorista, Radar de Fretes via grupos.
 
 ### V2 — Frota IA + Painel Web
 - **Finalidade**: painel de gestão visual para quem já tem conta (criada via WhatsApp ou não) e tem direito de acesso.
@@ -140,7 +140,7 @@ Diagrama ER completo: ver `docs/FROTA_IA_FLUXOS_V1_V2_ATUAL.md`.
 
 ## 5. Onboarding — resumo (detalhe completo no doc de onboarding)
 
-**V1 (WhatsApp)**: 8 etapas de pergunta (nome, perfil, intenção, localização base, região, rota fixa, veículo primário, configuração do veículo), com desambiguação extra para veículos articulados. Cria `auth.users` real (Admin API) já na primeira mensagem, `onboarding_sessions` guarda o estado, finalização cria `companies` + assinatura trial + veículo (se informado) + memórias iniciais (região, rota fixa).
+**V1 (WhatsApp)**: 12 etapas de pergunta (nome, perfil, intenção, localização base, região, rota fixa, rota principal — condicional, veículo: marca/modelo/ano — agora obrigatório, placa, configuração, carroceria/implemento, consumo médio), com desambiguação extra para veículos articulados. Cria `auth.users` real (Admin API) já na primeira mensagem, `onboarding_sessions` guarda o estado, finalização cria `companies` + assinatura trial + veículo completo (placa/carroceria/consumo inclusos) + rota salva (quando estruturável) + memórias iniciais (região, rota fixa, rota principal). Google Calendar continua fora do onboarding — só conectado sob demanda, depois.
 
 **V2 (painel)**: **não existe onboarding self-service funcional** para quem chega direto pelo painel sem conta prévia — `src/app/onboarding/` existe mas é gate atrás de `CUSTOMER_PANEL_ENABLED` (default `false`) + `profiles.is_admin`, então só administradores passam por ele hoje. Cliente comum entra no painel só depois de ter conta pelo WhatsApp e receber o entitlement.
 
@@ -203,7 +203,7 @@ Nenhum arquivo no repositório define frequência real — depende 100% do dashb
 ### 🔵 Melhoria
 - Botões nativos do WhatsApp (`sendWhatsappButtons`) têm histórico de falha silenciosa de entrega — onboarding já contorna isso usando texto/listas, mas a função continua em uso em outro ponto do webhook.
 - `ADMIN_PANEL_ENABLED` é uma flag morta (definida, nunca lida em nenhum outro lugar).
-- Nenhuma checagem de idempotência durante o onboarding em si (fora do chat pós-onboarding) — reentrega de webhook nessa fase poderia, em teoria, reprocessar uma resposta.
+- ✅ CORRIGIDO (2026-08-23) — o onboarding agora guarda o `messageId` da última mensagem processada (`collected_data.__lastMessageId`) e ignora reentregas do mesmo webhook. Continua sem lock/constraint de banco (proteção só em memória da sessão), suficiente pro caso real de reentrega de webhook.
 
 ### 📌 Futuro
 - V3 — nenhuma menção ativa encontrada no código.

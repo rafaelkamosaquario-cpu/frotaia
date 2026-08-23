@@ -1,20 +1,19 @@
 import type { CSSProperties } from "react";
-import { Calculator, CircleGauge, Gauge, Truck, Scale, WalletCards, Bell, Clock3, History, MapPin, Newspaper, CircleDollarSign, type LucideIcon } from "lucide-react";
+import { CircleGauge, Truck, WalletCards, Bell, MapPin, CircleDollarSign, Zap, Fuel, Wrench, FileText, List, type LucideIcon } from "lucide-react";
 import { FROTA_SUGGESTIONS } from "@/lib/frotaSuggestions";
 import styles from "./SuggestionCards.module.css";
 
 const ICONS: Record<string, LucideIcon> = {
   Truck,
-  Gauge,
-  Calculator,
-  CircleGauge,
-  Scale,
+  Zap,
+  Fuel,
   WalletCards,
-  Bell,
-  Clock3,
-  History,
+  Wrench,
+  FileText,
   MapPin,
-  Newspaper,
+  Bell,
+  CircleGauge,
+  List,
 };
 
 /**

@@ -85,35 +85,37 @@ Hoje **não existe checkout prévio nem senha** para começar a usar — o próp
 └────────────────────────────────────┘
 ```
 
-**Frota IA** — *Texto atual do sistema*
+**Frota IA** — *Texto atual do sistema (atualizado em 2026-08-23)*
 ```text
 ┌──────────────────────────────────────────────────┐
 │ 🟢 Frota IA                                       │
 │                                                    │
-│ Olá! Eu sou o Frota IA, seu especialista em       │
-│ transporte pelo WhatsApp.                         │
+│ Olá! Eu sou o Frota IA, seu assistente            │
+│ especializado em transporte. 🚛                   │
 │                                                    │
-│ Antes de aceitar um frete ou tomar uma decisão,   │
-│ eu ajudo você a calcular o que realmente compensa.│
-│ Analiso fretes, custos, combustível, CPK, pneus,  │
-│ manutenção, rotas, jornada e documentos. Também   │
-│ crio alertas e busco notícias e informações em    │
-│ fontes oficiais.                                  │
+│ Posso analisar fretes, calcular custos, organizar │
+│ despesas, manutenção, documentos e rotas, criar   │
+│ lembretes e ajudar você a encontrar oportunidades │
+│ de carga com o Radar de Fretes.                   │
 │                                                    │
 │ Você pode falar comigo por texto, áudio, foto,    │
 │ PDF ou planilha.                                  │
+│                                                    │
+│ Para eu usar os dados corretos do seu veículo nas │
+│ análises e recomendações, vou configurar sua      │
+│ operação primeiro.                                │
 │                                                    │
 │ Como posso chamar você?                08:30 ✓✓   │
 └──────────────────────────────────────────────────┘
 ```
 
-Essa mensagem é sempre a mesma para qualquer número novo — não varia por origem/campanha.
+Essa mensagem é sempre a mesma para qualquer número novo — não varia por origem/campanha. Ela já avisa, no fim, que a configuração do veículo faz parte do cadastro — pra nenhuma das novas perguntas (placa, consumo etc.) pegar o cliente de surpresa mais adiante.
 
 ---
 
 # PARTE 4 — ONBOARDING V1, PASSO A PASSO
 
-**8 etapas de pergunta ao todo.** Nenhuma delas pode ser pulada, exceto a do veículo (pode responder "depois").
+**12 etapas de pergunta ao todo** (11 sempre perguntadas + 1 condicional — a rota principal só aparece pra quem diz ter rota fixa). Redesenho de 2026-08-23 sob o princípio **"1 usuário + 1 veículo"**: o veículo passou a ser configurado por completo no cadastro — só ficaram opcionais placa e consumo médio; marca/modelo/ano deixou de poder ser pulado.
 
 ---
 
@@ -138,17 +140,17 @@ João
 ┌───────────────────────────────────────┐
 │ Prazer, João! Como você atua hoje?    │
 │                                        │
-│ ○ Motorista autônomo                  │
-│ ○ Apenas motorista                    │
-│ ○ Dono de empresa                     │
-│ ○ Gestor de frota                     │
-│ ○ Transportador                       │
+│ ○ 🚛 Motorista autônomo               │
+│ ○ 👤 Apenas motorista                 │
+│ ○ 🏢 Dono de empresa / transportadora │
+│ ○ 📊 Gestor de frota                  │
+│ ○ 🚚 Transportador                    │
 │                                        │
 │           [ Escolher opção ]          │
 └───────────────────────────────────────┘
 ```
 
-**Cliente:** toca em "Dono de empresa".
+**Cliente:** toca em "Dono de empresa / transportadora".
 
 **O que o sistema está coletando:** o tipo de perfil/empresa.
 **Onde isso será utilizado depois:** define `company_type` — afeta, por exemplo, quantos veículos ativos são permitidos ao mesmo tempo.
@@ -163,35 +165,40 @@ João
 │ O que você quer resolver primeiro         │
 │ com o Frota IA?                           │
 │                                            │
-│ 🚛 Fretes e viagens                       │
-│ ⛽ Combustível e custos                   │
-│ 🛞 Pneus e manutenção                     │
-│ 📄 Documentos                             │
-│ 🔔 Alertas, agenda e vencimentos          │
+│ 🚛 Fretes e oportunidades                 │
+│ 💰 Custos e despesas                      │
+│ 🔧 Manutenção e pneus                     │
+│ 📄 Documentos e vencimentos                │
+│ 📅 Agenda e lembretes                     │
 │ 🕐 Jornada                                │
-│ 🗺️ Rotas salvas                           │
-│ 📊 Histórico e legislação                 │
-│ 📰 Notícias do setor                      │
-│ Ver tudo que o Frota IA faz                │
+│ 🗺️ Rotas e viagens                        │
+│ 📊 Análises e histórico                   │
+│ 📰 Notícias do transporte                 │
+│ 📋 Ver tudo que o Frota IA faz             │
 │                                            │
 │              [ Escolher opção ]           │
 └───────────────────────────────────────────┘
 ```
 
-**Cliente:** toca em "🚛 Fretes e viagens".
+**Cliente:** toca em "🚛 Fretes e oportunidades".
 
 📱 Frota IA responde com uma transição personalizada — *Texto atual do sistema*:
 ```text
-Perfeito! Quando quiser, me manda a foto do CT-e, a
-proposta de frete, ou escreve: origem e destino, valor
-oferecido, tipo de veículo, consumo médio e preço do
-diesel.
+Perfeito! Você pode me mandar uma proposta de frete
+para analisar ou usar o Radar de Fretes para procurar
+oportunidades compatíveis com sua operação.
 
-Qual cidade ou região você utiliza como base principal?
+Agora vamos configurar sua base e seu veículo para eu
+usar informações mais precisas nas análises.
+
+Qual cidade você usa como base principal da sua
+operação?
+
+Ex.: Curitiba - PR
 ```
 
 **O que o sistema está coletando:** o interesse inicial do cliente.
-**Onde isso será utilizado depois:** só para personalizar a mensagem de conclusão do cadastro (mostrando que o sistema "lembrou" o que ele disse) — não muda nenhum cálculo.
+**Onde isso será utilizado depois:** só para personalizar a mensagem de conclusão do cadastro (mostrando que o sistema "lembrou" o que ele disse) — não muda nenhum cálculo. A categoria "Fretes e oportunidades" já apresenta o Radar de Fretes de cara, pra quem escolhe essa opção entender que existe busca automática de carga, não só análise sob pedido.
 
 ---
 
@@ -212,9 +219,9 @@ Curitiba, PR
 📱 Frota IA — *Texto atual do sistema*
 ```text
 ┌────────────────────────────────────────────┐
-│ Em qual região você mais atua? Toque numa  │
-│ opção, ou digite se forem várias           │
-│ (ex.: "Sul e Sudeste").                    │
+│ Em quais regiões você costuma rodar mais?  │
+│ Toque numa opção, ou digite se forem       │
+│ várias (ex.: "Sul e Sudeste").             │
 │                                             │
 │ ○ Norte      ○ Nordeste                    │
 │ ○ Centro-Oeste  ○ Sudeste                  │
@@ -234,26 +241,51 @@ Curitiba, PR
 
 📱 Frota IA — *Texto atual do sistema*
 ```text
-Você trabalha com rota fixa? Responda "sim" ou "não".
+Você costuma trabalhar em uma rota fixa ou recorrente?
+
+Responda "sim" ou "não".
 ```
 
 > Nota de bastidor: essa pergunta usa texto simples em vez de botões porque botões nativos do WhatsApp tiveram falha real de entrega em teste (mensagem nunca chegava no aparelho, sem erro visível). Não afeta o cliente — ele só vê uma pergunta de texto normal.
 
 **Cliente**
 ```text
-não
+sim
 ```
 
-**Onde isso será utilizado depois:** vira outra memória da IA (`has_fixed_route`).
+**Onde isso será utilizado depois:** vira outra memória da IA (`has_fixed_route`). Responder "sim" abre uma pergunta extra (Passo 6.1); quem responde "não" pula direto pro veículo (Passo 7).
 
 ---
 
-## PASSO 7 — Veículo (marca e modelo)
+## PASSO 6.1 — Rota principal *(nova etapa, só aparece pra quem disse "sim" no Passo 6)*
 
 📱 Frota IA — *Texto atual do sistema*
 ```text
-Qual a marca e modelo do seu veículo? Pode incluir o
-ano. Caso não queira cadastrar agora, responda "depois".
+Qual é sua rota principal?
+
+Ex.: Curitiba → São Paulo
+```
+
+**Cliente**
+```text
+Curitiba → São Paulo
+```
+
+**O que o sistema está coletando:** origem e destino da rota mais comum do cliente.
+**Onde isso será utilizado depois:** vira uma rota salva de verdade (visível depois em Rotas, tanto no WhatsApp quanto no painel) **e** uma memória da IA com o texto completo — mesmo que o cliente mencione mais de uma rota numa mensagem só, nenhuma informação se perde, só a primeira vira um registro estruturado.
+
+---
+
+## PASSO 7 — Veículo (marca, modelo e ano)
+
+📱 Frota IA — *Texto atual do sistema*
+```text
+Agora vamos configurar o veículo que você vai usar no
+Frota IA.
+
+Qual a marca, modelo e ano?
+
+Ex.: Scania R450 2022
 ```
 
 **Cliente**
@@ -261,12 +293,33 @@ ano. Caso não queira cadastrar agora, responda "depois".
 Scania R450 2022
 ```
 
-**O que o sistema está coletando:** identificação livre do veículo (opcional).
-**Onde isso será utilizado depois:** vira o nome do veículo cadastrado.
+**O que o sistema está coletando:** identificação do veículo.
+**Onde isso será utilizado depois:** vira o nome do veículo cadastrado. ⚠️ **Mudança de comportamento**: essa pergunta não pode mais ser pulada respondendo "depois" — na V1 "1 usuário + 1 veículo", configurar o veículo é parte obrigatória do cadastro.
 
 ---
 
-## PASSO 8 — Configuração do veículo (obrigatória)
+## PASSO 8 — Placa *(nova etapa, opcional)*
+
+📱 Frota IA — *Texto atual do sistema*
+```text
+Qual a placa do veículo?
+
+Ex.: ABC1D23
+
+Se preferir informar depois, responda "depois".
+```
+
+**Cliente**
+```text
+ABC1D23
+```
+
+**O que o sistema está coletando:** placa do veículo (reconhece formato Mercosul e antigo, aceita com ou sem hífen/espaço).
+**Onde isso será utilizado depois:** cadastro do veículo. Se a placa não for reconhecida ou o cliente responder "depois"/"não sei", o cadastro **segue normalmente sem travar** — é a única etapa nova que nunca insiste.
+
+---
+
+## PASSO 9 — Configuração do veículo (obrigatória)
 
 📱 Frota IA — *Texto atual do sistema*
 ```text
@@ -297,9 +350,54 @@ ou só o cavalo por enquanto?
 
 **Cliente:** "6 eixos"
 
-Só agora, com tipo **e** número de eixos definidos, o onboarding é considerado completo.
+**Onde isso será utilizado depois:** essencial para cálculos de combustível/CPK/pedágio — continua sendo a única pergunta do onboarding que nunca aceita "não sei" e repete até resolver.
 
-**Onde isso será utilizado depois:** essencial para cálculos de combustível/CPK/pedágio — é a única pergunta do onboarding marcada como obrigatória de verdade (nunca pode ficar em branco).
+---
+
+## PASSO 10 — Carroceria/implemento *(nova etapa)*
+
+📱 Frota IA — *Texto atual do sistema*
+```text
+┌────────────────────────────────────────────┐
+│ Qual carroceria ou implemento você         │
+│ utiliza?                                   │
+│                                             │
+│ ○ Sider              ○ Baú                 │
+│ ○ Graneleiro         ○ Basculante (caçamba)│
+│ ○ Tanque             ○ Grade baixa / carga │
+│                          seca              │
+│ ○ Prancha            ○ Frigorífico         │
+│ ○ Outro / não sei ainda                    │
+│                                             │
+│              [ Escolher opção ]            │
+└────────────────────────────────────────────┘
+```
+
+**Cliente:** toca em "Sider".
+
+**O que o sistema está coletando:** tipo de carroceria — informação diferente da configuração do Passo 9 (uma é sobre o conjunto/eixos, outra é sobre o que carrega).
+**Onde isso será utilizado depois:** cadastro do veículo — usado, por exemplo, pelo Radar de Fretes pra saber se uma carga é compatível. Essa etapa **nunca trava**: se o cliente digitar algo que o sistema não reconheça, ela cai automaticamente em "Outro" e segue em frente.
+
+---
+
+## PASSO 11 — Consumo médio *(nova etapa, opcional — última pergunta)*
+
+📱 Frota IA — *Texto atual do sistema*
+```text
+Qual é o consumo médio do seu veículo em km/l?
+
+Ex.: 2,8 km/l
+
+Se ainda não souber, responda "não sei".
+```
+
+**Cliente**
+```text
+2,8
+```
+
+**O que o sistema está coletando:** consumo médio (aceita vírgula ou ponto, com ou sem "km/l").
+**Onde isso será utilizado depois:** cadastro do veículo — usado em cálculos de combustível/CPK sem precisar perguntar de novo. Essa é a última pergunta do cadastro: com ou sem número reconhecido, o onboarding **sempre termina** aqui.
 
 ---
 
@@ -309,17 +407,17 @@ O onboarding usa 3 formatos diferentes, sempre com o texto real do sistema:
 
 | Formato | Quando é usado | Exemplo |
 |---|---|---|
-| **Lista nativa do WhatsApp** (toque numa opção) | Perfil, intenção, região, configuração do veículo | Ver Passos 2, 3, 5 e 8 acima |
+| **Lista nativa do WhatsApp** (toque numa opção) | Perfil, intenção, região, configuração do veículo, carroceria | Ver Passos 2, 3, 5, 9 e 10 acima |
 | **Texto livre esperando "sim/não"** | Rota fixa | Ver Passo 6 |
-| **Texto totalmente livre** | Nome, cidade, marca/modelo do veículo | Ver Passos 1, 4 e 7 |
+| **Texto totalmente livre** | Nome, cidade, rota principal, marca/modelo/ano, placa, consumo | Ver Passos 1, 4, 6.1, 7, 8 e 11 |
 
 ```text
 ┌───────────────────────────────┐
 │ O que você quer resolver?     │
 │                               │
-│ 🚛 Fretes e viagens           │
-│ ⛽ Combustível e custos       │
-│ 📊 Histórico e legislação     │
+│ 🚛 Fretes e oportunidades     │
+│ 💰 Custos e despesas          │
+│ 📊 Análises e histórico       │
 └───────────────────────────────┘
 ```
 *(exemplo de como uma lista nativa aparece no aparelho do cliente — visual aproximado, não a interface oficial do WhatsApp)*
@@ -328,19 +426,19 @@ O onboarding usa 3 formatos diferentes, sempre com o texto real do sistema:
 
 # PARTE 6 — FINAL DO ONBOARDING
 
-Assim que a última pergunta (configuração do veículo) é respondida com sucesso, o sistema, em segundo plano: cria a empresa, ativa um período de teste grátis, grava as memórias de região/rota fixa, e cadastra o veículo (se informado).
+Assim que a última pergunta (consumo médio) é respondida — com ou sem número informado —, o sistema, em segundo plano: cria a empresa, ativa um período de teste grátis, grava as memórias de região/rota fixa/rota principal, cadastra o veículo **completo** (marca/modelo/ano, placa, configuração, carroceria e consumo) e, se a rota principal foi reconhecida, cria também uma rota salva vinculada a esse veículo.
 
 📱 Frota IA — *Texto atual do sistema (versão personalizada, quando o cliente escolheu uma categoria específica no Passo 3)*
 ```text
-Cadastro concluído! Sobre fretes e viagens, é só mandar
-quando quiser que eu já calculo.
+Cadastro concluído! Sobre fretes e oportunidades, é só
+mandar quando quiser que eu já calculo.
 
 Aqui embaixo tem outras coisas que também faço — ou
 envie sua própria pergunta por texto, áudio, foto ou
 documento.
 ```
 
-Logo em seguida, uma **lista com 10 sugestões** (limite técnico do WhatsApp para listas — a 11ª sugestão fica de fora dessa lista, mas aparece em outros lugares, como o painel):
+Logo em seguida, o **novo menu de 10 sugestões** (2026-08-23 — substituiu por completo o menu anterior, já dentro do limite nativo de 10 linhas do WhatsApp, sem precisar de corte):
 
 📱 Frota IA — *Texto atual do sistema*
 ```text
@@ -348,15 +446,15 @@ Logo em seguida, uma **lista com 10 sugestões** (limite técnico do WhatsApp pa
 │ Como posso ajudar com sua frota hoje?│
 │                                       │
 │ Analisar um frete                    │
-│ Calcular consumo                     │
-│ Calcular CPK                         │
-│ Comparar pneus                       │
-│ Comparar propostas                   │
-│ Custos da frota                      │
+│ Procurar oportunidades               │
+│ Calcular custos da viagem            │
+│ Registrar uma despesa                │
+│ Organizar manutenção                 │
+│ Documentos e vencimentos             │
+│ Consultar uma rota                   │
 │ Criar um lembrete                    │
-│ Organizar jornada                    │
-│ Consultar histórico                  │
-│ Salvar uma rota                      │
+│ Analisar pneus                       │
+│ Ver tudo que o Frota IA faz          │
 │                                       │
 │           [ Ver sugestões ]          │
 └──────────────────────────────────────┘
@@ -371,7 +469,7 @@ acima.
 
 **Próxima ação esperada do cliente:** tocar numa sugestão ou simplesmente escrever o que precisa — o cadastro não impõe nenhum próximo passo obrigatório.
 
-Se o cliente digitar "ajuda", "menu" ou "opções" mais tarde, esse mesmo menu reaparece.
+Se o cliente digitar "ajuda", "menu" ou "opções" mais tarde, esse mesmo menu reaparece. Tocar em "Ver tudo que o Frota IA faz" sempre mostra o catálogo completo por texto (nunca resumido pela IA, é resposta fixa do sistema).
 
 ---
 
@@ -970,7 +1068,7 @@ compatível com o seu veículo.
 | Radar de Fretes (receber aviso) | ✅ | ✅ |
 | Radar de Fretes (cadastrar grupo/fonte) | ❌ | ✅ (só painel) |
 | Login | Não existe (número = identidade) | Google OAuth |
-| Onboarding self-service | ✅ (8 etapas) | ❌ (ver Parte 13) |
+| Onboarding self-service | ✅ (12 etapas) | ❌ (ver Parte 13) |
 
 ---
 
@@ -1040,7 +1138,7 @@ compatível com o seu veículo.
 ## V1
 
 **Começa em:** primeira mensagem no WhatsApp — sem cadastro prévio.
-**Onboarding:** 8 etapas.
+**Onboarding:** 12 etapas (11 sempre perguntadas + 1 condicional).
 **Depois do onboarding o cliente consegue:** calcular frete/combustível/CPK/margem/jornada, comparar pneus, consultar piso ANTT, consultar rota, registrar despesas, gerenciar veículo/motorista/manutenção/documentos, usar checklist (se motorista), receber alertas, buscar frete via Radar, receber notícias, conectar Agenda Google, gerar PDF, mandar foto/PDF/áudio/planilha.
 **Principal interface:** WhatsApp.
 
@@ -1065,7 +1163,7 @@ flowchart TB
     F --> V2[V2]
     V1 --> WA1[WhatsApp]
     V2 --> WA2[WhatsApp + Painel]
-    WA1 --> OB1[Onboarding — 8 etapas]
+    WA1 --> OB1[Onboarding — 12 etapas]
     WA2 --> AC[Login Google + Agenda conectada]
     OB1 --> M[MESMO FROTA IA]
     AC --> M

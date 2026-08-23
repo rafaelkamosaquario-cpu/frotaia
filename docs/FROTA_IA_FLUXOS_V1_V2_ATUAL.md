@@ -56,22 +56,28 @@ flowchart TD
 flowchart TD
     S0[Boas-vindas: pergunta o nome] --> S1[awaiting_name]
     S1 -->|nome válido| S2[awaiting_profile<br/>lista: 5 perfis]
-    S2 -->|válido| S3[awaiting_intent<br/>lista: 9 categorias]
+    S2 -->|válido| S3[awaiting_intent<br/>lista: 9 categorias + ver tudo]
     S3 -->|válido| S4[awaiting_base_location<br/>texto livre]
     S4 -->|válido| S5[awaiting_region<br/>lista: 6 regiões]
     S5 -->|válido| S6[awaiting_fixed_route<br/>texto sim/não]
-    S6 -->|válido| S7[awaiting_primary_vehicle<br/>texto ou "depois"]
-    S7 --> S8[awaiting_vehicle_configuration<br/>lista: 9 tipos]
-    S8 -->|resolvido| FIN[finalizeOnboarding]
+    S6 -->|não| S7[awaiting_primary_vehicle<br/>texto, obrigatório]
+    S6 -->|sim| S6R[awaiting_primary_route<br/>texto livre, condicional]
+    S6R --> S7
+    S7 --> S8P[awaiting_plate<br/>texto, opcional]
+    S8P --> S8[awaiting_vehicle_configuration<br/>lista: 9 tipos]
+    S8 -->|resolvido| S9[awaiting_body_type<br/>lista: 9 carrocerias]
     S8 -->|precisa desambiguar| S8b[pergunta composição<br/>5/6/7/9 eixos]
-    S8b --> FIN
+    S8b --> S9
     S8 -->|não reconhecido| S8[repete pergunta]
+    S9 -->|sempre resolve, cai em "outro"| S10[awaiting_consumption<br/>texto, opcional]
+    S10 --> FIN[finalizeOnboarding]
     FIN --> F1[cria companies + owner]
     F1 --> F2[cria assinatura trial]
     F2 --> F3[vincula user_channels.company_id]
-    F3 --> F4[grava memórias: região, rota fixa]
-    F4 --> F5[cria vehicles, se informado]
-    F5 --> MSG[Mensagem de conclusão + sugestões]
+    F3 --> F4[grava memórias: região, rota fixa, rota principal]
+    F4 --> F5[cria vehicles completo:<br/>marca/modelo/ano, placa, tipo,<br/>eixos, carroceria, consumo]
+    F5 --> F6[cria saved_routes,<br/>se rota principal foi estruturada]
+    F6 --> MSG[Mensagem de conclusão + novo menu de 10 sugestões]
 
     S1 -.cancelar/pausar.-> PAUSED[paused]
     S2 -.-> PAUSED
@@ -79,10 +85,16 @@ flowchart TD
     S4 -.-> PAUSED
     S5 -.-> PAUSED
     S6 -.-> PAUSED
+    S6R -.-> PAUSED
     S7 -.-> PAUSED
+    S8P -.-> PAUSED
     S8 -.-> PAUSED
-    PAUSED -->|retoma| S1
+    S9 -.-> PAUSED
+    S10 -.-> PAUSED
+    PAUSED -->|retoma pela pergunta<br/>mais básica pendente| S1
 ```
+
+Google Calendar **não aparece neste fluxograma de propósito** — nunca faz parte do onboarding; só é conectado sob demanda depois, quando alguma ferramenta (`gerenciar_alerta`/`gerenciar_google_calendar`) precisar (ver item 9).
 
 ## 4. Processamento da IA (motor de resposta)
 

@@ -31,60 +31,77 @@ export interface FrotaSuggestion {
   whatsappDescription: string;
 }
 
+/**
+ * Menu pós-onboarding V1 (08/2026, redesenho "1 usuário + 1 veículo") — 10
+ * itens, já dentro do limite real de 10 linhas da lista nativa do WhatsApp
+ * (`send-option-list` da Z-API, restrição da própria plataforma WhatsApp
+ * Business). Substituiu o menu anterior de 11 itens por completo — reflete
+ * as ferramentas mais usadas hoje (incluindo Radar de Fretes e registro de
+ * despesa, que não tinham atalho aqui antes) em vez de tentar listar as 35.
+ */
 export const FROTA_SUGGESTIONS: FrotaSuggestion[] = [
   {
     id: "analisar_frete",
     title: "Analisar um frete",
     description: "Esse frete compensa?",
-    icon: "Truck", // secundário sugerido: CircleDollarSign
+    icon: "Truck",
     intent: "analisar_frete",
     whatsappTitle: "Analisar um frete",
-    whatsappDescription: "Esse frete compensa?",
+    whatsappDescription: "Esse frete de R$ 4.200 pra Santos compensa?",
   },
   {
-    id: "calcular_consumo",
-    title: "Calcular consumo",
-    description: "Meu caminhão está fazendo 2,8 km/l. Isso é bom?",
-    icon: "Gauge",
-    intent: "calcular_consumo",
-    whatsappTitle: "Calcular consumo",
-    whatsappDescription: "Meu caminhão está fazendo 2,8 km/l. Isso é bom?",
+    id: "procurar_oportunidades",
+    title: "Procurar oportunidades",
+    description: "Encontre carga compatível com o Radar de Fretes",
+    icon: "Zap",
+    intent: "procurar_oportunidades",
+    whatsappTitle: "Procurar oportunidades",
+    whatsappDescription: "Quero procurar oportunidades de frete com o Radar de Fretes.",
   },
   {
-    id: "calcular_cpk",
-    title: "Calcular CPK",
-    description: "Como calcular CPK?",
-    icon: "Calculator",
-    intent: "calcular_cpk",
-    whatsappTitle: "Calcular CPK",
-    whatsappDescription: "Como calcular CPK?",
+    id: "calcular_custos_viagem",
+    title: "Calcular custos da viagem",
+    description: "Quanto vou gastar até o destino?",
+    icon: "Fuel",
+    intent: "calcular_custos_viagem",
+    whatsappTitle: "Calcular custos da viagem",
+    whatsappDescription: "Quanto vou gastar de combustível até Curitiba?",
   },
   {
-    id: "comparar_pneus",
-    title: "Comparar pneus",
-    description: "Vale mais a pena recapar ou comprar um pneu novo?",
-    icon: "CircleGauge",
-    intent: "comparar_pneus",
-    whatsappTitle: "Comparar pneus",
-    whatsappDescription: "Vale mais a pena recapar ou comprar um pneu novo?",
-  },
-  {
-    id: "comparar_propostas",
-    title: "Comparar propostas",
-    description: "Tenho duas propostas de frete, qual compensa mais?",
-    icon: "Scale",
-    intent: "comparar_propostas",
-    whatsappTitle: "Comparar propostas",
-    whatsappDescription: "Tenho duas propostas de frete, qual compensa mais?",
-  },
-  {
-    id: "custos_frota",
-    title: "Custos da frota",
-    description: "Quanto custa rodar um caminhão?",
+    id: "registrar_despesa",
+    title: "Registrar uma despesa",
+    description: "Registre um gasto da frota",
     icon: "WalletCards",
-    intent: "custos_frota",
-    whatsappTitle: "Custos da frota",
-    whatsappDescription: "Quanto custa rodar um caminhão?",
+    intent: "registrar_despesa",
+    whatsappTitle: "Registrar uma despesa",
+    whatsappDescription: "Gastei R$ 600 de diesel hoje.",
+  },
+  {
+    id: "organizar_manutencao",
+    title: "Organizar manutenção",
+    description: "Agende uma manutenção do veículo",
+    icon: "Wrench",
+    intent: "organizar_manutencao",
+    whatsappTitle: "Organizar manutenção",
+    whatsappDescription: "Preciso agendar a troca de óleo.",
+  },
+  {
+    id: "documentos_vencimentos",
+    title: "Documentos e vencimentos",
+    description: "Veja o que está vencendo",
+    icon: "FileText",
+    intent: "documentos_vencimentos",
+    whatsappTitle: "Documentos e vencimentos",
+    whatsappDescription: "Quais documentos estão vencendo?",
+  },
+  {
+    id: "consultar_rota",
+    title: "Consultar uma rota",
+    description: "Calcule a distância de um trajeto",
+    icon: "MapPin",
+    intent: "consultar_rota",
+    whatsappTitle: "Consultar uma rota",
+    whatsappDescription: "Qual a distância de Curitiba até São Paulo?",
   },
   {
     id: "criar_lembrete",
@@ -96,55 +113,35 @@ export const FROTA_SUGGESTIONS: FrotaSuggestion[] = [
     whatsappDescription: "Me avise 15 dias antes de vencer o seguro do caminhão",
   },
   {
-    id: "organizar_jornada",
-    title: "Organizar jornada",
-    description: "Vou sair amanhã às 5h de Curitiba pra São Paulo, organize minha jornada",
-    icon: "Clock3",
-    intent: "organizar_jornada",
-    whatsappTitle: "Organizar jornada",
-    whatsappDescription: "Vou sair amanhã às 5h de Curitiba pra São Paulo, organize minha jornada",
+    id: "comparar_pneus",
+    title: "Analisar pneus",
+    description: "Vale mais a pena recapar ou comprar um pneu novo?",
+    icon: "CircleGauge",
+    intent: "comparar_pneus",
+    whatsappTitle: "Analisar pneus",
+    whatsappDescription: "Vale mais a pena recapar ou comprar um pneu novo?",
   },
   {
-    id: "consultar_historico",
-    title: "Consultar histórico",
-    description: "Traga a análise que eu fiz semana passada",
-    icon: "History",
-    intent: "consultar_historico",
-    whatsappTitle: "Consultar histórico",
-    whatsappDescription: "Traga a análise que eu fiz semana passada",
-  },
-  {
-    id: "salvar_rota",
-    title: "Salvar uma rota",
-    description: "Salva a rota de Sorriso até Santos",
-    icon: "MapPin",
-    intent: "salvar_rota",
-    whatsappTitle: "Salvar uma rota",
-    whatsappDescription: "Salva a rota de Sorriso até Santos",
-  },
-  {
-    id: "noticias_setor",
-    title: "Notícias do setor",
-    description: "Quero receber notícias do setor todo dia",
-    icon: "Newspaper",
-    intent: "noticias_setor",
-    whatsappTitle: "Notícias do setor",
-    whatsappDescription: "Quero receber notícias do setor todo dia",
+    id: "ver_tudo",
+    title: "Ver tudo que o Frota IA faz",
+    description: "Conheça todas as áreas do Frota IA",
+    icon: "List",
+    intent: "ver_tudo",
+    whatsappTitle: "Ver tudo que o Frota IA faz",
+    // Frase deliberadamente igual a um gatilho de ehPedidoDeFuncionalidades
+    // (helpMenu.ts) — o toque nesta sugestão recebe o mesmo tratamento
+    // determinístico do texto digitado "o que você faz" (ver webhook route.ts),
+    // nunca depende do resumo livre da IA.
+    whatsappDescription: "O que você faz?",
   },
 ];
 
 /**
- * A lista nativa do WhatsApp (`send-option-list` da Z-API) tem limite real
- * de 10 linhas — restrição da própria plataforma WhatsApp Business, não da
- * Z-API. `FROTA_SUGGESTIONS` tem 11 itens (painel web não tem esse limite),
- * então só o envio da lista nativa usa este subconjunto de 10 — o fallback
- * em texto (`construirFallbackNumerado`, no webhook) e o painel continuam
- * mostrando os 11. Item removido daqui: "calcular_consumo" (mais
- * redundante com calcular_cpk/custos_frota entre os 11).
+ * Mantido por compatibilidade com quem já importa este nome — hoje é
+ * sempre igual a FROTA_SUGGESTIONS (10 itens, já dentro do limite nativo
+ * do WhatsApp).
  */
-export const SUGESTOES_LISTA_NATIVA_WHATSAPP: FrotaSuggestion[] = FROTA_SUGGESTIONS.filter(
-  (s) => s.id !== "calcular_consumo"
-);
+export const SUGESTOES_LISTA_NATIVA_WHATSAPP: FrotaSuggestion[] = FROTA_SUGGESTIONS;
 
 /**
  * Resolve a resposta de um menu numerado em texto (fallback do WhatsApp,

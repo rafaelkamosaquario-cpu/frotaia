@@ -52,6 +52,6 @@ describe("construirTextoAjudaCompleto", () => {
     for (const categoria of CATEGORIAS_AJUDA) {
       expect(texto).toContain(categoria.titulo);
     }
-    expect(texto).toContain("Notícias do setor");
+    expect(texto).toContain("Notícias do transporte");
   });
 });

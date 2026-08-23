@@ -2347,6 +2347,10 @@ export type Database = {
         | "completed"
         | "paused"
         | "awaiting_intent"
+        | "awaiting_primary_route"
+        | "awaiting_plate"
+        | "awaiting_body_type"
+        | "awaiting_consumption"
       route_data_source: "manual" | "google_routes" | "outro"
       run_status: "started" | "completed" | "failed" | "cancelled"
       scheduled_alert_status:
@@ -2660,6 +2664,10 @@ export const Constants = {
         "completed",
         "paused",
         "awaiting_intent",
+        "awaiting_primary_route",
+        "awaiting_plate",
+        "awaiting_body_type",
+        "awaiting_consumption",
       ],
       route_data_source: ["manual", "google_routes", "outro"],
       run_status: ["started", "completed", "failed", "cancelled"],
