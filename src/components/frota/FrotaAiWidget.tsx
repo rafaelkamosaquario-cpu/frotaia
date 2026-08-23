@@ -130,13 +130,13 @@ export function FrotaAiWidget() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Fechar o Frota IA" : "Pergunte ao Frota IA"}
-        className="fixed bottom-5 right-5 z-40 flex size-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105"
+        className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex size-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-105 sm:right-5 lg:bottom-5"
       >
         {open ? <X className="size-5" aria-hidden /> : <Sparkles className="size-5" aria-hidden />}
       </button>
 
       {open && (
-        <div className="fixed bottom-22 right-5 z-40 flex h-[min(560px,70dvh)] w-[min(380px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+        <div className="fixed bottom-[calc(8.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-[min(560px,70dvh)] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl sm:right-5 lg:bottom-22">
           <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <Sparkles className="size-4 text-primary" aria-hidden />
             <span className="text-sm font-semibold text-foreground">Pergunte ao Frota IA</span>

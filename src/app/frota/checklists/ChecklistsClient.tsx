@@ -150,7 +150,7 @@ export function ChecklistsClient({ dispatches, motoristas, veiculos }: Checklist
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
+          <table className="frota-table w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Motorista</th>
@@ -168,12 +168,12 @@ export function ChecklistsClient({ dispatches, motoristas, veiculos }: Checklist
                     className="cursor-pointer border-b border-border last:border-0 hover:bg-surface-muted/50"
                     onClick={() => setMotoristaAberto((atual) => (atual === item.driverId ? null : item.driverId))}
                   >
-                    <td className="px-4 py-3 font-medium text-foreground">{item.driverName}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{item.enviados}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{item.respondidos}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{item.naoRespondidos}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{item.atencao}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td data-label="Motorista" className="px-4 py-3 font-medium text-foreground">{item.driverName}</td>
+                    <td data-label="Enviados" className="px-4 py-3 text-right text-muted-foreground">{item.enviados}</td>
+                    <td data-label="Respondidos" className="px-4 py-3 text-right text-muted-foreground">{item.respondidos}</td>
+                    <td data-label="Não respondidos" className="px-4 py-3 text-right text-muted-foreground">{item.naoRespondidos}</td>
+                    <td data-label="Atenção" className="px-4 py-3 text-right text-muted-foreground">{item.atencao}</td>
+                    <td data-label="Aderência" className="px-4 py-3 text-right">
                       <span
                         className={
                           "rounded-full px-2 py-0.5 text-xs font-medium " +

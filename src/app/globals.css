@@ -98,6 +98,106 @@ body {
   border-radius: 999px;
 }
 
+/*
+ * Identidade do Painel Web (Frota IA Gestão, refinamento visual 08/2026).
+ * Escopado a `.frota-panel` (aplicado só no Shell do painel e no wizard de
+ * ativação /frota-ativacao) — o V1 (chat, login, onboarding V1) continua
+ * usando os tokens globais acima, intocados. Mesma técnica de sempre (CSS
+ * custom properties + @theme inline já mapeado no topo deste arquivo) —
+ * sobrescrever a variável no elemento ancestral basta, nenhuma classe
+ * utilitária nova precisa ser criada.
+ *
+ * Verde de marca (#0AEF12) e ciano informativo (#0FA3CF) são os mesmos
+ * documentados na landing page (repo separado) — não inventados aqui.
+ * --accent vira o token "informativo" (Agendado/Em andamento/Vencendo),
+ * deliberadamente diferente do verde de marca pra não virar tudo verde
+ * (ver uso em Manutenção/Jornadas/Alertas).
+ */
+.frota-panel {
+  --primary: #0bae2e;
+  --primary-hover: #099426;
+  --primary-foreground: #ffffff;
+  --accent: #0f8fb0;
+  --ring: #0bae2e;
+}
+
+.dark .frota-panel {
+  --background: #07110d;
+  --foreground: #eaf2ed;
+  --surface: #0e1b15;
+  --surface-muted: #142a20;
+  --border: #1d3327;
+  --muted-foreground: #8fa79b;
+  --primary: #0aef12;
+  --primary-hover: #08c20f;
+  --primary-foreground: #04170a;
+  --accent: #0fa3cf;
+  --ring: #0aef12;
+  --danger: #f0655a;
+  --danger-foreground: #2b0705;
+  --success: #2fd68c;
+  --warning: #f0b429;
+}
+
+/* Ambiente seguro pra bottom nav mobile (iPhone/Android com navegação gestual) */
+.frota-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/*
+ * Tabela → card no mobile (técnica clássica: thead escondido, td vira linha
+ * flex com o rótulo da coluna via ::before). Só estrutura/apresentação —
+ * nenhum dado muda. Aplicado nos componentes de tabela do painel via a
+ * classe `frota-table` + atributo `data-label` em cada <td> com valor.
+ * Células de ação (sem data-label) ficam alinhadas à esquerda, sem rótulo.
+ */
+@media (max-width: 767px) {
+  .frota-table {
+    min-width: 0;
+    width: 100%;
+  }
+  .frota-table thead {
+    display: none;
+  }
+  .frota-table,
+  .frota-table tbody,
+  .frota-table tr {
+    display: block;
+    width: 100%;
+  }
+  .frota-table tr {
+    border: 1px solid var(--color-border);
+    border-radius: 0.85rem;
+    margin-bottom: 0.65rem;
+    padding: 0.15rem 0;
+    overflow: hidden;
+  }
+  .frota-table tr:last-child {
+    margin-bottom: 0;
+  }
+  .frota-table td {
+    display: block;
+    border: none !important;
+    padding: 0.5rem 0.9rem;
+    text-align: left;
+  }
+  .frota-table td[data-label] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .frota-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-muted-foreground);
+  }
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;

@@ -113,7 +113,7 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
+          <table className="frota-table w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Placa</th>
@@ -128,18 +128,18 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
             <tbody>
               {veiculos.map((veiculo) => (
                 <tr key={veiculo.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
-                  <td className="px-4 py-3 font-medium text-foreground">{veiculo.plate ?? "—"}</td>
-                  <td className="px-4 py-3 text-foreground">{veiculo.name ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td data-label="Placa" className="px-4 py-3 font-medium text-foreground">{veiculo.plate ?? "—"}</td>
+                  <td data-label="Apelido" className="px-4 py-3 text-foreground">{veiculo.name ?? "—"}</td>
+                  <td data-label="Tipo" className="px-4 py-3 text-muted-foreground">
                     {veiculo.vehicle_type ? VEHICLE_TYPE_LABEL[veiculo.vehicle_type] : "—"}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td data-label="Seguro vence" className="px-4 py-3 text-muted-foreground">
                     {formatDate(documentos.find((d) => d.vehicle_id === veiculo.id && d.document_type === "seguro")?.expiry_date ?? null)}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td data-label="Licenciamento vence" className="px-4 py-3 text-muted-foreground">
                     {formatDate(documentos.find((d) => d.vehicle_id === veiculo.id && d.document_type === "licenciamento")?.expiry_date ?? null)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="Status" className="px-4 py-3">
                     <span
                       className={
                         veiculo.active

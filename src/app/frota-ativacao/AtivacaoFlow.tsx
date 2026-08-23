@@ -120,7 +120,7 @@ export function AtivacaoFlow({ company, veiculosIniciais, motoristasIniciais, do
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background px-4 py-10">
+    <div className="frota-panel flex min-h-dvh items-center justify-center bg-background px-4 py-10">
       <Card className="w-full max-w-lg p-8">
         <div className="mb-6 flex items-center gap-3">
           <LogoMark className="size-9" />

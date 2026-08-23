@@ -91,7 +91,7 @@ export function MotoristasClient({ motoristasIniciais, veiculos }: MotoristasCli
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[760px] border-collapse text-sm">
+          <table className="frota-table w-full min-w-[760px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Nome</th>
@@ -108,12 +108,12 @@ export function MotoristasClient({ motoristasIniciais, veiculos }: MotoristasCli
                 const veiculo = motorista.vehicle_id ? veiculosPorId.get(motorista.vehicle_id) : null;
                 return (
                   <tr key={motorista.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
-                    <td className="px-4 py-3 font-medium text-foreground">{motorista.name ?? "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{motorista.phone_e164 ?? "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDate(motorista.cnh_expiry_date)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDate(motorista.toxicologico_expiry_date)}</td>
-                    <td className="px-4 py-3">
+                    <td data-label="Nome" className="px-4 py-3 font-medium text-foreground">{motorista.name ?? "—"}</td>
+                    <td data-label="Telefone" className="px-4 py-3 text-muted-foreground">{motorista.phone_e164 ?? "—"}</td>
+                    <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
+                    <td data-label="CNH vence" className="px-4 py-3 text-muted-foreground">{formatDate(motorista.cnh_expiry_date)}</td>
+                    <td data-label="Toxicológico vence" className="px-4 py-3 text-muted-foreground">{formatDate(motorista.toxicologico_expiry_date)}</td>
+                    <td data-label="Status" className="px-4 py-3">
                       <span
                         className={
                           motorista.active

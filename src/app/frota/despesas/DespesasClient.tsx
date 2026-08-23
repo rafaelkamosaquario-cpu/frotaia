@@ -141,7 +141,7 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
+          <table className="frota-table w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Data</th>
@@ -157,11 +157,11 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
                 const veiculo = despesa.vehicle_id ? veiculosPorId.get(despesa.vehicle_id) : null;
                 return (
                   <tr key={despesa.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
-                    <td className="px-4 py-3 text-muted-foreground">{formatDate(despesa.expense_date)}</td>
-                    <td className="px-4 py-3 text-foreground">{EXPENSE_TYPE_LABEL[despesa.expense_type]}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{despesa.vendor ?? "—"}</td>
-                    <td className="px-4 py-3 text-right font-medium text-foreground">{formatBRL(despesa.amount)}</td>
+                    <td data-label="Data" className="px-4 py-3 text-muted-foreground">{formatDate(despesa.expense_date)}</td>
+                    <td data-label="Tipo" className="px-4 py-3 text-foreground">{EXPENSE_TYPE_LABEL[despesa.expense_type]}</td>
+                    <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
+                    <td data-label="Fornecedor" className="px-4 py-3 text-muted-foreground">{despesa.vendor ?? "—"}</td>
+                    <td data-label="Valor" className="px-4 py-3 text-right font-medium text-foreground">{formatBRL(despesa.amount)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setFormTarget(despesa)}>

@@ -39,7 +39,7 @@ export function FrotaMobileSidebar({ open, onClose }: FrotaMobileSidebarProps) {
         )}
         role="dialog"
         aria-modal="true"
-        aria-label="Menu de gestão de frota"
+        aria-label="Mais módulos do painel"
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
           <FrotaBrand compact />

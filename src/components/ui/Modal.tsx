@@ -36,7 +36,8 @@ export function Modal({ open, onClose, title, className, children }: ModalProps)
   if (!open || !hasMounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    // No mobile vira sheet de tela cheia (mais espaço/toque pra formulário longo); a partir de `sm` volta a ser o modal centralizado de sempre.
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in-up"
         onClick={onClose}
@@ -47,7 +48,7 @@ export function Modal({ open, onClose, title, className, children }: ModalProps)
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "animate-fade-in-up relative w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl",
+          "frota-safe-bottom animate-fade-in-up relative flex max-h-[92dvh] w-full flex-col overflow-y-auto scrollbar-thin rounded-t-2xl border border-border bg-surface p-6 shadow-xl sm:max-w-md sm:rounded-2xl",
           className
         )}
       >
@@ -57,10 +58,10 @@ export function Modal({ open, onClose, title, className, children }: ModalProps)
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md p-1 text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+              className="-mr-1.5 flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground"
               aria-label="Fechar"
             >
-              <X className="size-4" aria-hidden />
+              <X className="size-4.5" aria-hidden />
             </button>
           </div>
         )}

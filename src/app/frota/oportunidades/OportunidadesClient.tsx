@@ -202,7 +202,7 @@ export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fo
               type="button"
               disabled={carregando === "criar-radar"}
               onClick={criarRadar}
-              className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-white disabled:opacity-60"
+              className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
               Criar radar
             </button>
@@ -289,7 +289,7 @@ export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fo
           <p className="mb-3 text-xs text-muted-foreground">Grupos de WhatsApp (com o número do Frota IA dentro) que alimentam o Radar desta empresa. Pegue o id do grupo com o Frota IA (suporte).</p>
           <div className="mb-3 flex items-center gap-2">
             <input className="h-9 flex-1 rounded-lg border border-border bg-surface px-2 text-sm" placeholder="Id do grupo (ex.: 1203...-group)" value={novaFonteId} onChange={(e) => setNovaFonteId(e.target.value)} />
-            <button type="button" disabled={carregando === "nova-fonte"} onClick={adicionarFonte} className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-white disabled:opacity-60">
+            <button type="button" disabled={carregando === "nova-fonte"} onClick={adicionarFonte} className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60">
               Adicionar
             </button>
           </div>

@@ -72,7 +72,7 @@ export function DocumentosClient({ documentosIniciais, veiculos, motoristas }: D
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
+          <table className="frota-table w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Tipo</th>
@@ -88,10 +88,10 @@ export function DocumentosClient({ documentosIniciais, veiculos, motoristas }: D
                 const motorista = documento.driver_id ? motoristasPorId.get(documento.driver_id) : null;
                 return (
                   <tr key={documento.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
-                    <td className="px-4 py-3 font-medium text-foreground">{DOCUMENT_TYPE_LABEL[documento.document_type]}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{motorista ? motorista.name : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDate(documento.expiry_date)}</td>
+                    <td data-label="Tipo" className="px-4 py-3 font-medium text-foreground">{DOCUMENT_TYPE_LABEL[documento.document_type]}</td>
+                    <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
+                    <td data-label="Motorista" className="px-4 py-3 text-muted-foreground">{motorista ? motorista.name : "—"}</td>
+                    <td data-label="Vencimento" className="px-4 py-3 text-muted-foreground">{formatDate(documento.expiry_date)}</td>
                     <td className="px-4 py-3 text-right">
                       <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setFormTarget(documento)}>
                         <SquarePen className="size-3.5" aria-hidden />

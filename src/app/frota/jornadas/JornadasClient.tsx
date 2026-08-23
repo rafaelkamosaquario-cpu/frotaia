@@ -21,7 +21,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_CLASS: Record<string, string> = {
   planejada: "bg-surface-muted text-muted-foreground",
-  em_andamento: "bg-primary/10 text-primary",
+  em_andamento: "bg-accent/10 text-accent",
   concluida: "bg-success/10 text-success",
   cancelada: "bg-danger/10 text-danger",
 };
@@ -52,7 +52,7 @@ export function JornadasClient({ jornadas, motoristas, veiculos }: JornadasClien
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[820px] border-collapse text-sm">
+          <table className="frota-table w-full min-w-[820px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Origem → Destino</th>
@@ -69,14 +69,14 @@ export function JornadasClient({ jornadas, motoristas, veiculos }: JornadasClien
                 const veiculo = jornada.vehicle_id ? veiculosPorId.get(jornada.vehicle_id) : null;
                 return (
                   <tr key={jornada.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
-                    <td className="px-4 py-3 text-foreground">
+                    <td data-label="Origem → Destino" className="px-4 py-3 text-foreground">
                       {jornada.origin ?? "—"} → {jornada.destination ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{motorista?.name ?? "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDateTime(jornada.scheduled_departure)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDateTime(jornada.scheduled_arrival)}</td>
-                    <td className="px-4 py-3">
+                    <td data-label="Motorista" className="px-4 py-3 text-muted-foreground">{motorista?.name ?? "—"}</td>
+                    <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
+                    <td data-label="Saída prevista" className="px-4 py-3 text-muted-foreground">{formatDateTime(jornada.scheduled_departure)}</td>
+                    <td data-label="Chegada prevista" className="px-4 py-3 text-muted-foreground">{formatDateTime(jornada.scheduled_arrival)}</td>
+                    <td data-label="Status" className="px-4 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[jornada.status]}`}>{STATUS_LABEL[jornada.status]}</span>
                     </td>
                   </tr>

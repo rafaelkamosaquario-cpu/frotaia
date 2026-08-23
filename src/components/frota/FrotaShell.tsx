@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FrotaHeader } from "./FrotaHeader";
 import { FrotaSidebar } from "./FrotaSidebar";
 import { FrotaMobileSidebar } from "./FrotaMobileSidebar";
+import { FrotaBottomNav } from "./FrotaBottomNav";
 import { FrotaAiWidget } from "./FrotaAiWidget";
 import type { CompanyMemberRole } from "@/lib/supabase/tables";
 
@@ -14,16 +15,19 @@ interface FrotaShellProps {
 }
 
 export function FrotaShell({ companyName, role, children }: FrotaShellProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
-      <FrotaHeader onOpenSidebar={() => setIsSidebarOpen(true)} companyName={companyName} role={role} />
+    <div className="frota-panel flex h-dvh flex-col bg-background">
+      <FrotaHeader companyName={companyName} role={role} />
       <div className="flex min-h-0 flex-1">
         <FrotaSidebar />
-        <FrotaMobileSidebar open={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">{children}</main>
+        <FrotaMobileSidebar open={isMoreOpen} onClose={() => setIsMoreOpen(false)} />
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+          {children}
+        </main>
       </div>
+      <FrotaBottomNav onOpenMore={() => setIsMoreOpen(true)} />
       <FrotaAiWidget />
     </div>
   );
