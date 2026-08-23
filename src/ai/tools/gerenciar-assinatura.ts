@@ -1,77 +1,60 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
-import { criarAssinaturaMensal, criarPagamentoAnual } from "@/lib/mercadopago/client";
-import { MercadoPagoConfigError } from "@/lib/mercadopago/config";
+import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
+import { CATALOGO_OFERTAS, PLANOS_AUTOATENDIMENTO, PRECO_UPSELL_GESTAO_CENTAVOS, formatarReais, type OfertaPlano } from "@/lib/mercadopago/catalog";
 
 /**
  * Ferramenta: gerenciar_assinatura
  *
- * Gera um link de pagamento PERSONALIZADO (não um dos 3 links fixos do
- * painel do Mercado Pago) — o `external_reference` embutido no link é o
- * que permite ao webhook (/api/payments/mercadopago/webhook) saber
- * automaticamente qual empresa pagou e liberar o acesso sozinho, sem
- * conferência manual (decisão tomada com o Rafael em 07/08/2026).
+ * Nova estrutura comercial (08/2026): em vez de gerar o link do Mercado
+ * Pago direto, gera um link seguro pra página `/assinar` — um "gate de
+ * contratação" leve do próprio Frota IA, que mostra o resumo do plano (e o
+ * upsell do Individual pra Gestão) antes de ir pro Mercado Pago de fato.
+ * Isso é o que permite oferecer o upsell sem tratar a página hospedada do
+ * Mercado Pago como se fosse nossa. O e-mail (só necessário pros planos
+ * recorrentes) passou a ser pedido na própria página, não mais aqui.
  *
- * NÃO bloqueia nem libera acesso por si só — só gera o link. O bloqueio
- * de acesso por assinatura vencida/inexistente é uma etapa separada
- * (gating), ainda não ligada no loop principal de resposta.
+ * NÃO bloqueia nem libera acesso por si só — só gera o link. O bloqueio de
+ * acesso por assinatura vencida/inexistente é uma etapa separada (gating,
+ * ver isAccessAllowed em subscriptionService.ts).
  */
-
-export type PlanoAssinatura = "MENSAL" | "ANUAL_PARCELADO" | "ANUAL_PIX";
-
-const PLANOS: PlanoAssinatura[] = ["MENSAL", "ANUAL_PARCELADO", "ANUAL_PIX"];
 
 export interface GerenciarAssinaturaEntrada {
   userId: string;
   companyId: string;
   conversationId?: string;
-  plano: PlanoAssinatura;
-  /** Obrigatório só para o plano MENSAL — a API do Mercado Pago exige e-mail do pagador pra assinatura recorrente. */
-  email?: string;
+  plano: OfertaPlano;
 }
 
 export interface GerenciarAssinaturaResultado extends ResultadoFerramentaBase {
-  plano?: PlanoAssinatura;
-  linkPagamento?: string;
+  plano?: OfertaPlano;
+  linkContratacao?: string;
 }
 
 function respostaFalha(alertas: string[], dadosFaltantes: string[] = []): GerenciarAssinaturaResultado {
-  return { sucesso: false, alertas, premissas: [], dadosFaltantes, mensagemResumo: alertas[0] ?? "Não foi possível gerar o link de pagamento." };
+  return { sucesso: false, alertas, premissas: [], dadosFaltantes, mensagemResumo: alertas[0] ?? "Não foi possível gerar o link de contratação." };
 }
 
 async function executar(entrada: GerenciarAssinaturaEntrada): Promise<GerenciarAssinaturaResultado> {
-  const { userId, companyId, plano, email } = entrada;
+  const { userId, companyId, plano } = entrada;
 
   if (!userId || !companyId) {
     return respostaFalha(["Não foi possível identificar o usuário/empresa."], ["userId", "companyId"]);
   }
-  if (!plano || !PLANOS.includes(plano)) {
-    return respostaFalha([`Plano inválido: "${plano}". Use um de: ${PLANOS.join(", ")}.`]);
-  }
-  if (plano === "MENSAL" && !email) {
-    return respostaFalha(["Preciso do seu e-mail pra gerar o link do plano mensal (o Mercado Pago exige isso pra assinatura recorrente)."], ["email"]);
+  if (!plano || !PLANOS_AUTOATENDIMENTO.includes(plano)) {
+    return respostaFalha([`Plano inválido: "${plano}". Use um de: ${PLANOS_AUTOATENDIMENTO.join(", ")}.`]);
   }
 
-  try {
-    const resultado =
-      plano === "MENSAL"
-        ? await criarAssinaturaMensal({ companyId, email: email as string })
-        : await criarPagamentoAnual({ companyId, modo: plano === "ANUAL_PARCELADO" ? "PARCELADO" : "PIX" });
+  const link = buildCheckoutLinkUrl(companyId, plano);
 
-    return {
-      sucesso: true,
-      alertas: [],
-      premissas: [],
-      dadosFaltantes: [],
-      plano,
-      linkPagamento: resultado.initPoint,
-      mensagemResumo: `Link de pagamento do plano ${plano.toLowerCase()} gerado.`,
-    };
-  } catch (erro) {
-    if (erro instanceof MercadoPagoConfigError) {
-      return respostaFalha(["A integração de pagamento ainda não está configurada — avise o suporte."]);
-    }
-    return respostaFalha(["Não foi possível gerar o link de pagamento agora. Tente novamente em instantes."]);
-  }
+  return {
+    sucesso: true,
+    alertas: [],
+    premissas: [],
+    dadosFaltantes: [],
+    plano,
+    linkContratacao: link,
+    mensagemResumo: `Link de contratação do plano ${CATALOGO_OFERTAS[plano].label} gerado.`,
+  };
 }
 
 const PARAMETROS: DefinicaoParametroFerramenta[] = [
@@ -83,17 +66,19 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
     tipo: "enum",
     obrigatorio: true,
     descricao:
-      "MENSAL: R$79,90/mês recorrente (cartão ou Pix Automático). ANUAL_PARCELADO: 12x de R$59,90 (R$718,80 total), cobrança única parcelada, sem renovação automática. ANUAL_PIX: R$647,00 à vista no Pix, sem renovação automática.",
-    valoresPossiveis: PLANOS,
+      `MENSAL: Frota IA Individual, ${formatarReais(CATALOGO_OFERTAS.MENSAL.precoCentavos)}/mês recorrente, sem Painel de Gestão, 1 veículo. ` +
+      `GESTAO_MENSAL: Frota IA Gestão Mensal, ${formatarReais(CATALOGO_OFERTAS.GESTAO_MENSAL.precoCentavos)}/mês recorrente (Individual + upsell de ${formatarReais(PRECO_UPSELL_GESTAO_CENTAVOS)}), com Painel de Gestão, até 10 veículos — use quando o cliente pedir isso diretamente (ex.: "quero o painel no mensal"); a opção MENSAL também oferece esse upgrade dentro da própria página de contratação, então não é a única forma de chegar lá. ` +
+      `ANUAL_PARCELADO: Frota IA Gestão Anual no cartão, até ${CATALOGO_OFERTAS.ANUAL_PARCELADO.parcelas}x ${formatarReais(CATALOGO_OFERTAS.ANUAL_PARCELADO.precoCentavos / (CATALOGO_OFERTAS.ANUAL_PARCELADO.parcelas ?? 1))} (total ${formatarReais(CATALOGO_OFERTAS.ANUAL_PARCELADO.precoCentavos)}), pagamento único, sem renovação automática, com Painel de Gestão, até 10 veículos, 12 meses de acesso. ` +
+      `ANUAL_PIX: Frota IA Gestão Anual no Pix, ${formatarReais(CATALOGO_OFERTAS.ANUAL_PIX.precoCentavos)} à vista, pagamento único, sem renovação automática, com Painel de Gestão, até 10 veículos, 12 meses de acesso.`,
+    valoresPossiveis: PLANOS_AUTOATENDIMENTO,
   },
-  { nome: "email", tipo: "string", obrigatorio: false, descricao: "E-mail do cliente — obrigatório só quando plano=MENSAL (exigido pela API do Mercado Pago pra assinatura recorrente)." },
 ];
 
 export const ferramentaGerenciarAssinatura: DefinicaoFerramenta<GerenciarAssinaturaEntrada, GerenciarAssinaturaResultado> = {
   nome: "gerenciar_assinatura",
-  descricao: "Gera um link de pagamento personalizado (Mercado Pago) pro cliente assinar o Frota IA — Mensal, Anual parcelado ou Anual no Pix.",
+  descricao: "Gera um link seguro de contratação do Frota IA (Individual, Gestão Mensal ou Gestão Anual) — o cliente confirma o plano e a forma de pagamento numa página leve antes de ir pro Mercado Pago.",
   objetivo:
-    "Deixar o cliente assinar direto pelo WhatsApp: gera um link único vinculado à empresa dele, pra que o pagamento seja reconhecido e o acesso liberado automaticamente depois de confirmado.",
+    "Deixar o cliente assinar direto pelo WhatsApp: gera um link único vinculado à empresa dele, que abre uma página de resumo/confirmação e só então cria o checkout real do Mercado Pago — nunca gera o link de pagamento direto sem o cliente ver e confirmar o plano/valor antes.",
   parametros: PARAMETROS,
   executar,
 };

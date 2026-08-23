@@ -2368,6 +2368,7 @@ export type Database = {
         | "ANUAL_PARCELADO"
         | "ANUAL_PIX"
         | "EMPRESA"
+        | "GESTAO_MENSAL"
       subscription_status:
         | "TRIAL"
         | "ATIVA"
@@ -2687,6 +2688,7 @@ export const Constants = {
         "ANUAL_PARCELADO",
         "ANUAL_PIX",
         "EMPRESA",
+        "GESTAO_MENSAL",
       ],
       subscription_status: [
         "TRIAL",

@@ -16,6 +16,7 @@ const buscarPagamento = vi.fn();
 const buscarAssinatura = vi.fn();
 const atualizarAssinaturaPorPagamento = vi.fn();
 const registrarEventoPagamento = vi.fn();
+const eventoPagamentoJaProcessado = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
 vi.mock("@/lib/mercadopago/config", () => ({
@@ -34,6 +35,7 @@ vi.mock("@/lib/mercadopago/client", async () => {
 vi.mock("@/services/supabase/subscriptionService", () => ({
   atualizarAssinaturaPorPagamento: (...args: unknown[]) => atualizarAssinaturaPorPagamento(...args),
   registrarEventoPagamento: (...args: unknown[]) => registrarEventoPagamento(...args),
+  eventoPagamentoJaProcessado: (...args: unknown[]) => eventoPagamentoJaProcessado(...args),
 }));
 
 function chamarWebhook(opts: { body?: unknown; dataId?: string; type?: string; xSignature?: string; xRequestId?: string }) {
@@ -58,6 +60,7 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     isMercadoPagoConfigured.mockReturnValue(true);
     getMercadoPagoWebhookSecret.mockReturnValue("segredo");
     validarAssinaturaWebhook.mockReturnValue(true);
+    eventoPagamentoJaProcessado.mockResolvedValue(false);
   });
 
   it("503 quando o Mercado Pago não está configurado", async () => {
@@ -85,8 +88,8 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     expect(buscarPagamento).not.toHaveBeenCalled();
   });
 
-  it("payment aprovado de plano anual ativa a assinatura", async () => {
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PIX", valorCentavos: 64700 });
+  it("payment aprovado de plano anual ativa a assinatura e libera o Painel de Gestão", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PIX", valorCentavos: 79900 });
 
     const resposta = await chamarWebhook({ dataId: "pay-1", type: "payment", body: { type: "payment", data: { id: "pay-1" } } })();
 
@@ -94,8 +97,30 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     expect(registrarEventoPagamento).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ companyId: "empresa-1", statusRecebido: "approved" }));
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ companyId: "empresa-1", plan: "ANUAL_PIX", status: "ATIVA", valorCentavos: 64700 })
+      expect.objectContaining({ companyId: "empresa-1", plan: "ANUAL_PIX", status: "ATIVA", fleetPanelIncluded: true, valorCentavos: 79900 })
     );
+  });
+
+  it("payment aprovado de ANUAL_PARCELADO também libera o Painel de Gestão", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PARCELADO", valorCentavos: 83880 });
+
+    await chamarWebhook({ dataId: "pay-1b", type: "payment", body: { type: "payment", data: { id: "pay-1b" } } })();
+
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ plan: "ANUAL_PARCELADO", fleetPanelIncluded: true })
+    );
+  });
+
+  it("payment de mesmo id + status já processado não reaplica a assinatura (idempotência)", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PIX", valorCentavos: 79900 });
+    eventoPagamentoJaProcessado.mockResolvedValue(true);
+
+    const resposta = await chamarWebhook({ dataId: "pay-1", type: "payment", body: { type: "payment", data: { id: "pay-1" } } })();
+
+    expect(resposta.status).toBe(200);
+    expect(registrarEventoPagamento).toHaveBeenCalled(); // continua logando, só não reaplica
+    expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
   });
 
   it("payment aprovado de plano MENSAL não atualiza a assinatura (isso vem só do evento de preapproval)", async () => {
@@ -116,23 +141,37 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
   });
 
-  it("preapproval authorized ativa o plano mensal", async () => {
+  it("preapproval authorized ativa o plano mensal (Individual), sem painel", async () => {
     buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-2|MENSAL" });
 
     await chamarWebhook({ dataId: "sub-1", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-1" } } })();
 
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ companyId: "empresa-2", plan: "MENSAL", status: "ATIVA", mercadopagoSubscriptionId: "sub-1" })
+      expect.objectContaining({ companyId: "empresa-2", plan: "MENSAL", status: "ATIVA", fleetPanelIncluded: false, mercadopagoSubscriptionId: "sub-1" })
     );
   });
 
-  it("preapproval cancelled cancela a assinatura", async () => {
-    buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-2|MENSAL" });
+  it("preapproval authorized de GESTAO_MENSAL ativa o plano certo (não mais hardcoded como MENSAL) e libera o painel", async () => {
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-3|GESTAO_MENSAL" });
+
+    await chamarWebhook({ dataId: "sub-3", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-3" } } })();
+
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ companyId: "empresa-3", plan: "GESTAO_MENSAL", status: "ATIVA", fleetPanelIncluded: true })
+    );
+  });
+
+  it("preapproval cancelled cancela a assinatura e revoga o painel", async () => {
+    buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-2|GESTAO_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-2", type: "preapproval", body: { type: "preapproval", data: { id: "sub-2" } } })();
 
-    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: "CANCELADA" }));
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "CANCELADA", fleetPanelIncluded: false })
+    );
   });
 
   it("tipo de evento desconhecido: 200, sem chamar nada", async () => {

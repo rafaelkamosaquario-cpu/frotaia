@@ -23,6 +23,9 @@ import { AnthropicConfigError } from "@/lib/anthropic/client";
 import { isUniqueViolation } from "@/lib/supabase/errors";
 import { findPendingChecklistDispatchByPhone, recordChecklistResponse } from "@/services/supabase/checklistDispatchService";
 import { processarMensagemDeGrupo } from "@/services/freight/groupMessageIntake";
+import { resolverIntencaoComercialLanding, mensagemConfirmacaoOferta, MENSAGEM_INTERESSE_EMPRESAS } from "@/lib/mercadopago/landingIntent";
+import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
+import { isOfertaPlano } from "@/lib/mercadopago/catalog";
 import type { MessageInsert } from "@/lib/supabase/tables";
 
 /**
@@ -261,6 +264,16 @@ export async function POST(request: Request) {
 
   if (isNew) {
     // resolveOrCreateUserByPhone já criou a sessão de onboarding em awaiting_name.
+    // Mensagem vinda de um CTA da landing (08/2026): guarda a oferta pretendida
+    // no rascunho do onboarding (sobrevive a todas as etapas via spread, sem
+    // precisar alterar a máquina de estados) — só é usada depois de concluído
+    // (ver bloco de finalize abaixo), nunca pula o cadastro em si.
+    const intencaoComercial = resolverIntencaoComercialLanding(textoDireto);
+    if (intencaoComercial === "EMPRESAS") {
+      await sendWhatsappText(phoneE164, MENSAGEM_INTERESSE_EMPRESAS).catch(() => {});
+    } else if (intencaoComercial) {
+      await updateOnboardingSession(admin, userId, { collectedData: { ofertaPretendida: intencaoComercial } }).catch(() => {});
+    }
     await sendWhatsappText(phoneE164, firstOnboardingMessage()).catch(() => {});
     return NextResponse.json({ ok: true });
   }
@@ -312,8 +325,9 @@ export async function POST(request: Request) {
     });
 
     if (resultado.finalize) {
+      let empresaFinalizada;
       try {
-        await finalizeOnboarding(admin, userId, resultado.collectedData, phoneE164);
+        empresaFinalizada = await finalizeOnboarding(admin, userId, resultado.collectedData, phoneE164);
       } catch {
         await sendWhatsappText(
           phoneE164,
@@ -336,6 +350,16 @@ export async function POST(request: Request) {
         const mensagem = construirMensagemPosCadastro(collectedDataAtual.intentId, collectedDataAtual.intentLabel);
         await sendWhatsappText(phoneE164, mensagem).catch(() => {});
         await enviarSugestoesIniciais(admin, userId, phoneE164, collectedDataAtual);
+
+        // Cliente veio de um CTA da landing (ver bloco isNew acima) — só
+        // agora, com empresa criada, dá pra gerar o link de verdade. Preço e
+        // entitlement continuam vindo só do catálogo (buildCheckoutLinkUrl só
+        // carrega companyId + a chave do plano, nunca um valor).
+        const ofertaPretendida = collectedDataAtual.ofertaPretendida;
+        if (empresaFinalizada && typeof ofertaPretendida === "string" && isOfertaPlano(ofertaPretendida)) {
+          const link = buildCheckoutLinkUrl(empresaFinalizada.id, ofertaPretendida);
+          await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(ofertaPretendida)}\n\n${link}`).catch(() => {});
+        }
       }
       return NextResponse.json({ ok: true });
     }
@@ -398,6 +422,35 @@ export async function POST(request: Request) {
       ...inboundBase,
     });
     await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch(() => {});
+    return NextResponse.json({ ok: true });
+  }
+
+  // Mensagem vinda de um CTA da landing page (08/2026) — cliente já
+  // identificado (empresa existe). Interceptado ANTES da IA, mesmo
+  // princípio dos dois blocos acima: a oferta já veio decidida da landing,
+  // não faz sentido a IA perguntar "qual plano você quer" de novo. Funciona
+  // mesmo com trial vencido (roda antes do gate de isAccessAllowed, mais
+  // abaixo) — faz sentido: pagar é exatamente como se sai de um trial
+  // vencido. Preço/entitlement continuam vindo só do catálogo — o texto da
+  // mensagem nunca é usado pra nada além de escolher a CHAVE do plano.
+  const intencaoComercial = resolverIntencaoComercialLanding(textoDireto);
+  if (intencaoComercial) {
+    await appendMessage(admin, {
+      conversation_id: conversation.id,
+      company_id: companyId,
+      user_id: userId,
+      role: "user",
+      direction: "inbound",
+      content: textoDireto ?? "",
+      content_type: "text",
+      ...inboundBase,
+    });
+    if (intencaoComercial === "EMPRESAS") {
+      await sendWhatsappText(phoneE164, MENSAGEM_INTERESSE_EMPRESAS).catch(() => {});
+    } else {
+      const link = buildCheckoutLinkUrl(companyId, intencaoComercial);
+      await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(intencaoComercial)}\n\n${link}`).catch(() => {});
+    }
     return NextResponse.json({ ok: true });
   }
 

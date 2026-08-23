@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isMercadoPagoConfigured, getMercadoPagoWebhookSecret } from "@/lib/mercadopago/config";
 import { validarAssinaturaWebhook, buscarPagamento, buscarAssinatura, decodificarReferenciaExterna } from "@/lib/mercadopago/client";
-import { atualizarAssinaturaPorPagamento, registrarEventoPagamento } from "@/services/supabase/subscriptionService";
+import { CATALOGO_OFERTAS } from "@/lib/mercadopago/catalog";
+import {
+  atualizarAssinaturaPorPagamento,
+  registrarEventoPagamento,
+  eventoPagamentoJaProcessado,
+} from "@/services/supabase/subscriptionService";
 
 /**
  * Webhook do Mercado Pago (Fase 2 do fluxo de pagamento). Nunca confia no
@@ -65,6 +70,12 @@ export async function POST(request: Request) {
       const pagamento = await buscarPagamento(resourceId);
       const referencia = pagamento.externalReference ? decodificarReferenciaExterna(pagamento.externalReference) : null;
 
+      // Idempotência: mesma notificação (mesmo pagamento + mesmo status) já
+      // processada antes — registra de novo pra rastreabilidade (sempre
+      // best-effort), mas não reaplica a assinatura (evita empurrar
+      // valido_ate mais 365 dias a cada reentrega do mesmo webhook).
+      const jaProcessado = await eventoPagamentoJaProcessado(admin, resourceId, pagamento.status);
+
       await registrarEventoPagamento(admin, {
         companyId: referencia?.companyId,
         eventType: "payment",
@@ -73,11 +84,20 @@ export async function POST(request: Request) {
         payloadJson: body,
       });
 
-      if (referencia && pagamento.status === "approved" && referencia.plano !== "MENSAL") {
+      // Planos de cobrança única (Gestão Anual cartão/Pix) — planos
+      // recorrentes (MENSAL/GESTAO_MENSAL) são tratados só pelo evento de
+      // assinatura (preapproval) abaixo, nunca por aqui.
+      if (
+        referencia &&
+        !jaProcessado &&
+        pagamento.status === "approved" &&
+        CATALOGO_OFERTAS[referencia.plano].cobranca === "unica"
+      ) {
         await atualizarAssinaturaPorPagamento(admin, {
           companyId: referencia.companyId,
           plan: referencia.plano,
           status: "ATIVA",
+          fleetPanelIncluded: CATALOGO_OFERTAS[referencia.plano].painel,
           valorCentavos: pagamento.valorCentavos,
           mercadopagoPaymentId: resourceId,
           validoAte: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
@@ -88,6 +108,8 @@ export async function POST(request: Request) {
       const referencia = assinatura.externalReference ? decodificarReferenciaExterna(assinatura.externalReference) : null;
       const statusMapeado = STATUS_ASSINATURA_MAP[assinatura.status] ?? null;
 
+      const jaProcessado = await eventoPagamentoJaProcessado(admin, resourceId, assinatura.status);
+
       await registrarEventoPagamento(admin, {
         companyId: referencia?.companyId,
         eventType: tipo,
@@ -96,11 +118,15 @@ export async function POST(request: Request) {
         payloadJson: body,
       });
 
-      if (referencia && statusMapeado) {
+      // Antes gravava plan:"MENSAL" fixo, ignorando o plano real do
+      // external_reference — corrigido pra suportar GESTAO_MENSAL também
+      // (senão o upsell nunca resultaria em entitlement de painel correto).
+      if (referencia && !jaProcessado && statusMapeado) {
         await atualizarAssinaturaPorPagamento(admin, {
           companyId: referencia.companyId,
-          plan: "MENSAL",
+          plan: referencia.plano,
           status: statusMapeado,
+          fleetPanelIncluded: statusMapeado === "ATIVA" ? CATALOGO_OFERTAS[referencia.plano].painel : false,
           mercadopagoSubscriptionId: resourceId,
         });
       }

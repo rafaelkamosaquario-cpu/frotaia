@@ -122,13 +122,15 @@ export interface AtualizarAssinaturaPorPagamentoInput {
   companyId: string;
   plan: SubscriptionPlanEnum;
   status: SubscriptionStatusEnum;
+  /** Entitlement do Painel de Gestão que este plano concede — resolvido pelo chamador a partir de CATALOGO_OFERTAS (src/lib/mercadopago/catalog.ts), nunca lido do payload do Mercado Pago. Grava sempre (nunca deixa o campo intocado), pra downgrade de plano também revogar o painel corretamente. */
+  fleetPanelIncluded: boolean;
   valorCentavos?: number;
   mercadopagoSubscriptionId?: string;
   mercadopagoPaymentId?: string;
   validoAte?: string;
 }
 
-/** Usado pelo webhook do Mercado Pago (Fase 2) para refletir um pagamento confirmado. */
+/** Usado pelo webhook do Mercado Pago pra refletir um pagamento confirmado — inclui o entitlement do Painel de Gestão (08/2026, nova estrutura comercial), que antes desta mudança nunca era gravado aqui. */
 export async function atualizarAssinaturaPorPagamento(
   client: SupabaseDbClient,
   input: AtualizarAssinaturaPorPagamentoInput
@@ -138,6 +140,7 @@ export async function atualizarAssinaturaPorPagamento(
     .update({
       plan: input.plan,
       status: input.status,
+      fleet_panel_included: input.fleetPanelIncluded,
       valor_centavos: input.valorCentavos,
       mercadopago_subscription_id: input.mercadopagoSubscriptionId,
       mercadopago_payment_id: input.mercadopagoPaymentId,
@@ -149,6 +152,31 @@ export async function atualizarAssinaturaPorPagamento(
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Idempotência do webhook (08/2026): o Mercado Pago pode reentregar a mesma
+ * notificação — antes de reaplicar `atualizarAssinaturaPorPagamento`,
+ * checamos se já existe um evento igual (mesmo id + mesmo status) já
+ * registrado em `payment_events`. Sem constraint única no banco de
+ * propósito (é só log de auditoria, `company_id` pode ser nulo em eventos
+ * sem `external_reference` decodificável) — a checagem é feita aqui, na
+ * camada de aplicação.
+ */
+export async function eventoPagamentoJaProcessado(
+  client: SupabaseDbClient,
+  mercadopagoPaymentId: string,
+  statusRecebido: string
+): Promise<boolean> {
+  const { data, error } = await client
+    .from("payment_events")
+    .select("id")
+    .eq("mercadopago_payment_id", mercadopagoPaymentId)
+    .eq("status_recebido", statusRecebido)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data !== null;
 }
 
 export interface RegistrarEventoPagamentoInput {

@@ -1,7 +1,7 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getMercadoPagoConfig } from "./config";
-import type { SubscriptionPlanEnum } from "@/lib/supabase/tables";
+import { CATALOGO_OFERTAS, isOfertaPlano, type OfertaPlano } from "./catalog";
 
 /**
  * Cliente mínimo pra API REST do Mercado Pago (Fase 2 do fluxo de
@@ -9,32 +9,29 @@ import type { SubscriptionPlanEnum } from "@/lib/supabase/tables";
  * calendarClient.ts/zapiClient.ts. Nenhum outro arquivo deve chamar
  * api.mercadopago.com diretamente.
  *
- * Preços definidos junto com o Rafael em 06/08/2026 — ver [[project_frota_ia_status]].
+ * Preços vêm sempre de CATALOGO_OFERTAS (src/lib/mercadopago/catalog.ts) —
+ * nunca hardcoded aqui. Nova estrutura comercial "Individual vs. Gestão"
+ * definida com o Rafael em 23/08/2026.
  */
 
 const MP_API_BASE = "https://api.mercadopago.com";
 
-export const PRECOS_CENTAVOS: Record<Exclude<SubscriptionPlanEnum, "TRIAL" | "EMPRESA">, number> = {
-  MENSAL: 7990,
-  ANUAL_PARCELADO: 71880,
-  ANUAL_PIX: 64700,
-};
-
 /**
- * `external_reference` sozinho não diz qual dos 3 planos automatizados foi
- * pago — só diz a empresa. Codificamos `companyId|PLANO` na criação do
- * link e decodificamos na volta do webhook (`buscarPagamento`/
- * `buscarAssinatura` devolvem o valor exatamente como veio da API do
- * Mercado Pago, sem interpretar).
+ * `external_reference` sozinho não diz qual das 4 ofertas foi paga — só diz
+ * a empresa. Codificamos `companyId|PLANO` na criação do link e
+ * decodificamos na volta do webhook (`buscarPagamento`/`buscarAssinatura`
+ * devolvem o valor exatamente como veio da API do Mercado Pago, sem
+ * interpretar). O plano decodificado é só uma CHAVE pro catálogo — preço e
+ * entitlement de verdade são sempre resolvidos de novo a partir dele, nunca
+ * confiados de nenhum outro campo do payload do Mercado Pago.
  */
-function codificarReferenciaExterna(companyId: string, plano: Exclude<SubscriptionPlanEnum, "TRIAL" | "EMPRESA">): string {
+function codificarReferenciaExterna(companyId: string, plano: OfertaPlano): string {
   return `${companyId}|${plano}`;
 }
 
-export function decodificarReferenciaExterna(externalReference: string): { companyId: string; plano: SubscriptionPlanEnum } | null {
+export function decodificarReferenciaExterna(externalReference: string): { companyId: string; plano: OfertaPlano } | null {
   const [companyId, plano] = externalReference.split("|");
-  if (!companyId || !plano) return null;
-  if (plano !== "MENSAL" && plano !== "ANUAL_PARCELADO" && plano !== "ANUAL_PIX") return null;
+  if (!companyId || !plano || !isOfertaPlano(plano)) return null;
   return { companyId, plano };
 }
 
@@ -61,6 +58,8 @@ function authHeaders(): HeadersInit {
 export interface CriarAssinaturaMensalInput {
   companyId: string;
   email: string;
+  /** MENSAL (Individual, R$79,90) ou GESTAO_MENSAL (upsell, R$99,90) — mesmo mecanismo de preapproval, preço/entitlement resolvidos via CATALOGO_OFERTAS. */
+  plano: "MENSAL" | "GESTAO_MENSAL";
 }
 
 export interface LinkPagamentoResultado {
@@ -68,32 +67,35 @@ export interface LinkPagamentoResultado {
   initPoint: string;
 }
 
+function urlPadraoRetorno(): string {
+  return process.env.APP_URL ?? "https://frotaia.app.br";
+}
+
 /**
- * Assinatura recorrente (preapproval) pro plano Mensal — criada do zero
- * (sem preapproval_plan_id) porque não temos como buscar programaticamente
- * o ID do plano "Frota IA Mensal" já criado manualmente no painel do
- * Mercado Pago (endpoint de busca por nome não é documentado). Os dois
- * ficam desacoplados de propósito — o link fixo do painel continua servindo
- * só como referência/vitrine, nunca é o que vira acesso liberado.
- * `payer_email` é campo obrigatório da API do Mercado Pago pra preapproval
- * — por isso `gerenciar_assinatura` (ferramenta da Fase 5) precisa pedir o
- * e-mail do cliente antes de gerar este link.
+ * Assinatura recorrente (preapproval) — criada do zero (sem
+ * preapproval_plan_id) porque não temos como buscar programaticamente o ID
+ * de um plano já criado manualmente no painel do Mercado Pago (endpoint de
+ * busca por nome não é documentado). `payer_email` é campo obrigatório da
+ * API do Mercado Pago pra preapproval — por isso a página `/assinar`
+ * sempre pede o e-mail do cliente antes de chamar esta função.
  */
 export async function criarAssinaturaMensal(input: CriarAssinaturaMensalInput): Promise<LinkPagamentoResultado> {
+  const oferta = CATALOGO_OFERTAS[input.plano];
+
   const response = await fetch(`${MP_API_BASE}/preapproval`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
-      reason: "Frota IA Mensal",
-      external_reference: codificarReferenciaExterna(input.companyId, "MENSAL"),
+      reason: oferta.label,
+      external_reference: codificarReferenciaExterna(input.companyId, input.plano),
       payer_email: input.email,
       auto_recurring: {
         frequency: 1,
         frequency_type: "months",
-        transaction_amount: PRECOS_CENTAVOS.MENSAL / 100,
+        transaction_amount: oferta.precoCentavos / 100,
         currency_id: "BRL",
       },
-      back_url: process.env.APP_URL ?? "https://frotaia.app.br",
+      back_url: `${urlPadraoRetorno()}/assinar/confirmacao?plano=${input.plano}`,
     }),
   });
 
@@ -108,36 +110,40 @@ export interface CriarPagamentoAnualInput {
 }
 
 /**
- * Cobrança única (Checkout Pro / preference) pros planos Anuais — nunca
- * recorrente, o cliente é avisado antes do vencimento (ver Fase 5) e decide
- * se contrata de novo. `excluded_payment_types` no modo PIX restringe as
+ * Cobrança única (Checkout Pro / preference) pro plano Gestão Anual — nunca
+ * recorrente, sem renovação automática (cliente decide se contrata de novo
+ * ao fim dos 12 meses). `excluded_payment_types` no modo PIX restringe as
  * outras formas — os IDs de tipo exatos (`credit_card`, `debit_card` etc.)
  * não têm confirmação 100% oficial na documentação pública consultada;
  * conferir visualmente na página de checkout gerada antes de divulgar.
+ * `installments: 12` pede até 12 parcelas no Checkout Pro — se isso sai
+ * "sem juros" ou não depende da configuração de taxas da própria conta
+ * Mercado Pago, não é algo que esta chamada controle nem que dê pra
+ * confirmar por código.
  */
 export async function criarPagamentoAnual(input: CriarPagamentoAnualInput): Promise<LinkPagamentoResultado> {
-  const plano: SubscriptionPlanEnum = input.modo === "PARCELADO" ? "ANUAL_PARCELADO" : "ANUAL_PIX";
-  const valorReais = PRECOS_CENTAVOS[plano] / 100;
-  const titulo = input.modo === "PARCELADO" ? "Frota IA Anual (parcelado)" : "Frota IA Anual (Pix)";
+  const plano: OfertaPlano = input.modo === "PARCELADO" ? "ANUAL_PARCELADO" : "ANUAL_PIX";
+  const oferta = CATALOGO_OFERTAS[plano];
+  const valorReais = oferta.precoCentavos / 100;
 
   const paymentMethods =
     input.modo === "PIX"
       ? {
           excluded_payment_types: [{ id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }, { id: "prepaid_card" }],
         }
-      : { installments: 12 };
+      : { installments: oferta.parcelas ?? 1 };
 
   const response = await fetch(`${MP_API_BASE}/checkout/preferences`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
-      items: [{ title: titulo, quantity: 1, unit_price: valorReais, currency_id: "BRL" }],
+      items: [{ title: oferta.label, quantity: 1, unit_price: valorReais, currency_id: "BRL" }],
       external_reference: codificarReferenciaExterna(input.companyId, plano),
       payment_methods: paymentMethods,
       back_urls: {
-        success: process.env.APP_URL ?? "https://frotaia.app.br",
-        pending: process.env.APP_URL ?? "https://frotaia.app.br",
-        failure: process.env.APP_URL ?? "https://frotaia.app.br",
+        success: `${urlPadraoRetorno()}/assinar/confirmacao?resultado=sucesso&plano=${plano}`,
+        pending: `${urlPadraoRetorno()}/assinar/confirmacao?resultado=pendente&plano=${plano}`,
+        failure: `${urlPadraoRetorno()}/assinar/confirmacao?resultado=falha&plano=${plano}`,
       },
     }),
   });
