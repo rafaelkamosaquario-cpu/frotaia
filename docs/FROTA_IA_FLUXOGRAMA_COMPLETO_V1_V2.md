@@ -1,5 +1,7 @@
 # FROTA IA — FLUXOGRAMA COMPLETO V1 + V2
 
+> ⚠️ **HISTÓRICO/DEPRECATED (23/08/2026)** — companheiro de `FROTA_IA_RAIO_X_V1_V2.md`, mesma data/commit, mesma ressalva: anterior ao redesenho de onboarding e à reestruturação comercial. Fonte de verdade atual: `docs/FROTA_IA_ESTADO_ATUAL.md`.
+
 ## Jornada do Cliente, Arquitetura, Ferramentas e Integração WhatsApp ↔ Painel
 
 **Gerado em:** 19/08/2026 · **Repositório:** `github.com/rafaelkamosaquario-cpu/frotaia`, branch `claude/frota-ia-assistente-setup-qlrbac`, commit `7324e88`

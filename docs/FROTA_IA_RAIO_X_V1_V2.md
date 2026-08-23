@@ -1,5 +1,7 @@
 # FROTA IA — RAIO-X TÉCNICO E FUNCIONAL
 
+> ⚠️ **HISTÓRICO/DEPRECATED (23/08/2026)** — este documento é anterior ao redesenho do Onboarding V1 (marca/modelo/ano obrigatório etc.), ao Onboarding 2/Gestão e à reestruturação comercial Individual/Gestão (preços aqui, ex. R$59,90/R$647, estão desatualizados). Fonte de verdade atual: `docs/FROTA_IA_ESTADO_ATUAL.md`. Mantido só como registro histórico da arquitetura em 19/08/2026.
+
 ## Arquitetura Atual V1 WhatsApp + V2 Painel Web
 
 **Gerado em:** 19/08/2026

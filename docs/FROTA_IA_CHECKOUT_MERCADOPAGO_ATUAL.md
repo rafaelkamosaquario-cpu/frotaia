@@ -103,7 +103,13 @@ Nenhuma linha existente de `subscriptions` foi alterada — a migration só adic
 
 1 migration aditiva: `20260823162740_add_gestao_mensal_plan.sql` — novo valor `GESTAO_MENSAL` no enum `subscription_plan`. Nenhuma coluna nova, nenhuma tabela nova.
 
-## 11. Landing → WhatsApp → `/assinar` (resolvido em 2026-08-23)
+## 11. Correção pós-lançamento: `valido_ate` residual do trial (23/08/2026, commit `d836c93`)
+
+Achado numa auditoria comercial feita horas depois do lançamento desta refatoração: `criarAssinaturaTeste` grava `valido_ate` = +7 dias já no TRIAL; ao converter pra um plano **recorrente** (Individual/Gestão Mensal), o webhook nunca limpava esse campo — `atualizarAssinaturaPorPagamento` sempre recebia `validoAte: undefined`, e como o Supabase-js omite chaves `undefined` do PATCH, a coluna ficava intocada. Resultado: `isAccessAllowed`/`isFleetPanelAccessAllowed` caíam no ramo de comparação de data (em vez do ramo `status === "ATIVA"`), bloqueando o cliente pago ~7 dias após o cadastro original, apesar da assinatura estar `ATIVA` de verdade.
+
+**Corrigido**: no branch de assinatura recorrente do webhook, quando `statusMapeado === "ATIVA"`, agora passa `validoAte: null` explicitamente — limpa o resíduo do trial. Planos anuais (cobrança única) não são afetados: continuam recebendo `validoAte` = +365 dias normalmente, vindo do branch `payment`. Testes de regressão em `subscriptionService.test.ts` e `webhook/route.test.ts`.
+
+## 12. Landing → WhatsApp → `/assinar` (resolvido em 2026-08-23)
 
 A landing **nunca linka direto pra `/assinar`** — sempre abre o WhatsApp (`wa.me`) com uma mensagem pré-preenchida fixa. O Frota IA reconhece essa mensagem de forma determinística (`src/lib/mercadopago/landingIntent.ts`, mesmo princípio de `ehPedidoDeAjuda`/`ehPedidoDeFuncionalidades` — interceptado antes da IA) e só então gera o link assinado de `/assinar`, já com o plano certo pré-selecionado — sem perguntar de novo o que a landing já decidiu.
 

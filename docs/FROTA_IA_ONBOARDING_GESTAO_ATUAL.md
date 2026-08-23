@@ -16,7 +16,9 @@ Os 4 primeiros pontos já eram checados pelo gate de `/frota` (`layout.tsx`) —
 sessão → empresa → entitlement → Google Calendar conectado → onboarding de ativação concluído? → painel
 ```
 
-**Mensal e anual usam exatamente o mesmo fluxo.** A função que decide entitlement (`isFleetPanelAccessAllowed`) nunca leu `subscriptions.plan` — só `fleet_panel_included` + `status`/`valido_ate` — então a distinção comercial (MENSAL / ANUAL_PARCELADO / ANUAL_PIX) nunca chega a influenciar o onboarding. Nenhuma mudança foi necessária pra isso continuar assim.
+**Mensal e anual usam exatamente o mesmo fluxo.** A função que decide entitlement (`isFleetPanelAccessAllowed`) nunca leu `subscriptions.plan` — só `fleet_panel_included` + `status`/`valido_ate` — então a distinção comercial entre planos nunca chega a influenciar o onboarding. Nenhuma mudança foi necessária pra isso continuar assim.
+
+> **Nota (23/08/2026, posterior a este documento):** a enumeração de planos citada acima (`MENSAL / ANUAL_PARCELADO / ANUAL_PIX`) reflete a estrutura comercial de antes da tarde de 23/08 — o catálogo atual tem 4 ofertas (`MENSAL`=Individual sem painel, `GESTAO_MENSAL`, `ANUAL_PARCELADO`, `ANUAL_PIX`, as 3 últimas com painel). A afirmação central deste parágrafo (entitlement nunca leu `plan`) continua verdadeira e não foi afetada pela mudança. Ver `docs/FROTA_IA_ESTADO_ATUAL.md` pro catálogo atual completo.
 
 ## 2. Google — pré-requisito, não etapa do wizard
 
