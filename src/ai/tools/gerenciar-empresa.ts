@@ -91,7 +91,7 @@ async function executar(entrada: GerenciarEmpresaEntrada): Promise<GerenciarEmpr
     return {
       sucesso: true,
       modo,
-      alertas: entrada.tipo ? ["O tipo da empresa afeta a regra de quantos veículos podem ficar ativos ao mesmo tempo — confirme com o cliente se ele quis dizer isso."] : [],
+      alertas: [],
       premissas: [],
       dadosFaltantes: [],
       empresa: mapaEmpresa(atualizada),
@@ -113,7 +113,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
     nome: "tipo",
     tipo: "enum",
     obrigatorio: false,
-    descricao: "Tipo da empresa — afeta a regra de quantos veículos ativos são permitidos (só 'transportadora' pode ter mais de 1). Só altere se o cliente pedir explicitamente.",
+    descricao: "Tipo da empresa — rótulo administrativo/informativo, não afeta mais o limite de veículos (isso depende do plano/Painel de Gestão). Só altere se o cliente pedir explicitamente.",
     valoresPossiveis: TIPOS_EMPRESA,
   },
   { nome: "cidade", tipo: "string", obrigatorio: false, descricao: "Cidade da empresa (ATUALIZAR)." },

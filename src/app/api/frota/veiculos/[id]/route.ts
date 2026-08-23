@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { updateVehicle } from "@/services/supabase/vehicleService";
-import { MENSAGEM_UM_VEICULO_ATIVO, isUmVeiculoAtivoError } from "@/lib/frota/vehicleApiErrors";
+import { MENSAGEM_LIMITE_VEICULOS_ATIVOS, isLimiteVeiculosAtivosError } from "@/lib/frota/vehicleApiErrors";
 
 function statusForAccessReason(reason: "unauthenticated" | "no_company" | "not_entitled") {
   return reason === "unauthenticated" ? 401 : 403;
@@ -26,8 +26,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Dados inválidos.", detalhes: error.issues }, { status: 400 });
     }
-    if (isUmVeiculoAtivoError(error)) {
-      return NextResponse.json({ error: MENSAGEM_UM_VEICULO_ATIVO }, { status: 409 });
+    if (isLimiteVeiculosAtivosError(error)) {
+      return NextResponse.json({ error: MENSAGEM_LIMITE_VEICULOS_ATIVOS }, { status: 409 });
     }
     if (isNotFoundError(error)) {
       return NextResponse.json({ error: "Veículo não encontrado." }, { status: 404 });

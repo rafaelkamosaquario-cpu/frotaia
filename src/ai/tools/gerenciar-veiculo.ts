@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { listVehicles, getVehicle, createVehicle, updateVehicle, setDefaultVehicle } from "@/services/supabase/vehicleService";
 import { replaceCostProfile } from "@/services/supabase/vehicleCostProfileService";
 import { createTireProfile } from "@/services/supabase/vehicleTireProfileService";
-import { getCompany } from "@/services/supabase/companyService";
+import { getVehicleLimitForCompany } from "@/lib/frota/vehicleLimit";
 import { listVehicleDocumentsForPanel, upsertVehicleDocumentByType } from "@/services/supabase/vehicleDocumentService";
 import { syncDocumentAlert } from "@/services/supabase/fleetAlertsService";
 import type {
@@ -36,16 +36,16 @@ import type {
  * completar/corrigir isso depois, a partir do que o cliente conta na própria
  * conversa.
  *
- * Regra de produto: no máximo 1 veículo ATIVO por conta/empresa quando
- * `company_type` não é `transportadora` (motorista autônomo / operação
- * pequena) — CRIAR verifica isso antes de escrever, espelhando exatamente a
- * mesma condição do trigger de banco `enforce_one_vehicle_for_individual_accounts`
- * (migration 20260809180000: `tipo_empresa is distinct from 'transportadora'`).
- * Empresa `transportadora` (V2, gestão de frota) pode cadastrar múltiplos
- * veículos ativos por este mesmo caminho — o painel web já permitia isso,
- * esta ferramenta só passou a espelhar a mesma regra. Quando já existe um
- * veículo e a conta não é `transportadora`, o caminho certo é ATUALIZAR (ou
- * DEFINIR_CUSTO/DEFINIR_PNEU) — nunca CRIAR outro.
+ * Regra de produto (redesenhada em 08/2026, Onboarding 2 — Frota IA
+ * Gestão/Painel): limite de veículos ATIVOS por conta/empresa vem do
+ * ENTITLEMENT real, não mais de `company_type` — `getVehicleLimitForCompany`
+ * (src/lib/frota/vehicleLimit.ts) é a fonte central única: 1 veículo sem
+ * Painel de Gestão, até 10 com Painel de Gestão. CRIAR verifica isso antes
+ * de escrever, espelhando exatamente a mesma condição do trigger de banco
+ * `enforce_vehicle_limit_by_entitlement` (migration
+ * 20260823062200_generalize_vehicle_limit_by_entitlement). Quando o limite
+ * já foi atingido, o caminho certo é ATUALIZAR (ou DEFINIR_CUSTO/
+ * DEFINIR_PNEU) o veículo existente — nunca insistir em CRIAR outro.
  *
  * `vehicleId` sempre é verificado contra `companyId` antes de qualquer
  * escrita (ver `verificarPropriedade`) — nunca confia soh no id que o
@@ -291,13 +291,13 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
       }
 
       const veiculosExistentes = await listVehicles(admin, companyId);
-      if (veiculosExistentes.length > 0) {
-        const empresa = await getCompany(admin, companyId);
-        if (empresa?.company_type !== "transportadora") {
-          return respostaFalha(modo, [
-            "Esta conta já tem um veículo cadastrado — nesta versão só é permitido 1 veículo por conta. Use ATUALIZAR para corrigir/completar os dados dele, em vez de cadastrar outro.",
-          ]);
-        }
+      const limiteVeiculos = await getVehicleLimitForCompany(admin, companyId);
+      if (veiculosExistentes.length >= limiteVeiculos) {
+        const mensagem =
+          limiteVeiculos === 1
+            ? "Esta conta já tem um veículo cadastrado — nesta versão só é permitido 1 veículo por conta. Use ATUALIZAR para corrigir/completar os dados dele, em vez de cadastrar outro. O Painel de Gestão permite até 10 veículos por conta."
+            : `Esta empresa já atingiu o limite de ${limiteVeiculos} veículos ativos do plano atual.`;
+        return respostaFalha(modo, [mensagem]);
       }
 
       const criado = await createVehicle(admin, companyId, userId, {
@@ -498,7 +498,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
   { nome: "vencimentoSeguro", tipo: "string", obrigatorio: false, descricao: "Data de vencimento do seguro do veículo, formato YYYY-MM-DD — lida de foto do comprovante ou informada pelo cliente." },
   { nome: "vencimentoLicenciamento", tipo: "string", obrigatorio: false, descricao: "Data de vencimento do licenciamento/CRLV, formato YYYY-MM-DD — lida de foto do documento ou informada pelo cliente." },
   { nome: "observacoes", tipo: "string", obrigatorio: false, descricao: "Observações livres sobre o veículo." },
-  { nome: "ativo", tipo: "boolean", obrigatorio: false, descricao: "ATUALIZAR: true reativa, false desativa o veículo (ex.: cliente vendeu o caminhão ou voltou a usá-lo). Contas não-transportadora só podem ter 1 veículo ativo por vez — se der erro de limite, avise o cliente." },
+  { nome: "ativo", tipo: "boolean", obrigatorio: false, descricao: "ATUALIZAR: true reativa, false desativa o veículo (ex.: cliente vendeu o caminhão ou voltou a usá-lo). O limite de veículos ativos depende do plano (1 sem Painel de Gestão, até 10 com Painel de Gestão) — se der erro de limite, avise o cliente." },
   { nome: "precoCombustivelLitro", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: preço do combustível por litro." },
   { nome: "custoFixoDia", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: custo fixo diário." },
   { nome: "custoFixoMes", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: custo fixo mensal." },

@@ -250,15 +250,32 @@ flowchart TD
 ```mermaid
 flowchart TD
     Lead((Lead)) --> WA3[Manda mensagem no WhatsApp]
-    WA3 --> Cadastro[Onboarding 8 etapas]
+    WA3 --> Cadastro[Onboarding 1 — 12 etapas<br/>1 usuário + 1 veículo completo]
     Cadastro --> Empresa[(companies + trial)]
-    Empresa --> Veiculo[(vehicles, se informado)]
+    Empresa --> Veiculo[(vehicles completo:<br/>placa/config/carroceria/consumo)]
     Veiculo --> Uso1[Usa a IA normalmente<br/>35 ferramentas, multimodal]
     Uso1 -->|opcional| Vincular[Pede acesso ao painel<br/>vincular_painel]
     Vincular --> Login[Login Google]
     Login --> Gate2{Entitlement +<br/>Calendar conectado?}
-    Gate2 -->|sim| Painel3[Painel: 16 telas]
+    Gate2 -->|sim| Ativacao[Onboarding 2 — /frota-ativacao<br/>reaproveita empresa/veículo da V1]
     Gate2 -->|não| Bloqueio[/frota-indisponivel ou<br/>/frota-conectar-agenda/]
+    Ativacao --> Painel3[Painel: 16 telas<br/>até 10 veículos]
     Painel3 --> MesmoBanco[(Mesmo banco,<br/>mesmas tools, mesma memória)]
     Uso1 --> MesmoBanco
 ```
+
+## 17. Onboarding 2 — ativação do Painel de Gestão (08/2026)
+
+```mermaid
+flowchart TD
+    A[Passo 1 — Encontramos sua conta] --> A1[Confirma/edita nome da empresa]
+    A1 --> A2[Mostra Veículo 1 já existente]
+    A2 --> B[Passo 2 — Veículos, até 10]
+    B --> C[Passo 3 — Motoristas, opcional]
+    C --> D[Passo 4 — Checklist, opcional]
+    D --> E[Passo 5 — Resumo]
+    E --> F[companies.fleet_onboarding_completed_at = agora]
+    F --> G[/frota/dashboard]
+```
+
+Detalhe completo (textos das telas, reaproveitamento de dados, regra 1×10): `docs/FROTA_IA_ONBOARDING_GESTAO_ATUAL.md`.

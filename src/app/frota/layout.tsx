@@ -15,6 +15,13 @@ import { FrotaShell } from "@/components/frota/FrotaShell";
  * (`checkCalendarConnection`, não mais por usuário, ver A.1). O destino
  * fica FORA de src/app/frota (frota-conectar-agenda, mesmo motivo de
  * frota-indisponivel) pra não entrar em loop de redirect com este layout.
+ *
+ * Onboarding 2 (Frota IA Gestão, 08/2026): depois de Calendar conectado,
+ * falta só confirmar que o cliente já passou pelo wizard de ativação do
+ * painel (`companies.fleet_onboarding_completed_at`) — que reaproveita a
+ * empresa/veículo já criados pelo onboarding V1 do WhatsApp, nunca
+ * duplica. Fica em `/frota-ativacao` (fora de src/app/frota, mesmo motivo
+ * das outras duas rotas acima).
  */
 export default async function FrotaLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -31,6 +38,8 @@ export default async function FrotaLayout({ children }: { children: React.ReactN
     .catch(() => false);
 
   if (!calendarConnected) redirect("/frota-conectar-agenda");
+
+  if (!access.company.fleet_onboarding_completed_at) redirect("/frota-ativacao");
 
   return (
     <FrotaShell companyName={access.company.name} role={access.role}>

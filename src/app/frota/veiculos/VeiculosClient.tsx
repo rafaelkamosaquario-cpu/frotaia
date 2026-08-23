@@ -200,7 +200,7 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
         description={
           toggleTarget?.active
             ? `Tem certeza que deseja desativar "${toggleTarget?.name ?? toggleTarget?.plate}"?`
-            : `Tem certeza que deseja ativar "${toggleTarget?.name ?? toggleTarget?.plate}"? Empresas do tipo autônomo só podem ter 1 veículo ativo por vez.`
+            : `Tem certeza que deseja ativar "${toggleTarget?.name ?? toggleTarget?.plate}"? O limite de veículos ativos depende do plano (1 sem Painel de Gestão, até 10 com Painel de Gestão).`
         }
         confirmLabel={toggleTarget?.active ? "Desativar" : "Ativar"}
         variant={toggleTarget?.active ? "danger" : "default"}

@@ -34,7 +34,7 @@ O código **não usa mais a nomenclatura "Camada 3/4/5/6"** dos docs antigos com
 - **Finalidade**: painel de gestão visual para quem já tem conta (criada via WhatsApp ou não) e tem direito de acesso.
 - **Interface**: navegador, login Google via Supabase Auth.
 - **Gate de acesso** (cadeia confirmada em `src/app/frota/layout.tsx:19-39`, evidência completa no doc de fluxos): sessão Supabase → empresa vinculada (`company_members`) → **entitlement** (`companies.fleet_panel_enabled` OU `subscriptions.fleet_panel_included`) → **Google Calendar conectado pela empresa** → libera.
-- **Status**: ✅ **IMPLEMENTADO E UTILIZADO**, mas com uma particularidade importante: **não existe onboarding self-service funcional para quem chega direto pelo painel** (ver seção 9). Na prática, hoje só entra no painel quem já tem empresa criada por outro caminho (tipicamente WhatsApp) e recebeu o entitlement manualmente.
+- **Status**: ✅ **IMPLEMENTADO E UTILIZADO**. **Atualização 2026-08-23**: existe agora um segundo onboarding self-service (`/frota-ativacao`, "Frota IA Gestão") para quem já tem entitlement de painel — reaproveita a empresa/veículo criados pela V1, nunca duplica. Ver `docs/FROTA_IA_ONBOARDING_GESTAO_ATUAL.md`. A rota `/onboarding` (seção 9) continua sem ser self-service — não foi tocada, e não é mais o caminho de ativação do painel.
 
 ### Terceiro "canal" encontrado, não previsto na pergunta: rota raiz `/`
 - `src/app/page.tsx` é uma **terceira superfície**, atrás da flag `CUSTOMER_PANEL_ENABLED` (default `false`) — só usuários com `profiles.is_admin=true` acessam. É o chat de teste/administração, distinto do painel `/frota` (que tem seu próprio gate, independente dessa flag). 🟠 **ESTRUTURA PREPARADA MAS NÃO ATIVA PARA CLIENTE COMUM.**
@@ -142,7 +142,9 @@ Diagrama ER completo: ver `docs/FROTA_IA_FLUXOS_V1_V2_ATUAL.md`.
 
 **V1 (WhatsApp)**: 12 etapas de pergunta (nome, perfil, intenção, localização base, região, rota fixa, rota principal — condicional, veículo: marca/modelo/ano — agora obrigatório, placa, configuração, carroceria/implemento, consumo médio), com desambiguação extra para veículos articulados. Cria `auth.users` real (Admin API) já na primeira mensagem, `onboarding_sessions` guarda o estado, finalização cria `companies` + assinatura trial + veículo completo (placa/carroceria/consumo inclusos) + rota salva (quando estruturável) + memórias iniciais (região, rota fixa, rota principal). Google Calendar continua fora do onboarding — só conectado sob demanda, depois.
 
-**V2 (painel)**: **não existe onboarding self-service funcional** para quem chega direto pelo painel sem conta prévia — `src/app/onboarding/` existe mas é gate atrás de `CUSTOMER_PANEL_ENABLED` (default `false`) + `profiles.is_admin`, então só administradores passam por ele hoje. Cliente comum entra no painel só depois de ter conta pelo WhatsApp e receber o entitlement.
+**V2 (painel)**: **Atualização 2026-08-23** — agora existe onboarding self-service real (`/frota-ativacao`), mas só para quem já tem conta V1 pelo WhatsApp **e** entitlement de painel; não cria empresa do zero (isso continua sendo papel exclusivo do onboarding V1). A rota antiga `/onboarding` (`CUSTOMER_PANEL_ENABLED` + `profiles.is_admin`) segue existindo sem alteração, mas não é mais o caminho de ativação do Painel de Gestão. Detalhe completo em `docs/FROTA_IA_ONBOARDING_GESTAO_ATUAL.md`.
+
+**Limite de veículos (atualizado 2026-08-23)**: deixou de vir de `companies.company_type` e passou a vir do entitlement de painel — 1 veículo ativo sem Painel de Gestão, até 10 com. Ver `getVehicleLimitForCompany` (`src/lib/frota/vehicleLimit.ts`).
 
 ---
 
