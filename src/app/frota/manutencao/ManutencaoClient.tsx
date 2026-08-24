@@ -5,17 +5,27 @@ import { Wrench, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import type { MaintenanceScheduleRow, VehicleRow } from "@/lib/supabase/tables";
+import type { MaintenanceScheduleRow, VehicleRow, ExpenseRow } from "@/lib/supabase/tables";
 import { MaintenanceFormModal } from "./MaintenanceFormModal";
 
 interface ManutencaoClientProps {
   manutencoesIniciais: MaintenanceScheduleRow[];
   veiculos: VehicleRow[];
+  despesasVinculadas: ExpenseRow[];
 }
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
   return new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function formatKm(km: number | null) {
+  if (km == null) return "—";
+  return `${km.toLocaleString("pt-BR")} km`;
+}
+
+function formatBRL(valor: number) {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -32,19 +42,28 @@ const STATUS_CLASS: Record<string, string> = {
   cancelado: "bg-danger/10 text-danger",
 };
 
-export function ManutencaoClient({ manutencoesIniciais, veiculos }: ManutencaoClientProps) {
+export function ManutencaoClient({ manutencoesIniciais, veiculos, despesasVinculadas }: ManutencaoClientProps) {
   const [manutencoes, setManutencoes] = useState(manutencoesIniciais);
+  const [despesas, setDespesas] = useState(despesasVinculadas);
   const [formTarget, setFormTarget] = useState<MaintenanceScheduleRow | null | undefined>(undefined);
 
   const veiculosPorId = useMemo(() => new Map(veiculos.map((v) => [v.id, v])), [veiculos]);
   const veiculosAtivos = useMemo(() => veiculos.filter((v) => v.active), [veiculos]);
+  const custoPorManutencaoId = useMemo(() => new Map(despesas.map((d) => [d.maintenance_schedule_id, d])), [despesas]);
 
-  function handleSaved(manutencao: MaintenanceScheduleRow) {
+  function handleSaved(manutencao: MaintenanceScheduleRow, despesaVinculada?: ExpenseRow | null) {
     setManutencoes((prev) => {
       const existe = prev.some((m) => m.id === manutencao.id);
       const proxima = existe ? prev.map((m) => (m.id === manutencao.id ? manutencao : m)) : [manutencao, ...prev];
       return [...proxima].sort((a, b) => a.due_date.localeCompare(b.due_date));
     });
+
+    if (despesaVinculada) {
+      setDespesas((prev) => {
+        const existe = prev.some((d) => d.id === despesaVinculada.id);
+        return existe ? prev.map((d) => (d.id === despesaVinculada.id ? despesaVinculada : d)) : [despesaVinculada, ...prev];
+      });
+    }
   }
 
   return (
@@ -74,12 +93,15 @@ export function ManutencaoClient({ manutencoesIniciais, veiculos }: ManutencaoCl
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="frota-table w-full min-w-[640px] border-collapse text-sm">
+          <table className="frota-table w-full min-w-[860px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Veículo</th>
                 <th className="px-4 py-3 font-medium">Tipo</th>
+                <th className="px-4 py-3 font-medium">Km execução</th>
+                <th className="px-4 py-3 font-medium">Próxima km</th>
                 <th className="px-4 py-3 font-medium">Vencimento</th>
+                <th className="px-4 py-3 font-medium">Custo</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium text-right">Ações</th>
               </tr>
@@ -87,13 +109,17 @@ export function ManutencaoClient({ manutencoesIniciais, veiculos }: ManutencaoCl
             <tbody>
               {manutencoes.map((manutencao) => {
                 const veiculo = veiculosPorId.get(manutencao.vehicle_id);
+                const despesa = custoPorManutencaoId.get(manutencao.id);
                 return (
                   <tr key={manutencao.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
                     <td data-label="Veículo" className="px-4 py-3 font-medium text-foreground">
                       {veiculo ? veiculo.name || veiculo.plate : "—"}
                     </td>
                     <td data-label="Tipo" className="px-4 py-3 text-foreground">{manutencao.type}</td>
+                    <td data-label="Km execução" className="px-4 py-3 text-muted-foreground">{formatKm(manutencao.executed_km)}</td>
+                    <td data-label="Próxima km" className="px-4 py-3 text-muted-foreground">{formatKm(manutencao.next_due_km)}</td>
                     <td data-label="Vencimento" className="px-4 py-3 text-muted-foreground">{formatDate(manutencao.due_date)}</td>
+                    <td data-label="Custo" className="px-4 py-3 text-muted-foreground">{despesa ? formatBRL(despesa.amount) : "—"}</td>
                     <td data-label="Status" className="px-4 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[manutencao.status]}`}>
                         {STATUS_LABEL[manutencao.status]}

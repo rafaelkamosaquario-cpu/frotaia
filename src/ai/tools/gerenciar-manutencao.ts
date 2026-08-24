@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { listMaintenanceSchedulesForPanel, createMaintenanceSchedule, updateMaintenanceSchedule } from "@/services/supabase/maintenanceScheduleService";
 import { getVehicle } from "@/services/supabase/vehicleService";
 import { syncMaintenanceAlert } from "@/services/supabase/fleetAlertsService";
+import { syncMaintenanceExpense } from "@/services/supabase/expenseService";
 import type { MaintenanceScheduleRow, MaintenanceStatusEnum } from "@/lib/supabase/tables";
 
 /**
@@ -41,6 +42,17 @@ export interface GerenciarManutencaoEntrada {
   dataPrevista?: string;
   status?: MaintenanceStatusEnum;
   observacoes?: string;
+
+  /** Data em que a manutenção foi de fato feita (YYYY-MM-DD) — normalmente usada em CONCLUIR; se ausente ali, usa a data de hoje. */
+  dataExecucao?: string;
+  /** Km do veículo no momento da execução — só o que o cliente informou, nunca lido de telemetria/odômetro (não existe monitoramento automático). */
+  kmExecucao?: number;
+  /** Km alvo já sabido da PRÓXIMA manutenção, se o cliente informar diretamente. */
+  proximaKm?: number;
+  /** Intervalo em km até a próxima manutenção — só usado pra CALCULAR proximaKm (kmExecucao + intervaloKm) quando proximaKm não vier direto. Nunca presumir um intervalo que o cliente não informou. */
+  intervaloKm?: number;
+  /** Custo da manutenção em reais — só relevante ao concluir (CONCLUIR, ou CRIAR/ATUALIZAR quando status já é concluido). Vira/atualiza a despesa vinculada, nunca duplica. */
+  custo?: number;
 }
 
 export interface ManutencaoResumo {
@@ -50,6 +62,9 @@ export interface ManutencaoResumo {
   dataPrevista: string;
   status: MaintenanceStatusEnum;
   observacoes: string | null;
+  dataExecucao: string | null;
+  kmExecucao: number | null;
+  proximaKm: number | null;
 }
 
 export interface GerenciarManutencaoResultado extends ResultadoFerramentaBase {
@@ -66,7 +81,17 @@ function mapaManutencao(row: MaintenanceScheduleRow): ManutencaoResumo {
     dataPrevista: row.due_date,
     status: row.status,
     observacoes: row.notes,
+    dataExecucao: row.executed_date,
+    kmExecucao: row.executed_km,
+    proximaKm: row.next_due_km,
   };
+}
+
+/** kmExecucao + intervaloKm calculam proximaKm SÓ se o cliente informou o intervalo — nunca presume um intervalo padrão. */
+function resolverProximaKm(entrada: GerenciarManutencaoEntrada): number | undefined {
+  if (entrada.proximaKm != null) return entrada.proximaKm;
+  if (entrada.kmExecucao != null && entrada.intervaloKm != null) return entrada.kmExecucao + entrada.intervaloKm;
+  return undefined;
 }
 
 function respostaFalha(modo: ModoGerenciarManutencao, alertas: string[], dadosFaltantes: string[] = []): GerenciarManutencaoResultado {
@@ -103,9 +128,24 @@ async function executar(entrada: GerenciarManutencaoEntrada): Promise<GerenciarM
         dueDate: entrada.dataPrevista,
         status: entrada.status,
         notes: entrada.observacoes,
+        executedDate: entrada.dataExecucao,
+        executedKm: entrada.kmExecucao,
+        nextDueKm: resolverProximaKm(entrada),
       });
 
       await syncMaintenanceAlert(admin, companyId, userId, criada);
+
+      if (criada.status === "concluido" && entrada.custo != null) {
+        await syncMaintenanceExpense(admin, {
+          companyId,
+          userId,
+          maintenanceScheduleId: criada.id,
+          vehicleId: criada.vehicle_id,
+          amount: entrada.custo,
+          expenseDate: criada.executed_date ?? criada.due_date,
+          description: `Manutenção: ${criada.type}`,
+        });
+      }
 
       return {
         sucesso: true,
@@ -150,9 +190,24 @@ async function executar(entrada: GerenciarManutencaoEntrada): Promise<GerenciarM
         dueDate: entrada.dataPrevista,
         status: entrada.status,
         notes: entrada.observacoes,
+        executedDate: entrada.dataExecucao,
+        executedKm: entrada.kmExecucao,
+        nextDueKm: resolverProximaKm(entrada),
       });
 
       await syncMaintenanceAlert(admin, companyId, userId, atualizada);
+
+      if (atualizada.status === "concluido" && entrada.custo != null) {
+        await syncMaintenanceExpense(admin, {
+          companyId,
+          userId,
+          maintenanceScheduleId: atualizada.id,
+          vehicleId: atualizada.vehicle_id,
+          amount: entrada.custo,
+          expenseDate: atualizada.executed_date ?? atualizada.due_date,
+          description: `Manutenção: ${atualizada.type}`,
+        });
+      }
 
       return {
         sucesso: true,
@@ -165,10 +220,48 @@ async function executar(entrada: GerenciarManutencaoEntrada): Promise<GerenciarM
       };
     }
 
-    const novoStatus: MaintenanceStatusEnum = modo === "CONCLUIR" ? "concluido" : "cancelado";
-    const finalizada = await updateMaintenanceSchedule(admin, entrada.scheduleId, companyId, { status: novoStatus });
+    if (modo === "CANCELAR") {
+      const cancelada = await updateMaintenanceSchedule(admin, entrada.scheduleId, companyId, { status: "cancelado" });
+      await syncMaintenanceAlert(admin, companyId, userId, cancelada);
+      return {
+        sucesso: true,
+        modo,
+        alertas: [],
+        premissas: [],
+        dadosFaltantes: [],
+        manutencao: mapaManutencao(cancelada),
+        mensagemResumo: `Manutenção "${cancelada.type}" cancelada.`,
+      };
+    }
 
-    await syncMaintenanceAlert(admin, companyId, userId, finalizada);
+    // CONCLUIR — aceita km/data de execução e custo (nunca inventa nenhum dos três se o cliente não informou).
+    const concluida = await updateMaintenanceSchedule(admin, entrada.scheduleId, companyId, {
+      status: "concluido",
+      dueDate: entrada.dataPrevista,
+      executedDate: entrada.dataExecucao,
+      executedKm: entrada.kmExecucao,
+      nextDueKm: resolverProximaKm(entrada),
+      notes: entrada.observacoes,
+    });
+
+    await syncMaintenanceAlert(admin, companyId, userId, concluida);
+
+    if (entrada.custo != null) {
+      await syncMaintenanceExpense(admin, {
+        companyId,
+        userId,
+        maintenanceScheduleId: concluida.id,
+        vehicleId: concluida.vehicle_id,
+        amount: entrada.custo,
+        expenseDate: concluida.executed_date ?? concluida.due_date,
+        description: `Manutenção: ${concluida.type}`,
+      });
+    }
+
+    const partesResumo = [`Manutenção "${concluida.type}" marcada como concluída.`];
+    if (entrada.kmExecucao != null) partesResumo.push(`Km registrado: ${entrada.kmExecucao}.`);
+    if (concluida.next_due_km != null) partesResumo.push(`Próxima prevista aos ${concluida.next_due_km} km.`);
+    if (entrada.custo != null) partesResumo.push(`Custo de R$${entrada.custo.toFixed(2)} registrado em Despesas.`);
 
     return {
       sucesso: true,
@@ -176,8 +269,8 @@ async function executar(entrada: GerenciarManutencaoEntrada): Promise<GerenciarM
       alertas: [],
       premissas: [],
       dadosFaltantes: [],
-      manutencao: mapaManutencao(finalizada),
-      mensagemResumo: modo === "CONCLUIR" ? `Manutenção "${finalizada.type}" marcada como concluída.` : `Manutenção "${finalizada.type}" cancelada.`,
+      manutencao: mapaManutencao(concluida),
+      mensagemResumo: partesResumo.join(" "),
     };
   } catch {
     return respostaFalha(modo, ["Não foi possível concluir a ação de manutenção agora. Confira os dados e tente novamente."]);
@@ -195,6 +288,11 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
   { nome: "dataPrevista", tipo: "string", obrigatorio: false, descricao: "Data prevista da manutenção, formato YYYY-MM-DD, já resolvida para data absoluta — obrigatória em CRIAR. Também usada em ATUALIZAR para reagendar." },
   { nome: "status", tipo: "enum", obrigatorio: false, descricao: "Status da manutenção — use em ATUALIZAR para ajuste manual; CONCLUIR/CANCELAR já resolvem isso sozinhos.", valoresPossiveis: STATUS_MANUTENCAO },
   { nome: "observacoes", tipo: "string", obrigatorio: false, descricao: "Observações livres sobre a manutenção." },
+  { nome: "dataExecucao", tipo: "string", obrigatorio: false, descricao: "Data em que a manutenção foi de fato feita, formato YYYY-MM-DD — use em CONCLUIR quando o cliente informar (ex.: 'troquei ontem'). Se não informado, não presuma — deixe em branco." },
+  { nome: "kmExecucao", tipo: "number", obrigatorio: false, descricao: "Quilometragem do veículo no momento da execução, só se o cliente informou (ex.: 'com 250 mil km'). Nunca invente — não existe leitura automática de odômetro." },
+  { nome: "proximaKm", tipo: "number", obrigatorio: false, descricao: "Quilometragem alvo da PRÓXIMA manutenção, se o cliente já souber e informar direto (ex.: 'próxima aos 260 mil'). Só informativo, não gera alerta automático." },
+  { nome: "intervaloKm", tipo: "number", obrigatorio: false, descricao: "Intervalo em km até a próxima manutenção, SÓ se o cliente informar explicitamente (ex.: 'de 10 em 10 mil km') — usado junto com kmExecucao pra calcular proximaKm. Nunca presuma um intervalo padrão do fabricante/genérico." },
+  { nome: "custo", tipo: "number", obrigatorio: false, descricao: "Valor gasto na manutenção em reais, só se o cliente informou — obrigatório junto de CONCLUIR quando o cliente quiser registrar o gasto (ex.: 'custou R$1.200'). Vira uma despesa em Despesas automaticamente, nunca duplicada se a manutenção já tiver uma vinculada." },
 ];
 
 export const ferramentaGerenciarManutencao: DefinicaoFerramenta<GerenciarManutencaoEntrada, GerenciarManutencaoResultado> = {

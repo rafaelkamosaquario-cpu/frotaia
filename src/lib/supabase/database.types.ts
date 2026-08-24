@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -658,6 +658,7 @@ export type Database = {
           expense_date: string
           expense_type: Database["public"]["Enums"]["expense_type"]
           id: string
+          maintenance_schedule_id: string | null
           source_message_id: string | null
           user_id: string
           vehicle_id: string | null
@@ -672,6 +673,7 @@ export type Database = {
           expense_date: string
           expense_type: Database["public"]["Enums"]["expense_type"]
           id?: string
+          maintenance_schedule_id?: string | null
           source_message_id?: string | null
           user_id: string
           vehicle_id?: string | null
@@ -686,6 +688,7 @@ export type Database = {
           expense_date?: string
           expense_type?: Database["public"]["Enums"]["expense_type"]
           id?: string
+          maintenance_schedule_id?: string | null
           source_message_id?: string | null
           user_id?: string
           vehicle_id?: string | null
@@ -704,6 +707,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_maintenance_schedule_id_fkey"
+            columns: ["maintenance_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_schedules"
             referencedColumns: ["id"]
           },
           {
@@ -1126,7 +1136,10 @@ export type Database = {
           company_id: string
           created_at: string
           due_date: string
+          executed_date: string | null
+          executed_km: number | null
           id: string
+          next_due_km: number | null
           notes: string | null
           status: Database["public"]["Enums"]["maintenance_status"]
           type: string
@@ -1138,7 +1151,10 @@ export type Database = {
           company_id: string
           created_at?: string
           due_date: string
+          executed_date?: string | null
+          executed_km?: number | null
           id?: string
+          next_due_km?: number | null
           notes?: string | null
           status?: Database["public"]["Enums"]["maintenance_status"]
           type: string
@@ -1150,7 +1166,10 @@ export type Database = {
           company_id?: string
           created_at?: string
           due_date?: string
+          executed_date?: string | null
+          executed_km?: number | null
           id?: string
+          next_due_km?: number | null
           notes?: string | null
           status?: Database["public"]["Enums"]["maintenance_status"]
           type?: string

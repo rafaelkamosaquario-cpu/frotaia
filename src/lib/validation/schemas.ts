@@ -169,15 +169,23 @@ export const expenseUpdateSchema = expenseFields.partial();
 
 export const maintenanceStatusSchema = z.enum(["pendente", "agendado", "concluido", "cancelado"]);
 
+const nonNegativeKmSchema = z.number().int().nonnegative("Quilometragem não pode ser negativa.");
+
 export const maintenanceScheduleCreateSchema = z.object({
   vehicleId: uuidSchema,
   type: maxText(120, "Tipo de manutenção").min(1, "Tipo é obrigatório."),
   dueDate: z.string().date(),
   status: maintenanceStatusSchema.optional(),
   notes: maxText(2000, "Observações").optional(),
+  executedDate: z.string().date().optional(),
+  executedKm: nonNegativeKmSchema.optional(),
+  nextDueKm: nonNegativeKmSchema.optional(),
 });
 
 export const maintenanceScheduleUpdateSchema = maintenanceScheduleCreateSchema.partial();
+
+/** Custo informado ao concluir uma manutenção — nunca gravado em maintenance_schedules (evita duplicar valor); vira/atualiza uma despesa vinculada (ver syncMaintenanceExpense). */
+export const maintenanceCostSchema = z.number().finite().positive("Custo deve ser maior que zero.");
 
 // ── vehicle document ─────────────────────────────────────────────────────
 

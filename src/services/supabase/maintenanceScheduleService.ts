@@ -31,6 +31,9 @@ export async function createMaintenanceSchedule(
       due_date: parsed.dueDate,
       status: parsed.status,
       notes: parsed.notes,
+      executed_date: parsed.executedDate,
+      executed_km: parsed.executedKm,
+      next_due_km: parsed.nextDueKm,
     })
     .select("*")
     .single();
@@ -56,6 +59,9 @@ export async function updateMaintenanceSchedule(
       due_date: parsed.dueDate,
       status: parsed.status,
       notes: parsed.notes,
+      executed_date: parsed.executedDate,
+      executed_km: parsed.executedKm,
+      next_due_km: parsed.nextDueKm,
     })
     .eq("id", scheduleId)
     .eq("company_id", companyId)

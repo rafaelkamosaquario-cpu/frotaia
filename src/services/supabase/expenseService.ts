@@ -7,6 +7,8 @@ export interface RecordExpenseInput {
   conversationId?: string;
   vehicleId?: string;
   sourceMessageId?: string;
+  /** Manutenção que originou esta despesa (custo informado ao concluir) — nunca informado pelo cliente/modelo diretamente, só pelo fluxo de conclusão de manutenção (ver syncMaintenanceExpense). */
+  maintenanceScheduleId?: string;
   expenseType: ExpenseTypeEnum;
   amount: number;
   /** Data da despesa (não a data de registro) — YYYY-MM-DD. */
@@ -24,6 +26,7 @@ export async function recordExpense(client: SupabaseDbClient, input: RecordExpen
       conversation_id: input.conversationId,
       vehicle_id: input.vehicleId,
       source_message_id: input.sourceMessageId,
+      maintenance_schedule_id: input.maintenanceScheduleId,
       expense_type: input.expenseType,
       amount: input.amount,
       expense_date: input.expenseDate,
@@ -35,6 +38,51 @@ export async function recordExpense(client: SupabaseDbClient, input: RecordExpen
 
   if (error) throw error;
   return data;
+}
+
+export interface SyncMaintenanceExpenseInput {
+  companyId: string;
+  userId: string;
+  maintenanceScheduleId: string;
+  vehicleId: string;
+  amount: number;
+  expenseDate: string;
+  description: string;
+}
+
+/**
+ * Custo informado ao concluir uma manutenção vira/atualiza UMA despesa (categoria
+ * "manutencao") vinculada por `maintenance_schedule_id` — nunca duplica: se a
+ * manutenção já tem uma despesa vinculada (índice único parcial no banco garante
+ * no máximo 1), atualiza o valor/data/veículo dela em vez de criar outra. Editar o
+ * custo de uma manutenção já concluída sempre reaproveita a mesma despesa.
+ */
+export async function syncMaintenanceExpense(client: SupabaseDbClient, input: SyncMaintenanceExpenseInput): Promise<ExpenseRow> {
+  const { data: existente, error: erroConsulta } = await client
+    .from("expenses")
+    .select("*")
+    .eq("maintenance_schedule_id", input.maintenanceScheduleId)
+    .maybeSingle();
+  if (erroConsulta) throw erroConsulta;
+
+  if (existente) {
+    return updateExpense(client, existente.id, input.companyId, {
+      amount: input.amount,
+      expenseDate: input.expenseDate,
+      vehicleId: input.vehicleId,
+    });
+  }
+
+  return recordExpense(client, {
+    companyId: input.companyId,
+    userId: input.userId,
+    vehicleId: input.vehicleId,
+    maintenanceScheduleId: input.maintenanceScheduleId,
+    expenseType: "manutencao",
+    amount: input.amount,
+    expenseDate: input.expenseDate,
+    description: input.description,
+  });
 }
 
 export interface ListExpensesFilter {
@@ -97,4 +145,15 @@ export async function updateExpense(client: SupabaseDbClient, expenseId: string,
 export async function deleteExpense(client: SupabaseDbClient, expenseId: string, companyId: string): Promise<void> {
   const { error } = await client.from("expenses").delete().eq("id", expenseId).eq("company_id", companyId);
   if (error) throw error;
+}
+
+/** Despesas vinculadas a alguma manutenção (custo registrado ao concluir) — usado pela tela de Manutenção pra mostrar o custo sem duplicar a fonte de verdade (que continua sendo `expenses`). */
+export async function listMaintenanceLinkedExpenses(client: SupabaseDbClient, companyId: string): Promise<ExpenseRow[]> {
+  const { data, error } = await client
+    .from("expenses")
+    .select("*")
+    .eq("company_id", companyId)
+    .not("maintenance_schedule_id", "is", null);
+  if (error) throw error;
+  return data ?? [];
 }
