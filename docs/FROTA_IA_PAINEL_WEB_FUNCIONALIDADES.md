@@ -250,26 +250,36 @@ notificação automática pelo WhatsApp pro cliente dono do radar
 cliente pode pedir "analisa" (pré-análise de custo, reaproveitando as ferramentas de cálculo)
 ```
 
-**No painel** (`/frota/oportunidades`, `/frota/fretes` para configuração de fontes): criar/pausar/reativar/cancelar radar de busca (origem, destino, veículo opcional), cadastrar/desativar grupos de WhatsApp autorizados (só owner/admin), ver lista de oportunidades com score de compatibilidade, analisar/favoritar/ignorar cada uma.
+**No painel** (`/frota/oportunidades`, `/frota/fretes` para configuração de fontes): criar/pausar/reativar/cancelar radar de busca (origem, destino, veículo opcional), cadastrar/desativar grupos de WhatsApp autorizados (só owner/admin), ver lista de oportunidades com score de compatibilidade e o **porquê** desse score em linguagem simples (origem/destino/carroceria/data confirmados ou não), analisar/favoritar/ignorar cada uma. Ao pedir "Analisar", o resultado (custo/margem estimados, quando houver dado suficiente) aparece direto no card, sem precisar abrir o WhatsApp.
 
-**Relação com WhatsApp/IA**: ferramentas `gerenciar_radar_frete` e `consultar_oportunidades_frete` fazem exatamente as mesmas operações que o painel, usando os mesmos services — total paridade.
+**Relação com WhatsApp/IA**: ferramentas `gerenciar_radar_frete` e `consultar_oportunidades_frete` fazem exatamente as mesmas operações que o painel, usando os mesmos services — total paridade. A ação "Analisar" do painel chama a mesma `analisarOportunidadeParaMatch` usada pelo motor automático — nunca um segundo cálculo.
 
-**ROADMAP FUTURO / preparado mas sem uso real hoje**: fontes de mercado tipo Fretebras/Truckpad (o enum já prevê, mas só WhatsApp/grupo funciona hoje); um modo de "análise automática" antes de notificar (a coluna existe no banco com valor padrão "avisar primeiro", mas não há nenhuma tela nem comando que troque isso hoje).
+**IMPLEMENTADO NA RODADA 2 (24/08/2026)**: preferência "Como quer receber oportunidades?" (`freight_radar_analysis_mode`, coluna que já existia mas era travada — hoje é gravável pelo painel, em `/frota/oportunidades`, sem nunca expor o nome técnico do campo ao usuário):
+- **Avisar primeiro** (padrão): aviso simples no WhatsApp assim que aparece um match forte (score ≥ 70), pedindo confirmação pra análise completa.
+- **Analisar antes de avisar**: o Frota IA já tenta uma pré-análise (só custo de combustível, rotulada como preliminar) antes de notificar; se conseguir calcular, manda custo/margem estimados junto do aviso; se não tiver dado suficiente (veículo sem consumo médio ou sem preço de combustível cadastrado), o aviso explica isso em vez de inventar um número.
+- Corrigido nesta rodada um bug em que essa explicação de "dado insuficiente" nunca aparecia (a condição comparava o resultado, não se a tentativa tinha sido feita) — coberto por teste de regressão.
+
+**ROADMAP FUTURO / nunca fingido como funcional hoje**: fontes de mercado tipo Fretebras/Truckpad (o enum já prevê a coluna, mas nenhuma tela ou integração real existe — a tela de Fontes deixa isso explícito) — sem scraping, sem automação de navegador, sem acesso não autorizado a essas plataformas.
 
 ---
 
 ## 13. Alertas e Lembretes
 
-**O painel é só leitura neste módulo** — não existe criar, editar ou cancelar alerta pela tela.
+**IMPLEMENTADO NA RODADA 2 (24/08/2026)**: o painel virou um módulo operacional real — criar, editar e cancelar alertas manuais em `/frota/alertas`, usando a MESMA tabela (`scheduled_alerts`) e os mesmos services que o WhatsApp já usava (`gerenciar_alerta`). Nenhum sistema paralelo foi criado.
 
-**Origem de cada alerta**:
-- **Automático** — sincronizado sozinho sempre que uma manutenção ou documento é criado/editado (painel ou WhatsApp), com vencimento marcado (11h Brasília do dia).
+**Origem de cada alerta** (mostrada com selo na tela, calculada só pela presença de FK — nunca por texto livre):
+- **Automático (manutenção)** — sincronizado sozinho sempre que uma manutenção é criada/editada, com vencimento marcado (11h Brasília do dia). **Não editável nem cancelável pelo painel** — editar redireciona pra tela de Manutenção, que é a fonte real.
+- **Automático (documento)** — mesma lógica, a partir de Documentos.
 - **Checklist "atenção"** — criado automaticamente para os owners/admins da empresa.
-- **Manual, pelo WhatsApp** — ferramenta `gerenciar_alerta` (CRIAR/LISTAR/CANCELAR), pra lembrete livre (sem vínculo a manutenção/documento) — ex. "me lembra de renovar o contrato dia 30".
+- **Manual** — criado pelo WhatsApp (`gerenciar_alerta`) OU agora pelo painel — os dois editáveis/canceláveis livremente, sempre que ainda estiverem `pending`.
 
-**Disparo**: um job (cron) roda a cada ~5 minutos, busca os alertas vencidos e ainda pendentes, e manda por WhatsApp pra pessoa. Marca como enviado ou falhou. **Não existe confirmação de leitura/recebimento** — só o status de envio.
+**Proteção contra dessincronização**: reforçada em dois níveis — RLS (as policies de escrita exigem `maintenance_schedule_id` e `vehicle_document_id` nulos) e a API (`409` explicando que o alerta é controlado automaticamente). Cancelamento é sempre soft (`status = cancelled`), nunca exclusão física.
 
-**O que o painel mostra** (`/frota/alertas`): uma tabela derivada ao vivo (veículos/manutenções/documentos vencidos ou vencendo em 30 dias, com link pra tela de origem) mais uma seção separada listando os lembretes "livres" criados pelo WhatsApp que ainda não dispararam.
+**Disparo**: continua o mesmo job (cron) a cada ~5 minutos, busca os alertas vencidos e ainda pendentes, manda por WhatsApp e marca como enviado ou falhou.
+
+**Confirmação de leitura/entrega**: auditado nesta rodada — **confirmado que não existe**. O webhook do Z-API ignora explicitamente os callbacks de status de mensagem; o sistema só sabe se *tentou* enviar, nunca se a pessoa recebeu ou leu. Documentado aqui de propósito, pra não ser reintroduzido como funcionalidade fake depois.
+
+**O que o painel mostra** (`/frota/alertas`): cards agrupados por Atrasados/Hoje/Próximos/Histórico, com filtro por status/origem/veículo, e badge de origem em cada card. Substituiu a antiga tabela derivada (`computeFleetAlerts`) — que continua existindo só para o Dashboard, sem mudança lá.
 
 ---
 
@@ -478,3 +488,15 @@ Depois deste raio-X (23/08/2026) ter identificado os módulos parciais, uma roda
 6. **Configurações** — memória da IA (perguntar antes de salvar / guardar automaticamente) exposta, único par de campos de `company_preferences` com efeito real confirmado que ainda não tinha UI.
 
 Nenhuma migration destrutiva — todas aditivas (colunas novas nullable, 1 bucket de Storage novo). Nenhum dado antigo invalidado. `freight_radar_analysis_mode`, evolução de Alertas, confirmação de leitura e integração Fretebras/Truckpad ficaram deliberadamente de fora, para uma próxima rodada.
+
+---
+
+## 27. Rodada 2 de evolução funcional (24/08/2026) — Alertas + Radar de Fretes
+
+Segunda rodada, focada nas duas lacunas deixadas de fora da Rodada 1 (commit `11c076c` para Alertas; Radar de Fretes nesta mesma leva).
+
+**Alertas** (ver seção 13 atualizada): virou módulo operacional real — criar/editar/cancelar pelo painel, mesma tabela/services do WhatsApp, nunca um segundo sistema. Origem automática (manutenção/documento) protegida em dois níveis (RLS + API, `409`), sempre redirecionando pra tela de origem em vez de permitir edição direta. Confirmado por auditoria que **não existe confirmação de leitura/entrega** no WhatsApp hoje — documentado como ausência real, não implementado nada fake pra cobrir isso.
+
+**Radar de Fretes** (ver seção 12 atualizada): `freight_radar_analysis_mode` — que já tinha lógica de leitura pronta mas era impossível de mudar por qualquer superfície — agora é gravável pelo painel (`/frota/oportunidades`), sempre em linguagem simples ("Avisar primeiro" / "Analisar antes de avisar"), nunca expondo o nome do campo. A pré-análise automática do modo "Analisar antes" foi corrigida: antes calculava o resultado mas nunca refletia isso na notificação; agora a mensagem muda de verdade quando há custo/margem real, e explica quando não há dado suficiente (nunca inventa número). Nesse processo foi encontrado e corrigido um bug onde essa explicação de "dado insuficiente" nunca aparecia (condição invertida). A ação "Analisar" do painel passou a mostrar o resultado (ou a ausência dele) direto no card, e cada oportunidade ganhou a explicação em linguagem simples do porquê do score (mesmos dados da função de matching, nunca um texto inventado). A tela de Fontes deixa explícito que hoje só WhatsApp funciona — Fretebras/Truckpad continuam roadmap, sem scraping nem integração fake.
+
+Migration nova: nenhuma (a coluna `freight_radar_analysis_mode` já existia desde a v1 do Radar — só destravamos a escrita). Nenhuma migration destrutiva. Regressão completa (388 testes, typecheck, lint, build) rodada depois das duas partes, sem quebrar nenhum módulo anterior.

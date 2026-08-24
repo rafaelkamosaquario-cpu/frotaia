@@ -40,11 +40,13 @@ export async function processarNovaOportunidade(admin: SupabaseDbClient, opportu
 
     try {
       const preferencias = await getOrCreatePreferences(admin, radar.company_id);
-      if (preferencias.freight_radar_analysis_mode === "analise_automatica" && veiculo) {
-        await analisarOportunidadeParaMatch(admin, match.id, radar.company_id, opportunity, radar, veiculo);
+      const tentouPreAnalise = preferencias.freight_radar_analysis_mode === "analise_automatica" && Boolean(veiculo);
+      let preAnalise: PreAnaliseResumo | null = null;
+      if (tentouPreAnalise && veiculo) {
+        preAnalise = await analisarOportunidadeParaMatch(admin, match.id, radar.company_id, opportunity, radar, veiculo);
       }
 
-      const enviado = await notificarOportunidade(admin, radar, opportunity, match.id, resultado.score);
+      const enviado = await notificarOportunidade(admin, radar, opportunity, match.id, resultado.score, preAnalise, tentouPreAnalise);
       if (enviado) {
         await markMatchNotified(admin, match.id);
         notificacoesEnviadas += 1;
@@ -58,6 +60,49 @@ export async function processarNovaOportunidade(admin: SupabaseDbClient, opportu
   return { matchesGerados, notificacoesEnviadas };
 }
 
+function formatarBRLSimples(valor: number): string {
+  return `R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+}
+
+/**
+ * Modo "avisar primeiro" (padrão) — mesmo texto de sempre, sempre pergunta
+ * se o cliente quer a análise completa. Usado também no modo "analisar
+ * antes" quando a pré-análise não teve dados suficientes pra concluir
+ * (nunca finge um resultado que não existe — só avisa e explica o motivo).
+ */
+function construirMensagemAvisarPrimeiro(origem: string, destino: string, valor: string, peso: string | null, bodyType: string | null, score: number, semDadosSuficientes: boolean): string {
+  const linhas = [
+    "⚡ *Oportunidade de frete encontrada*",
+    "",
+    `${origem} → ${destino}`,
+    valor,
+    ...(peso ? [peso] : []),
+    ...(bodyType ? [bodyType] : []),
+    "",
+    `Compatibilidade: ${score}% com o radar que você deixou ativo.`,
+    "",
+    semDadosSuficientes
+      ? 'Pelos dados disponíveis, pode ser interessante — não deu pra pré-analisar automaticamente (faltam dados de consumo/preço de combustível no cadastro do veículo). Quer que eu faça a análise completa mesmo assim? Responda "analisa" ou "ignora".'
+      : 'Pelos dados disponíveis, pode ser interessante — quer que eu faça a análise completa? Responda "analisa" ou "ignora".',
+  ];
+  return linhas.join("\n");
+}
+
+/** Modo "analisar antes" com pré-análise concluída de verdade (custo e margem calculados, nunca inventados). */
+function construirMensagemComPreAnalise(origem: string, destino: string, valor: string, preAnalise: PreAnaliseResumo): string {
+  const linhas = [
+    "⚡ *Oportunidade de frete encontrada*",
+    "",
+    `${origem} → ${destino}`,
+    `Frete: ${valor}`,
+    `Custo estimado: ${formatarBRLSimples(preAnalise.custoTotal!)}`,
+    ...(preAnalise.margemPercentual !== undefined ? [`Margem estimada: ${preAnalise.margemPercentual.toFixed(0)}%`] : []),
+    "",
+    "Pode valer a análise. Dados dependem dos cadastros da sua operação (combustível, consumo) — peça a análise completa no chat pra considerar todos os custos.",
+  ];
+  return linhas.join("\n");
+}
+
 /**
  * Além de mandar pelo WhatsApp, persiste a notificação como mensagem de
  * saída da conversa normal do cliente (mesma tabela que o chat usa) — sem
@@ -65,29 +110,31 @@ export async function processarNovaOportunidade(admin: SupabaseDbClient, opportu
  * teria nenhum contexto de qual oportunidade ele quer dizer. `matchId` fica
  * em metadata (nunca no texto visível) para o caso de precisar recuperar.
  */
-async function notificarOportunidade(admin: SupabaseDbClient, radar: FreightRadarRow, opportunity: FreightOpportunityRow, matchId: string, score: number): Promise<boolean> {
+async function notificarOportunidade(
+  admin: SupabaseDbClient,
+  radar: FreightRadarRow,
+  opportunity: FreightOpportunityRow,
+  matchId: string,
+  score: number,
+  preAnalise: PreAnaliseResumo | null,
+  tentouPreAnalise: boolean
+): Promise<boolean> {
   const canais = await listChannelsForCompany(admin, radar.company_id);
   const canalWhatsapp = canais.find((c) => c.channel_type === "whatsapp" && c.phone_e164);
   if (!canalWhatsapp?.phone_e164) return false;
 
   const origem = [opportunity.origin_city, opportunity.origin_state].filter(Boolean).join(" - ") || "origem não informada";
   const destino = [opportunity.destination_city, opportunity.destination_state].filter(Boolean).join(" - ") || "destino não informado";
-  const valor = opportunity.freight_value_cents ? `R$ ${(opportunity.freight_value_cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "valor não informado";
+  const valor = opportunity.freight_value_cents ? formatarBRLSimples(opportunity.freight_value_cents / 100) : "valor não informado";
   const peso = opportunity.weight_kg ? `${(opportunity.weight_kg / 1000).toLocaleString("pt-BR")} t` : null;
 
-  const linhas = [
-    "⚡ *Oportunidade de frete encontrada*",
-    "",
-    `${origem} → ${destino}`,
-    valor,
-    ...(peso ? [peso] : []),
-    ...(opportunity.body_type ? [opportunity.body_type] : []),
-    "",
-    `Compatibilidade: ${score}% com o radar que você deixou ativo.`,
-    "",
-    "Pelos dados disponíveis, pode ser interessante — quer que eu faça a análise completa? Responda \"analisa\" ou \"ignora\".",
-  ];
-  const texto = linhas.join("\n");
+  // Só usa o texto de pré-análise quando ela de fato produziu custo real — nunca finge cálculo com dado faltando (etapa 19/26 da spec).
+  const preAnaliseValida = preAnalise && preAnalise.custoTotal !== undefined;
+  // "sem dados suficientes" só aparece quando o modo analise_automatica FOI tentado e não produziu resultado válido — nunca quando o modo é avisar_primeiro (que nem tenta).
+  const semDadosSuficientes = tentouPreAnalise && !preAnaliseValida;
+  const texto = preAnaliseValida
+    ? construirMensagemComPreAnalise(origem, destino, valor, preAnalise)
+    : construirMensagemAvisarPrimeiro(origem, destino, valor, peso, opportunity.body_type, score, semDadosSuficientes);
 
   await sendWhatsappText(canalWhatsapp.phone_e164, texto);
 
@@ -111,6 +158,12 @@ async function notificarOportunidade(admin: SupabaseDbClient, radar: FreightRada
   return true;
 }
 
+/** Resumo mínimo da pré-análise usado só pra decidir/compor a notificação — nunca persiste dado extra, o registro completo já fica em analysis_runs via completeAnalysisRun. */
+export interface PreAnaliseResumo {
+  custoTotal?: number;
+  margemPercentual?: number;
+}
+
 /**
  * Análise financeira PRELIMINAR da oportunidade — reaproveita consultar_rota
  * + calcular_combustivel + analisar_frete (nunca um motor novo, etapa 2 da
@@ -119,7 +172,10 @@ async function notificarOportunidade(admin: SupabaseDbClient, radar: FreightRada
  * motorista, que dependem de composição mais complexa do perfil de custo) —
  * sempre rotulado como preliminar; a análise completa continua exigindo o
  * cliente pedir "analisa" numa conversa real, onde a IA compõe o cálculo
- * completo com todos os dados salvos.
+ * completo com todos os dados salvos. Devolve `null` quando a pré-análise
+ * falhou ou não teve dado suficiente pra produzir um custo real — quem
+ * chama (notificarOportunidade) usa isso pra decidir qual texto mandar,
+ * nunca inventando um resultado que não existe.
  */
 export async function analisarOportunidadeParaMatch(
   admin: SupabaseDbClient,
@@ -128,7 +184,7 @@ export async function analisarOportunidadeParaMatch(
   opportunity: FreightOpportunityRow,
   radar: FreightRadarRow,
   veiculo: VehicleRow
-): Promise<void> {
+): Promise<PreAnaliseResumo | null> {
   const analysisRun = await startAnalysisRun(admin, companyId, {
     userId: radar.user_id,
     vehicleId: veiculo.id,
@@ -171,9 +227,15 @@ export async function analisarOportunidadeParaMatch(
 
     await completeAnalysisRun(admin, analysisRun.id, analise.mensagemResumo, analise as unknown as Record<string, unknown>);
     await markMatchAnalyzed(admin, matchId, companyId, analysisRun.id);
+
+    // custoTotal indefinido = ferramentaAnalisarFrete não conseguiu concluir (faltou dado) — nunca reportado como resultado real.
+    const resultadoFrete = analise.freteAnalisado;
+    if (!resultadoFrete || resultadoFrete.custoTotal === undefined) return null;
+    return { custoTotal: resultadoFrete.custoTotal, margemPercentual: resultadoFrete.margemPercentual };
   } catch (err) {
     const mensagem = err instanceof Error ? err.message : String(err);
     await failAnalysisRun(admin, analysisRun.id, "RADAR_PRE_ANALISE_FALHOU", "Não foi possível concluir a pré-análise automática desta oportunidade.");
     console.error(`[radar-matching] Falha na pré-análise do match ${matchId}: ${mensagem}`);
+    return null;
   }
 }

@@ -53,6 +53,7 @@ export async function updatePreferences(
       checklist_enabled: parsed.checklistEnabled,
       checklist_send_hour: parsed.checklistSendHour,
       checklist_item_keys: parsed.checklistItemKeys,
+      freight_radar_analysis_mode: parsed.freightRadarAnalysisMode,
       updated_by: userId,
     })
     .eq("company_id", companyId)

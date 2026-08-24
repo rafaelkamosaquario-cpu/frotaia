@@ -315,6 +315,7 @@ export const companyPreferencesUpdateSchema = z.object({
   checklistEnabled: z.boolean().optional(),
   checklistSendHour: z.number().int().min(0).max(23).optional(),
   checklistItemKeys: z.array(maxText(32, "Item do checklist")).min(1).optional(),
+  freightRadarAnalysisMode: z.enum(["avisar_primeiro", "analise_automatica"]).optional(),
 });
 
 // ── ai memory ────────────────────────────────────────────────────────────

@@ -7,12 +7,20 @@ import { cn } from "@/lib/utils";
 import type { FreightRadarRow, FreightSourceRow, VehicleRow } from "@/lib/supabase/tables";
 import type { MatchComOportunidade } from "@/services/supabase/freightMatchService";
 
+type OportunidadeComDetalhes = MatchComOportunidade & { detalhes: string[] };
+
+interface PreAnaliseResumo {
+  custoTotal?: number;
+  margemPercentual?: number;
+}
+
 interface OportunidadesClientProps {
   radaresIniciais: FreightRadarRow[];
-  oportunidadesIniciais: MatchComOportunidade[];
+  oportunidadesIniciais: OportunidadeComDetalhes[];
   fontesIniciais: FreightSourceRow[];
   veiculos: VehicleRow[];
   podeEditar: boolean;
+  modoAnaliseInicial: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -37,15 +45,39 @@ function formatarReais(valor: number | null): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fontesIniciais, veiculos, podeEditar }: OportunidadesClientProps) {
+export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fontesIniciais, veiculos, podeEditar, modoAnaliseInicial }: OportunidadesClientProps) {
   const { showToast } = useToast();
   const [radares, setRadares] = useState(radaresIniciais);
   const [oportunidades, setOportunidades] = useState(oportunidadesIniciais);
   const [fontes, setFontes] = useState(fontesIniciais);
   const [carregando, setCarregando] = useState<string | null>(null);
+  const [modoAnalise, setModoAnalise] = useState(modoAnaliseInicial === "analise_automatica" ? "analise_automatica" : "avisar_primeiro");
+  const [analises, setAnalises] = useState<Record<string, PreAnaliseResumo | null>>({});
 
   const [novoRadar, setNovoRadar] = useState({ origemCidade: "", origemUf: "", destinoCidade: "", destinoUf: "", veiculoId: "" });
   const [novaFonteId, setNovaFonteId] = useState("");
+
+  async function mudarModoAnalise(novoModo: "avisar_primeiro" | "analise_automatica") {
+    const modoAnterior = modoAnalise;
+    setModoAnalise(novoModo);
+    setCarregando("modo-analise");
+    try {
+      const response = await fetch("/api/frota/configuracoes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freightRadarAnalysisMode: novoModo }),
+      });
+      if (!response.ok) {
+        setModoAnalise(modoAnterior);
+        const data = await response.json();
+        showToast({ title: "Não foi possível salvar a preferência", description: data.error, variant: "error" });
+        return;
+      }
+      showToast({ title: "Preferência salva", variant: "success" });
+    } finally {
+      setCarregando(null);
+    }
+  }
 
   async function criarRadar() {
     if (!novoRadar.origemCidade && !novoRadar.origemUf) {
@@ -112,6 +144,9 @@ export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fo
       }
       const matchAtualizado = data.match;
       setOportunidades((atual) => atual.map((o) => (o.id === matchId ? { ...o, ...matchAtualizado } : o)));
+      if (body.acao === "analisar") {
+        setAnalises((atual) => ({ ...atual, [matchId]: data.preAnalise ?? null }));
+      }
       showToast({ title: "Feito", variant: "success" });
     } finally {
       setCarregando(null);
@@ -165,6 +200,39 @@ export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fo
         <h1 className="text-lg font-semibold text-foreground">⚡ Oportunidades</h1>
         <p className="text-sm text-muted-foreground">Radar de Fretes — buscas ativas e cargas encontradas compatíveis com seus veículos.</p>
       </div>
+
+      {podeEditar && (
+        <Card className="p-4">
+          <h2 className="mb-1 text-sm font-semibold text-foreground">Como quer receber oportunidades?</h2>
+          <p className="mb-3 text-xs text-muted-foreground">Vale pra todos os radares desta empresa.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={carregando === "modo-analise"}
+              onClick={() => mudarModoAnalise("avisar_primeiro")}
+              className={cn(
+                "rounded-lg border p-3 text-left text-sm transition-colors",
+                modoAnalise === "avisar_primeiro" ? "border-primary bg-primary/5" : "border-border"
+              )}
+            >
+              <span className="font-medium text-foreground">Avisar primeiro</span>
+              <p className="mt-1 text-xs text-muted-foreground">Assim que uma carga compatível aparecer, você recebe o aviso no WhatsApp e decide se quer a análise completa.</p>
+            </button>
+            <button
+              type="button"
+              disabled={carregando === "modo-analise"}
+              onClick={() => mudarModoAnalise("analise_automatica")}
+              className={cn(
+                "rounded-lg border p-3 text-left text-sm transition-colors",
+                modoAnalise === "analise_automatica" ? "border-primary bg-primary/5" : "border-border"
+              )}
+            >
+              <span className="font-medium text-foreground">Analisar antes de avisar</span>
+              <p className="mt-1 text-xs text-muted-foreground">O Frota IA já manda uma estimativa de custo e margem junto com o aviso, quando tiver dado suficiente pra calcular.</p>
+            </button>
+          </div>
+        </Card>
+      )}
 
       <Card className="p-4">
         <h2 className="mb-3 text-sm font-semibold text-foreground">Radares ativos</h2>
@@ -266,6 +334,25 @@ export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fo
                   {" · "}
                   {STATUS_LABEL[o.status] ?? o.status}
                 </p>
+                {o.detalhes.length > 0 && (
+                  <ul className="mb-2 flex flex-col gap-0.5 text-xs text-muted-foreground">
+                    {o.detalhes.map((linha, i) => (
+                      <li key={i}>• {linha}</li>
+                    ))}
+                  </ul>
+                )}
+                {analises[o.id] !== undefined && (
+                  <div className="mb-2 rounded-lg bg-surface-muted p-2 text-xs">
+                    {analises[o.id] === null ? (
+                      <span className="text-muted-foreground">Não foi possível estimar custo/margem — faltam dados de consumo ou preço de combustível no cadastro do veículo.</span>
+                    ) : (
+                      <span className="text-foreground">
+                        Custo estimado: {formatarReais(analises[o.id]!.custoTotal ?? null)}
+                        {analises[o.id]!.margemPercentual !== undefined ? ` · Margem estimada: ${analises[o.id]!.margemPercentual!.toFixed(0)}%` : ""}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <button type="button" disabled={carregando === `oportunidade-${o.id}`} onClick={() => agirNaOportunidade(o.id, { acao: "analisar" })} className="text-xs font-medium text-primary hover:underline">
                     Analisar
@@ -285,8 +372,11 @@ export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fo
 
       {podeEditar && (
         <Card className="p-4">
-          <h2 className="mb-1 text-sm font-semibold text-foreground">Grupos autorizados</h2>
-          <p className="mb-3 text-xs text-muted-foreground">Grupos de WhatsApp (com o número do Frota IA dentro) que alimentam o Radar desta empresa. Pegue o id do grupo com o Frota IA (suporte).</p>
+          <h2 className="mb-1 text-sm font-semibold text-foreground">Fontes do Radar</h2>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Hoje o Radar só busca oportunidades em grupos de WhatsApp (com o número do Frota IA dentro) — sem integração com Fretebras, Truckpad ou outras
+            plataformas ainda. Pegue o id do grupo com o Frota IA (suporte).
+          </p>
           <div className="mb-3 flex items-center gap-2">
             <input className="h-9 flex-1 rounded-lg border border-border bg-surface px-2 text-sm" placeholder="Id do grupo (ex.: 1203...-group)" value={novaFonteId} onChange={(e) => setNovaFonteId(e.target.value)} />
             <button type="button" disabled={carregando === "nova-fonte"} onClick={adicionarFonte} className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60">

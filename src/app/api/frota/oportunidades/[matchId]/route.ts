@@ -39,9 +39,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ match
     const radar = radares.find((r) => r.id === match.radar_id);
     if (!oportunidade || !veiculo || !radar) return NextResponse.json({ error: "Dados incompletos para análise." }, { status: 422 });
 
-    await analisarOportunidadeParaMatch(admin, match.id, access.company.id, oportunidade, radar, veiculo);
+    const preAnalise = await analisarOportunidadeParaMatch(admin, match.id, access.company.id, oportunidade, radar, veiculo);
     const matchAtualizado = await getMatch(supabase, matchId, access.company.id);
-    return NextResponse.json({ match: matchAtualizado });
+    return NextResponse.json({ match: matchAtualizado, preAnalise });
   }
 
   if (typeof body.status !== "string" || !STATUS_VALIDOS.includes(body.status)) {

@@ -9,6 +9,7 @@ import {
   maintenanceCostSchema,
   alertCreateSchema,
   alertUpdateSchema,
+  companyPreferencesUpdateSchema,
 } from "./schemas";
 
 describe("vehicleCreateSchema / vehicleUpdateSchema — campo active (painel V2)", () => {
@@ -134,5 +135,20 @@ describe("alertCreateSchema / alertUpdateSchema (Alertas manuais, evolução fun
   it("alertUpdateSchema aceita payload parcial (só editar a data, por exemplo)", () => {
     expect(alertUpdateSchema.safeParse({ scheduledFor: "2026-08-26T09:00:00-03:00" }).success).toBe(true);
     expect(alertUpdateSchema.safeParse({}).success).toBe(true);
+  });
+});
+
+describe("companyPreferencesUpdateSchema — freightRadarAnalysisMode (Radar de Fretes, Rodada 2)", () => {
+  it("aceita os dois modos reais (nunca expõe o nome cru do campo pro usuário, mas o valor salvo é sempre um destes dois)", () => {
+    expect(companyPreferencesUpdateSchema.safeParse({ freightRadarAnalysisMode: "avisar_primeiro" }).success).toBe(true);
+    expect(companyPreferencesUpdateSchema.safeParse({ freightRadarAnalysisMode: "analise_automatica" }).success).toBe(true);
+  });
+
+  it("rejeita qualquer valor fora dos dois modos suportados", () => {
+    expect(companyPreferencesUpdateSchema.safeParse({ freightRadarAnalysisMode: "outro" }).success).toBe(false);
+  });
+
+  it("campo é opcional (payload de configurações sem ele continua válido)", () => {
+    expect(companyPreferencesUpdateSchema.safeParse({}).success).toBe(true);
   });
 });
