@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, SquarePen } from "lucide-react";
+import { FileText, SquarePen, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -72,13 +72,14 @@ export function DocumentosClient({ documentosIniciais, veiculos, motoristas }: D
         </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="frota-table w-full min-w-[720px] border-collapse text-sm">
+          <table className="frota-table w-full min-w-[800px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Tipo</th>
                 <th className="px-4 py-3 font-medium">Veículo</th>
                 <th className="px-4 py-3 font-medium">Motorista</th>
                 <th className="px-4 py-3 font-medium">Vencimento</th>
+                <th className="px-4 py-3 font-medium">Arquivo</th>
                 <th className="px-4 py-3 font-medium text-right">Ações</th>
               </tr>
             </thead>
@@ -92,6 +93,16 @@ export function DocumentosClient({ documentosIniciais, veiculos, motoristas }: D
                     <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
                     <td data-label="Motorista" className="px-4 py-3 text-muted-foreground">{motorista ? motorista.name : "—"}</td>
                     <td data-label="Vencimento" className="px-4 py-3 text-muted-foreground">{formatDate(documento.expiry_date)}</td>
+                    <td data-label="Arquivo" className="px-4 py-3 text-muted-foreground">
+                      {documento.storage_path ? (
+                        <span className="inline-flex items-center gap-1.5 text-success">
+                          <Paperclip className="size-3.5" aria-hidden />
+                          Anexado
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setFormTarget(documento)}>
                         <SquarePen className="size-3.5" aria-hidden />

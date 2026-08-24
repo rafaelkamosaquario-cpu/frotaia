@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { FileText, Upload, Eye, Download, RefreshCw, Trash2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -35,6 +36,8 @@ const DOCUMENT_TYPE_LABEL: Record<VehicleDocumentTypeEnum, string> = {
   cnh: "CNH",
   toxicologico: "Toxicológico",
 };
+
+const ACCEPT_ARQUIVO = "application/pdf,image/jpeg,image/jpg,image/png";
 
 interface DocumentFormModalProps {
   open: boolean;
@@ -75,6 +78,12 @@ function toPayload(form: FormState, ownerKind: "vehicle" | "driver"): Record<str
   return payload;
 }
 
+function formatFileSize(bytes: number | null): string {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
 export function DocumentFormModal({
   open,
   onClose,
@@ -87,11 +96,29 @@ export function DocumentFormModal({
   const [form, setForm] = useState<FormState>(() => toFormState(document));
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [documentoAtual, setDocumentoAtual] = useState<VehicleDocumentRow | null>(document);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isRemovingArquivo, setIsRemovingArquivo] = useState(false);
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
   const isEditing = document !== null;
   const ownerKind = OWNER_KIND_BY_TYPE[form.documentType];
 
+  // A instância deste modal é reaproveitada entre aberturas (não desmonta) — resincroniza no
+  // corpo do render (padrão "ajustar estado quando uma prop muda" do próprio React, evita o
+  // round-trip extra de um useEffect) sempre que abre pra um documento diferente do último sincronizado.
+  const [syncedWith, setSyncedWith] = useState<VehicleDocumentRow | null>(null);
+  if (open && document !== syncedWith) {
+    setSyncedWith(document);
+    setForm(toFormState(document));
+    setDocumentoAtual(document);
+    setFormError(null);
+  } else if (!open && syncedWith !== null) {
+    setSyncedWith(null);
+  }
+
   function resetAndClose() {
     setForm(toFormState(null));
+    setDocumentoAtual(null);
     setFormError(null);
     onClose();
   }
@@ -146,13 +173,82 @@ export function DocumentFormModal({
         return;
       }
 
-      showToast({ title: isEditing ? "Documento atualizado" : "Documento cadastrado", variant: "success" });
       onSaved(data.documento);
-      resetAndClose();
+
+      if (isEditing) {
+        showToast({ title: "Documento atualizado", variant: "success" });
+        resetAndClose();
+      } else {
+        // Fica aberto (agora "editando" o registro recém-criado) pra permitir anexar o arquivo na mesma ação, sem reabrir o modal.
+        setDocumentoAtual(data.documento);
+        showToast({ title: "Documento cadastrado — anexe um arquivo abaixo, se quiser.", variant: "success" });
+      }
     } catch {
       showToast({ title: "Não foi possível salvar", description: "Verifique sua conexão e tente novamente.", variant: "error" });
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleSelecionarArquivo(event: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.target.files?.[0];
+    event.target.value = "";
+    if (!arquivo || !documentoAtual) return;
+
+    setIsUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", arquivo);
+      const response = await fetch(`/api/frota/documentos/${documentoAtual.id}/arquivo`, { method: "POST", body });
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast({ title: "Não foi possível anexar o arquivo", description: data.error ?? "Tente novamente.", variant: "error" });
+        return;
+      }
+
+      setDocumentoAtual(data.documento);
+      onSaved(data.documento);
+      showToast({ title: "Arquivo anexado", variant: "success" });
+    } catch {
+      showToast({ title: "Não foi possível anexar o arquivo", description: "Verifique sua conexão e tente novamente.", variant: "error" });
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function handleAbrirArquivo(download: boolean) {
+    if (!documentoAtual) return;
+    try {
+      const response = await fetch(`/api/frota/documentos/${documentoAtual.id}/arquivo${download ? "?download=1" : ""}`);
+      const data = await response.json();
+      if (!response.ok) {
+        showToast({ title: "Não foi possível abrir o arquivo", description: data.error ?? "Tente novamente.", variant: "error" });
+        return;
+      }
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch {
+      showToast({ title: "Não foi possível abrir o arquivo", description: "Verifique sua conexão e tente novamente.", variant: "error" });
+    }
+  }
+
+  async function handleRemoverArquivo() {
+    if (!documentoAtual) return;
+    setIsRemovingArquivo(true);
+    try {
+      const response = await fetch(`/api/frota/documentos/${documentoAtual.id}/arquivo`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) {
+        showToast({ title: "Não foi possível remover o arquivo", description: data.error ?? "Tente novamente.", variant: "error" });
+        return;
+      }
+      setDocumentoAtual(data.documento);
+      onSaved(data.documento);
+      showToast({ title: "Arquivo removido", description: "O registro do documento continua salvo.", variant: "success" });
+    } catch {
+      showToast({ title: "Não foi possível remover o arquivo", description: "Verifique sua conexão e tente novamente.", variant: "error" });
+    } finally {
+      setIsRemovingArquivo(false);
     }
   }
 
@@ -168,6 +264,8 @@ export function DocumentFormModal({
             value={form.documentType}
             onChange={(e) => handleDocumentTypeChange(e.target.value)}
             className={selectClass}
+            disabled={documentoAtual?.storage_path != null}
+            title={documentoAtual?.storage_path != null ? "Remova o arquivo anexado antes de trocar o tipo (o caminho do arquivo depende do dono/tipo)." : undefined}
           >
             {Object.entries(DOCUMENT_TYPE_LABEL).map(([value, label]) => (
               <option key={value} value={value}>
@@ -249,13 +347,80 @@ export function DocumentFormModal({
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={resetAndClose}>
-            Cancelar
+            {documentoAtual ? "Concluir" : "Cancelar"}
           </Button>
-          <Button type="submit" isLoading={isSaving}>
-            {isEditing ? "Salvar alterações" : "Cadastrar documento"}
-          </Button>
+          {!isEditing && documentoAtual === null && (
+            <Button type="submit" isLoading={isSaving}>
+              Cadastrar documento
+            </Button>
+          )}
+          {isEditing && (
+            <Button type="submit" isLoading={isSaving}>
+              Salvar alterações
+            </Button>
+          )}
         </div>
       </form>
+
+      {documentoAtual && (
+        <div className="mt-5 border-t border-border pt-4">
+          <p className={labelClass}>Arquivo</p>
+          <input ref={inputArquivoRef} type="file" accept={ACCEPT_ARQUIVO} onChange={handleSelecionarArquivo} className="hidden" />
+
+          {documentoAtual.storage_path ? (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-muted/40 p-3">
+              <FileText className="size-8 shrink-0 text-muted-foreground" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{documentoAtual.original_filename}</p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(documentoAtual.file_size)}</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                <Button type="button" variant="ghost" size="sm" className="gap-1.5" onClick={() => handleAbrirArquivo(false)}>
+                  <Eye className="size-3.5" aria-hidden />
+                  Ver
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="gap-1.5" onClick={() => handleAbrirArquivo(true)}>
+                  <Download className="size-3.5" aria-hidden />
+                  Baixar
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5"
+                  isLoading={isUploading}
+                  onClick={() => inputArquivoRef.current?.click()}
+                >
+                  <RefreshCw className="size-3.5" aria-hidden />
+                  Substituir
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-danger hover:bg-danger/10"
+                  isLoading={isRemovingArquivo}
+                  onClick={handleRemoverArquivo}
+                >
+                  <Trash2 className="size-3.5" aria-hidden />
+                  Remover
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              isLoading={isUploading}
+              onClick={() => inputArquivoRef.current?.click()}
+            >
+              <Upload className="size-4" aria-hidden />
+              Anexar PDF, JPG ou PNG
+            </Button>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }

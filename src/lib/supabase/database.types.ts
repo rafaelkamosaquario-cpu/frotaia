@@ -1997,9 +1997,14 @@ export type Database = {
           document_type: Database["public"]["Enums"]["vehicle_document_type"]
           driver_id: string | null
           expiry_date: string | null
+          file_size: number | null
           id: string
+          mime_type: string | null
           notes: string | null
+          original_filename: string | null
+          storage_path: string | null
           updated_at: string
+          uploaded_at: string | null
           vehicle_id: string | null
         }
         Insert: {
@@ -2008,9 +2013,14 @@ export type Database = {
           document_type: Database["public"]["Enums"]["vehicle_document_type"]
           driver_id?: string | null
           expiry_date?: string | null
+          file_size?: number | null
           id?: string
+          mime_type?: string | null
           notes?: string | null
+          original_filename?: string | null
+          storage_path?: string | null
           updated_at?: string
+          uploaded_at?: string | null
           vehicle_id?: string | null
         }
         Update: {
@@ -2019,9 +2029,14 @@ export type Database = {
           document_type?: Database["public"]["Enums"]["vehicle_document_type"]
           driver_id?: string | null
           expiry_date?: string | null
+          file_size?: number | null
           id?: string
+          mime_type?: string | null
           notes?: string | null
+          original_filename?: string | null
+          storage_path?: string | null
           updated_at?: string
+          uploaded_at?: string | null
           vehicle_id?: string | null
         }
         Relationships: [

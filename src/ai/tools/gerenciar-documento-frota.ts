@@ -22,6 +22,20 @@ import type { VehicleDocumentRow, VehicleDocumentTypeEnum } from "@/lib/supabase
  * Cada documento pertence a EXATAMENTE 1 veículo OU 1 motorista — a mesma
  * regra do CHECK `vehicle_documents_exactly_one_owner` do banco é
  * replicada aqui em código pra dar um erro amigável antes do INSERT falhar.
+ *
+ * LIMITAÇÃO CONHECIDA E DELIBERADA (evolução funcional 08/2026, upload real
+ * de arquivo): esta ferramenta continua só gravando os DADOS extraídos da
+ * foto (tipo, dono, vencimento) — nunca o arquivo em si. A foto que o
+ * cliente manda pelo WhatsApp passa só em memória, como base64, direto pra
+ * chamada da Claude API (`conteudoMultimodal` em gerarRespostaAssistente.ts,
+ * via `baixarMidia`/`paraBase64` do webhook) e é descartada depois — nunca
+ * persistida em Storage nem em lugar nenhum. O upload real (arquivo
+ * guardado de verdade, com preview/download) só existe hoje pelo Painel Web
+ * (`/frota/documentos`, ver DocumentFormModal.tsx e a rota
+ * `/api/frota/documentos/[id]/arquivo`). Ligar o WhatsApp a esse mesmo
+ * armazenamento exigiria um pipeline novo (baixar a mídia recebida do
+ * webhook e fazer upload pro bucket a partir dali) — não implementado nesta
+ * rodada; documentado aqui em vez de fingir que já existe.
  */
 
 export type ModoGerenciarDocumentoFrota = "CRIAR" | "LISTAR" | "ATUALIZAR";

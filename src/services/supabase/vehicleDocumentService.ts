@@ -15,6 +15,13 @@ export async function listVehicleDocumentsForPanel(
   return data ?? [];
 }
 
+/** companyId é filtro obrigatório — usado antes de upload/download de arquivo pra nunca confiar só no id vindo da URL. */
+export async function getVehicleDocument(client: SupabaseDbClient, documentId: string, companyId: string): Promise<VehicleDocumentRow | null> {
+  const { data, error } = await client.from("vehicle_documents").select("*").eq("id", documentId).eq("company_id", companyId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function createVehicleDocument(
   client: SupabaseDbClient,
   companyId: string,
@@ -86,6 +93,52 @@ export async function updateVehicleDocument(
       expiry_date: parsed.expiryDate,
       notes: parsed.notes,
     })
+    .eq("id", documentId)
+    .eq("company_id", companyId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export interface AttachDocumentFileInput {
+  storagePath: string;
+  originalFilename: string;
+  mimeType: string;
+  fileSize: number;
+}
+
+/** Grava os metadados do arquivo já enviado ao Storage — nunca chamado sem o upload ter sucesso antes. Substituir um arquivo existente sobrescreve os metadados (o path muda a cada envio, então o objeto antigo é removido separadamente pela rota). */
+export async function attachDocumentFile(
+  client: SupabaseDbClient,
+  documentId: string,
+  companyId: string,
+  input: AttachDocumentFileInput
+): Promise<VehicleDocumentRow> {
+  const { data, error } = await client
+    .from("vehicle_documents")
+    .update({
+      storage_path: input.storagePath,
+      original_filename: input.originalFilename,
+      mime_type: input.mimeType,
+      file_size: input.fileSize,
+      uploaded_at: new Date().toISOString(),
+    })
+    .eq("id", documentId)
+    .eq("company_id", companyId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/** "Remover arquivo" — limpa só os metadados do arquivo, nunca o registro do documento (tipo/dono/vencimento continuam intactos). A remoção do objeto no Storage é feita separadamente pela rota, antes de chamar isto. */
+export async function removeDocumentFile(client: SupabaseDbClient, documentId: string, companyId: string): Promise<VehicleDocumentRow> {
+  const { data, error } = await client
+    .from("vehicle_documents")
+    .update({ storage_path: null, original_filename: null, mime_type: null, file_size: null, uploaded_at: null })
     .eq("id", documentId)
     .eq("company_id", companyId)
     .select("*")
