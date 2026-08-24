@@ -15,6 +15,7 @@ import {
   BarChart3,
   Newspaper,
   Settings,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
@@ -50,6 +51,7 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/rotas", label: "Rotas salvas", icon: Map, group: "Gestão", disponivel: true },
   { href: "/frota/checklists", label: "Checklists", icon: ClipboardCheck, group: "Gestão", disponivel: true },
 
+  { href: "/frota/agenda", label: "Agenda", icon: CalendarDays, group: "Acompanhamento", disponivel: true },
   { href: "/frota/alertas", label: "Alertas", icon: Bell, group: "Acompanhamento", disponivel: true },
   { href: "/frota/relatorios", label: "Relatórios", icon: BarChart3, group: "Acompanhamento", disponivel: true },
   { href: "/frota/noticias", label: "Notícias", icon: Newspaper, group: "Acompanhamento", disponivel: true },
