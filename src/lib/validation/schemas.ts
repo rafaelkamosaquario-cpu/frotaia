@@ -284,6 +284,18 @@ export const savedRouteCreateSchema = z.object({
 
 export const savedRouteUpdateSchema = savedRouteCreateSchema.partial();
 
+// ── scheduled alert (manual, painel — Rodada 2 evolução funcional) ────────
+
+export const alertCreateSchema = z.object({
+  title: maxText(160, "Título").min(1, "Título é obrigatório."),
+  notes: maxText(2000, "Descrição").optional(),
+  vehicleId: uuidSchema.nullable().optional(),
+  /** ISO 8601 com offset (ex.: 2026-08-25T08:00:00-03:00) — sempre absoluto, nunca expressão relativa. */
+  scheduledFor: z.string().datetime({ offset: true }),
+});
+
+export const alertUpdateSchema = alertCreateSchema.partial();
+
 // ── company preferences ──────────────────────────────────────────────────
 
 export const companyPreferencesUpdateSchema = z.object({

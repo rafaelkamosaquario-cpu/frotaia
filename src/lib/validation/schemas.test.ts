@@ -7,6 +7,8 @@ import {
   maintenanceScheduleCreateSchema,
   maintenanceScheduleUpdateSchema,
   maintenanceCostSchema,
+  alertCreateSchema,
+  alertUpdateSchema,
 } from "./schemas";
 
 describe("vehicleCreateSchema / vehicleUpdateSchema — campo active (painel V2)", () => {
@@ -100,5 +102,37 @@ describe("maintenanceCostSchema — custo vinculado a despesa (nunca gravado em 
   it("rejeita zero e negativo (mesma regra de expenses_amount_positive no banco)", () => {
     expect(maintenanceCostSchema.safeParse(0).success).toBe(false);
     expect(maintenanceCostSchema.safeParse(-50).success).toBe(false);
+  });
+});
+
+describe("alertCreateSchema / alertUpdateSchema (Alertas manuais, evolução funcional 08/2026)", () => {
+  const base = { title: "Ligar pro mecânico", scheduledFor: "2026-08-25T08:00:00-03:00" };
+
+  it("aceita payload mínimo (título + data absoluta)", () => {
+    expect(alertCreateSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("rejeita título vazio", () => {
+    expect(alertCreateSchema.safeParse({ ...base, title: "" }).success).toBe(false);
+  });
+
+  it("rejeita scheduledFor sem offset/timezone (nunca aceita expressão relativa ou hora solta)", () => {
+    expect(alertCreateSchema.safeParse({ ...base, scheduledFor: "2026-08-25T08:00:00" }).success).toBe(false);
+    expect(alertCreateSchema.safeParse({ ...base, scheduledFor: "amanhã às 8h" }).success).toBe(false);
+  });
+
+  it("aceita offset Z ou +/-HH:MM", () => {
+    expect(alertCreateSchema.safeParse({ ...base, scheduledFor: "2026-08-25T11:00:00Z" }).success).toBe(true);
+    expect(alertCreateSchema.safeParse({ ...base, scheduledFor: "2026-08-25T08:00:00-03:00" }).success).toBe(true);
+  });
+
+  it("vehicleId aceita uuid, null (sem veículo) ou ausente", () => {
+    expect(alertCreateSchema.safeParse({ ...base, vehicleId: "11111111-1111-4111-8111-111111111111" }).success).toBe(true);
+    expect(alertCreateSchema.safeParse({ ...base, vehicleId: null }).success).toBe(true);
+  });
+
+  it("alertUpdateSchema aceita payload parcial (só editar a data, por exemplo)", () => {
+    expect(alertUpdateSchema.safeParse({ scheduledFor: "2026-08-26T09:00:00-03:00" }).success).toBe(true);
+    expect(alertUpdateSchema.safeParse({}).success).toBe(true);
   });
 });

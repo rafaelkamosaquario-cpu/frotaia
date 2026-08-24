@@ -61,6 +61,92 @@ export async function cancelAlert(client: SupabaseDbClient, alertId: string, com
   if (error) throw error;
 }
 
+export type AlertOrigin = "manutencao" | "documento" | "checklist" | "manual";
+
+/**
+ * `category` é texto livre (sem enum/check no banco) — nunca confiável sozinho como discriminador.
+ * A origem real vem dos FKs (`maintenance_schedule_id`/`vehicle_document_id`); checklist é a única
+ * origem automática sem FK próprio, identificada pela convenção de `category: "checklist"` já usada
+ * por `avisarGestorChecklistComAtencao`. Qualquer outra coisa é alerta manual (painel ou WhatsApp).
+ */
+export function resolveAlertOrigin(alert: Pick<ScheduledAlertRow, "maintenance_schedule_id" | "vehicle_document_id" | "category">): AlertOrigin {
+  if (alert.maintenance_schedule_id) return "manutencao";
+  if (alert.vehicle_document_id) return "documento";
+  if (alert.category === "checklist") return "checklist";
+  return "manual";
+}
+
+/** Só alertas manuais (sem origem automática) podem ser editados/cancelados diretamente — mesma regra que a RLS de escrita já aplica no banco (ver migration 20260824100000). */
+export function isEditableAlert(alert: Pick<ScheduledAlertRow, "maintenance_schedule_id" | "vehicle_document_id">): boolean {
+  return alert.maintenance_schedule_id === null && alert.vehicle_document_id === null;
+}
+
+export async function getAlert(client: SupabaseDbClient, alertId: string, companyId: string): Promise<ScheduledAlertRow | null> {
+  const { data, error } = await client.from("scheduled_alerts").select("*").eq("id", alertId).eq("company_id", companyId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export interface UpdateAlertInput {
+  title?: string;
+  notes?: string;
+  vehicleId?: string | null;
+  /** ISO 8601 com offset — sempre absoluto. */
+  scheduledFor?: string;
+}
+
+/** companyId é filtro obrigatório — mesmo princípio de updateMaintenanceSchedule/updateExpense. A RLS já impede editar alerta de origem automática via client de sessão; isEditableAlert existe pra dar um erro amigável ANTES de tentar (em vez de deixar a RLS rejeitar silenciosamente). */
+export async function updateAlert(client: SupabaseDbClient, alertId: string, companyId: string, input: UpdateAlertInput): Promise<ScheduledAlertRow> {
+  const { data, error } = await client
+    .from("scheduled_alerts")
+    .update({
+      title: input.title,
+      notes: input.notes,
+      vehicle_id: input.vehicleId,
+      scheduled_for: input.scheduledFor,
+    })
+    .eq("id", alertId)
+    .eq("company_id", companyId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export interface ListAlertsForPanelFilter {
+  companyId: string;
+  status?: "pending" | "sent" | "cancelled" | "failed" | "resolved";
+  from?: string;
+  to?: string;
+  vehicleId?: string;
+  limit?: number;
+}
+
+/**
+ * Listagem para a tela do painel — diferente de listUpcomingAlerts (só pending, limit 10, pensada
+ * pro contexto da IA): aqui é a fonte real e completa da tela /frota/alertas, com todos os status e
+ * origens (manual/manutenção/documento/checklist — ver resolveAlertOrigin). Filtro de origem é
+ * aplicado em memória pelo chamador (poucos registros, evita uma query dinâmica complexa por OR).
+ */
+export async function listAlertsForPanel(client: SupabaseDbClient, filter: ListAlertsForPanelFilter): Promise<ScheduledAlertRow[]> {
+  let query = client
+    .from("scheduled_alerts")
+    .select("*")
+    .eq("company_id", filter.companyId)
+    .order("scheduled_for", { ascending: true })
+    .limit(filter.limit ?? 200);
+
+  if (filter.status) query = query.eq("status", filter.status);
+  if (filter.from) query = query.gte("scheduled_for", filter.from);
+  if (filter.to) query = query.lte("scheduled_for", filter.to);
+  if (filter.vehicleId) query = query.eq("vehicle_id", filter.vehicleId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** Alertas pendentes com scheduled_for já vencido — usado pelo job de disparo. */
 export async function listDueAlerts(client: SupabaseDbClient, limit = 50): Promise<ScheduledAlertRow[]> {
   const { data, error } = await client
