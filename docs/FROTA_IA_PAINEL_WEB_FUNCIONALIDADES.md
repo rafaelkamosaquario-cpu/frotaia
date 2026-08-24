@@ -3,9 +3,9 @@
 
 ### Raio-X funcional da versão atual
 
-**Data:** 23/08/2026
+**Data:** 24/08/2026 (atualizado após a Rodada 1 de evolução funcional — ver seção 26)
 **Branch:** `claude/frota-ia-assistente-setup-qlrbac`
-**Commit:** `05c1c76`
+**Commit:** `c109e2b`
 
 Documento escrito a partir de auditoria direta do código atual (páginas, APIs, services, tabelas, RLS, ferramentas de IA) — não de documentação anterior. Cada afirmação abaixo foi verificada no repositório antes de ser escrita. Onde uma funcionalidade existe só parcialmente, isso é dito explicitamente — nada aqui foi arredondado pra "completo".
 
@@ -29,22 +29,23 @@ PAINEL FROTA IA (/frota/*)
 ├── Dashboard        — indicadores e alertas, só leitura
 ├── Veículos         — CRUD (sem exclusão real, só ativar/desativar)
 ├── Motoristas        — CRUD (sem exclusão real, só ativar/desativar)
-├── Manutenção        — criar/editar (sem exclusão)
-├── Documentos         — criar/editar (sem exclusão, sem upload de arquivo)
+├── Manutenção        — criar/editar (km e/ou data, custo vira despesa vinculada; sem exclusão)
+├── Documentos         — criar/editar/anexar arquivo real (PDF/JPG/PNG, sem exclusão do registro)
 ├── Despesas         — CRUD completo (único módulo com exclusão real)
 ├── Checklist          — só leitura (configuração fica em Configurações)
+├── Agenda            — CRUD real, Google Calendar como fonte única de verdade
 ├── Alertas            — só leitura
 ├── Notícias do setor    — toggle + leitura do último resumo
 ├── Radar de Fretes (Fretes/Oportunidades) — CRUD completo
-├── Relatórios          — leitura + exportação em PDF
+├── Relatórios          — leitura + filtros reais (período/veículo/motorista) + exportação em PDF
 ├── Fretes (análises)    — só leitura (histórico de análises do WhatsApp)
 ├── Jornadas          — só leitura (histórico de jornadas do WhatsApp)
-├── Rotas             — só leitura (histórico de rotas do WhatsApp)
+├── Rotas             — CRUD real (antes só leitura)
 ├── Empresa            — editar dados cadastrais
-└── Configurações       — estilo de resposta da IA + config de checklist
+└── Configurações       — estilo de resposta da IA, memória da IA, config de checklist
 ```
 
-Não existe tela de agenda/Calendar visual — só uma tela de confirmação de conexão OAuth (ver seção 11). Um widget de chat de IA (`FrotaAiWidget`) fica disponível em **todas** as telas acima (ver seção 16).
+Agenda visual existe desde a Rodada 1 de evolução funcional (24/08/2026) — ver seção 11. Um widget de chat de IA (`FrotaAiWidget`) fica disponível em **todas** as telas acima (ver seção 16).
 
 ---
 
@@ -55,20 +56,20 @@ Não existe tela de agenda/Calendar visual — só uma tela de confirmação de 
 | Dashboard | IMPLEMENTADO E FUNCIONAL (só leitura) |
 | Veículos | IMPLEMENTADO E FUNCIONAL (exclusão real não existe, por design) |
 | Motoristas | IMPLEMENTADO E FUNCIONAL (exclusão real não existe, por design) |
-| Manutenção | IMPLEMENTADO PARCIALMENTE (sem km/custo, sem exclusão) |
-| Documentos | IMPLEMENTADO PARCIALMENTE (sem upload de arquivo real) |
+| Manutenção | IMPLEMENTADO E FUNCIONAL (km e/ou data, custo vira despesa vinculada — desde 24/08/2026) |
+| Documentos | IMPLEMENTADO E FUNCIONAL (upload real via Supabase Storage — desde 24/08/2026) |
 | Despesas | IMPLEMENTADO E FUNCIONAL |
 | Checklist (painel) | IMPLEMENTADO E FUNCIONAL (só leitura, por design) |
-| Alertas (painel) | IMPLEMENTADO PARCIALMENTE (só leitura, sem criar/cancelar pelo painel) |
+| Agenda (Google Calendar) | IMPLEMENTADO E FUNCIONAL (Lista + Mês, CRUD real — desde 24/08/2026) |
+| Alertas (painel) | IMPLEMENTADO PARCIALMENTE (só leitura, sem criar/cancelar pelo painel — fora do escopo da Rodada 1) |
 | Notícias do setor | IMPLEMENTADO E FUNCIONAL (toggle + leitura) |
-| Google Calendar/Agenda | IMPLEMENTADO PARCIALMENTE (sem tela de agenda visual) |
 | Radar de Fretes | IMPLEMENTADO E FUNCIONAL |
-| Relatórios | IMPLEMENTADO PARCIALMENTE (fixo, sem filtros) |
-| Fretes (análises) | INTERFACE EXISTENTE MAS SÓ LEITURA (cálculo é só WhatsApp) |
-| Jornadas | INTERFACE EXISTENTE MAS SÓ LEITURA (RLS nem permite escrita via painel) |
-| Rotas | INTERFACE EXISTENTE MAS SÓ LEITURA (RLS já permite escrita, UI não foi feita) |
+| Relatórios | IMPLEMENTADO E FUNCIONAL (filtros reais de período/veículo/motorista — desde 24/08/2026) |
+| Fretes (análises) | INTERFACE EXISTENTE MAS SÓ LEITURA (cálculo é só WhatsApp — fora do escopo da Rodada 1) |
+| Jornadas | INTERFACE EXISTENTE MAS SÓ LEITURA (RLS nem permite escrita via painel — fora do escopo da Rodada 1) |
+| Rotas | IMPLEMENTADO E FUNCIONAL (CRUD real — desde 24/08/2026, antes só leitura) |
 | Empresa | IMPLEMENTADO E FUNCIONAL |
-| Configurações | IMPLEMENTADO PARCIALMENTE (vários campos do banco sem UI, ver seção 24) |
+| Configurações | IMPLEMENTADO E FUNCIONAL nos campos com efeito real confirmado (estilo de resposta, memória da IA, checklist); campos sem consumidor real permanecem deliberadamente fora da UI (ver seção 24) |
 | Chat de IA no painel (widget) | IMPLEMENTADO E FUNCIONAL |
 
 ---
@@ -134,33 +135,35 @@ Não existe tela de agenda/Calendar visual — só uma tela de confirmação de 
 
 **Rota**: `/frota/manutencao` (`ManutencaoClient.tsx` + `MaintenanceFormModal.tsx`). **API**: `GET`/`POST /api/frota/manutencao`, `PATCH .../[id]`. Sem `DELETE` (a policy de exclusão existe no banco, mas não é usada em lugar nenhum — nem painel, nem IA).
 
-**Campos reais** (tabela `maintenance_schedules`): tipo (texto livre, não é enum fixo), veículo, data de vencimento, status (pendente/agendado/concluído/cancelado), observações.
+**Campos reais** (tabela `maintenance_schedules`): tipo (texto livre, não é enum fixo), veículo, data de vencimento, status (pendente/agendado/concluído/cancelado), observações — e, desde 24/08/2026: **data de execução**, **km de execução** e **próxima manutenção em km** (3 colunas novas, todas opcionais/nulas — manutenção antiga sem esses dados continua válida).
 
-**Importante**: **não existem campos de quilometragem nem de custo** neste módulo — é inteiramente baseado em data. Quem quer registrar quanto uma manutenção custou lança em Despesas (categoria "manutenção"), mas as duas tabelas não têm vínculo entre si.
+**Controle por data e/ou km**: o cliente pode registrar só data, só km, ou os dois — nada é obrigatório além do que já existia. **Km é sempre informado pelo cliente, nunca lido de telemetria/odômetro automático** — o sistema não finge monitoramento que não existe; "próxima em X km" é só informativo no painel/WhatsApp, não gera alerta sozinho (só o alerta por data continua existindo).
 
-**Ações na tela**: cadastrar, editar (inclusive marcar como concluída/cancelada trocando o status). Sem exclusão, sem filtro.
+**Custo vira despesa, nunca duplica**: ao concluir uma manutenção (status = concluído), informar um custo cria — ou, se editar de novo, **atualiza** — uma única despesa (categoria "manutenção") vinculada pela nova coluna `expenses.maintenance_schedule_id` (índice único parcial no banco garante no máximo 1 despesa por manutenção). O valor nunca é gravado duas vezes (não existe coluna de custo em `maintenance_schedules`) — a tela de Manutenção só **exibe** o valor lendo a despesa vinculada, a fonte real continua sendo `expenses`. Se a despesa vinculada for excluída (pela tela de Despesas), a manutenção volta a mostrar "sem custo" — informar de novo cria uma nova despesa.
 
-**Alerta automático**: sim — toda criação/atualização sincroniza uma linha em `scheduled_alerts` (nunca duplica), que dispara automaticamente às 11h (horário de Brasília) do dia do vencimento, via WhatsApp. Se a manutenção for concluída/cancelada, o alerta pendente é cancelado junto.
+**Ações na tela**: cadastrar, editar (inclusive marcar como concluída/cancelada trocando o status, e informar km/data de execução/custo ao concluir). Sem exclusão, sem filtro.
 
-**Relação com WhatsApp**: ferramenta `gerenciar_manutencao` (CRIAR/LISTAR/ATUALIZAR/CONCLUIR/CANCELAR), mesma tabela e mesmo mecanismo de alerta — painel e WhatsApp sempre sincronizados.
+**Alerta automático**: sim — toda criação/atualização sincroniza uma linha em `scheduled_alerts` (nunca duplica), que dispara automaticamente às 11h (horário de Brasília) do dia do vencimento (por data, não por km), via WhatsApp. Se a manutenção for concluída/cancelada, o alerta pendente é cancelado junto.
+
+**Relação com WhatsApp**: ferramenta `gerenciar_manutencao` (CRIAR/LISTAR/ATUALIZAR/CONCLUIR/CANCELAR) ganhou os mesmos campos novos (km de execução, próxima km — calculada automaticamente se o cliente informar um intervalo, ex. "de 10 em 10 mil km" —, data de execução, custo). Mesma tabela e mesmo mecanismo de alerta/despesa — painel e WhatsApp sempre sincronizados. Exemplo real: *"Troquei o óleo da Scania hoje com 250 mil km, custou R$1.200"* já registra manutenção concluída, km, custo e cria a despesa, sem inventar nenhum dado que o cliente não informou.
 
 ---
 
 ## 8. Documentos
 
-**Rota**: `/frota/documentos` (`DocumentosClient.tsx` + `DocumentFormModal.tsx`). **API**: `GET`/`POST /api/frota/documentos`, `PATCH .../[id]`. Sem `DELETE` (mesmo padrão dos outros módulos).
+**Rota**: `/frota/documentos` (`DocumentosClient.tsx` + `DocumentFormModal.tsx`). **API**: `GET`/`POST /api/frota/documentos`, `PATCH .../[id]` (metadados) + `POST`/`GET`/`DELETE /api/frota/documentos/[id]/arquivo` (arquivo, novo desde 24/08/2026). Sem exclusão do **registro** do documento (mesmo padrão dos outros módulos) — mas o **arquivo** anexado pode ser removido separadamente ("remover arquivo" ≠ "remover documento").
 
 **Tipos de documento** (enum real): tacógrafo, RNTRC, seguro, licenciamento (vinculados a veículo) e CNH, exame toxicológico (vinculados a motorista) — cada documento pertence a exatamente um veículo OU um motorista, nunca aos dois.
 
-**Campos**: tipo, dono (veículo ou motorista, conforme o tipo), data de vencimento (opcional), observações.
+**Campos**: tipo, dono (veículo ou motorista, conforme o tipo), data de vencimento (opcional), observações — e, desde 24/08/2026: `storage_path`, `original_filename`, `mime_type`, `file_size`, `uploaded_at` (todos nulos até um arquivo ser anexado; documento antigo sem arquivo continua totalmente válido).
 
-**Importante — não existe upload de arquivo**: o sistema guarda só metadados (tipo, dono, vencimento, observações), **não existe campo de arquivo/PDF/foto anexado nem integração com armazenamento de arquivo neste módulo**. A "leitura por foto" mencionada no WhatsApp (ver abaixo) extrai só os dados (ex.: a data de vencimento) direto da imagem, na hora — não guarda a foto em lugar nenhum.
+**Upload real de arquivo (24/08/2026)** — primeiro uso de Supabase Storage no projeto inteiro: bucket **privado** `vehicle-documents` (sem nenhuma policy pública), caminho sempre `company_id/documents/vehicle|driver/entity_id/timestamp-arquivo` (nome sanitizado, nunca confia no nome original pra segurança). Aceita PDF, JPG e PNG, até 10MB. Visualizar/baixar geram uma **URL assinada de 60 segundos** (nunca um link permanente) via client admin — o navegador nunca recebe o `storage_path` bruto. Cadastrar um documento novo mantém o modal aberto pra permitir anexar o arquivo na mesma ação; documento existente permite ver/baixar/substituir/remover o arquivo diretamente.
 
-**Leitura por IA/foto**: a ferramenta de IA `gerenciar_documento_frota` documenta explicitamente que a data de vencimento pode vir "lida de foto do documento ou informada pelo cliente" — usa a visão nativa do Claude (a foto entra na conversa, o modelo extrai o dado), sem uma etapa separada de OCR. Não há leitura automática de CT-e/DACTE neste módulo (isso é tratado por uma ferramenta totalmente diferente, de geração de relatório em PDF, não de cadastro de documento).
+**Leitura por IA/foto (WhatsApp) — limitação documentada, não resolvida nesta rodada**: a ferramenta de IA `gerenciar_documento_frota` continua só extraindo os DADOS da foto (tipo, dono, vencimento) — usa a visão nativa do Claude, sem OCR separado — mas **nunca persiste o arquivo em si**. A foto recebida pelo WhatsApp passa só em memória (base64, direto pra chamada da Claude API) e é descartada depois; ligar o WhatsApp ao mesmo Storage do painel exigiria um pipeline novo (baixar a mídia do webhook e fazer upload), não implementado nesta rodada. Upload real hoje é exclusivo do painel.
 
 **Alerta automático**: mesmo mecanismo de Manutenção — sincroniza `scheduled_alerts`, dispara às 11h do dia do vencimento.
 
-**Relação com WhatsApp**: ferramenta `gerenciar_documento_frota` (CRIAR/LISTAR/ATUALIZAR), mesma tabela.
+**Relação com WhatsApp**: ferramenta `gerenciar_documento_frota` (CRIAR/LISTAR/ATUALIZAR), mesma tabela — os metadados sempre sincronizados; o arquivo em si é só painel (ver limitação acima).
 
 ---
 
@@ -209,17 +212,19 @@ PAINEL (/frota/checklists) mostra tudo em tempo real
 
 ## 11. Google Calendar / Agenda
 
-**Não existe uma tela de agenda visual no painel** — nenhuma lista de eventos, nenhum calendário renderizado em `/frota/*`. O único ponto de contato do painel com o Google Calendar é uma tela de confirmação depois do fluxo OAuth (conectado com sucesso / erro).
+**Existe tela de agenda visual desde 24/08/2026** — `/frota/agenda` (`AgendaClient.tsx` + `EventFormModal.tsx`), com 2 visualizações: **Lista** (próximos 30 dias, agrupada por dia) e **Mês** (grade simples, navega entre meses buscando sob demanda). Não recria o Google Calendar inteiro (sem lib de calendário nova, sem drag-and-drop, sem múltiplos calendários simultâneos na tela).
 
-**Conexão**: por link assinado enviado pelo WhatsApp, ou por sessão de navegador já logada — os dois caminhos levam ao login do Google e depois de volta ao Frota IA.
+**Fonte de verdade continua sendo só o Google** — a tela NÃO lê de uma tabela própria do Frota IA, consulta a API do Google ao vivo a cada carregamento/navegação de mês. Nenhuma tabela nova, nenhum evento copiado pro banco.
+
+**Conexão**: por link assinado enviado pelo WhatsApp, ou por sessão de navegador já logada — os dois caminhos levam ao login do Google e depois de volta ao Frota IA. O gate de `/frota/layout.tsx` já garante Calendar conectado antes de deixar chegar em `/frota/agenda` (redireciona pra `/frota-conectar-agenda` senão).
 
 **Isolamento**: confirmado **por empresa**, não por usuário — `google_integrations.company_id`, com índice único garantindo só 1 conexão ativa por empresa no banco. Isso é o que permite o mesmo Calendar "aparecer" tanto quando a pessoa fala pelo WhatsApp quanto quando entra logada no painel, mesmo sendo tecnicamente dois `user_id` diferentes.
 
 **Segurança**: os tokens de acesso nunca ficam nas tabelas do produto — só uma referência ao cofre (Vault) do Supabase.
 
-**Ações disponíveis** (só via IA — WhatsApp, ou o widget de chat do painel): verificar conexão, listar calendários, definir calendário padrão, consultar eventos, criar evento, criar jornada completa (vários eventos de uma vez), alterar, excluir (sempre com confirmação explícita).
+**Ações disponíveis no painel**: criar, editar, excluir (sempre com diálogo de confirmação explícito na tela — mesma exigência de confirmação que a ferramenta de IA já tinha, só que a confirmação acontece na UI em vez de um parâmetro) e visualizar (Lista/Mês). **Ações que continuam só via IA** (WhatsApp ou o widget do painel): verificar conexão, listar/definir calendário padrão, criar jornada completa (vários eventos de uma vez), busca por texto — o painel usa sempre o calendário padrão, sem seletor de múltiplos calendários (mantém a tela simples).
 
-**O que é bidirecional**: tudo. Como o Frota IA não guarda uma cópia local dos eventos — toda consulta é feita ao vivo na API do Google — qualquer evento criado direto no Google Calendar pela pessoa aparece quando a IA consulta, e qualquer evento criado pela IA aparece de verdade no Google Calendar real. **O que não existe** é uma visualização própria dentro do painel — pra ver a agenda, hoje só dá via IA (WhatsApp ou o widget de chat).
+**Bidirecional de verdade, confirmado nos dois sentidos**: evento criado no painel aparece imediatamente quando a IA consulta pelo WhatsApp, e evento criado direto no Google (ou pela IA) aparece na tela ao recarregar/navegar — porque os dois caminhos leem/escrevem a mesma API do Google, reaproveitando literalmente os mesmos services (`listUpcomingEvents`/`createEvent`/`updateEvent`/`deleteEvent` de `googleCalendarService.ts`) que `gerenciar_google_calendar` já usava.
 
 ---
 
@@ -291,9 +296,9 @@ cliente pode pedir "analisa" (pré-análise de custo, reaproveitando as ferramen
 7. Checklists por status + aderência média + 3 piores aderências por motorista
 8. Fretes analisados nos últimos 30 dias (contagem)
 
-**Filtros**: nenhum — o período de 30 dias é fixo no código, sem seletor de data/veículo/motorista na tela.
+**Filtros reais desde 24/08/2026** — via query params (`?period=&from=&to=&vehicleId=&driverId=`), compartilháveis/recarregáveis: **período** (últimos 7/30/90 dias, mês atual, mês anterior, personalizado), **veículo** e **motorista**. O filtro só reduz um bloco onde a relação genuinamente existe em cada tabela — ex.: despesas não tem `driver_id`, então filtrar por motorista nunca esconde/falsifica o bloco de despesas; documento sem vencimento nunca é excluído por filtro de período. Um cabeçalho gerencial simples (período/veículo/motorista selecionados + totais de despesas/manutenções/documentos/checklists/fretes) aparece acima dos 8 blocos.
 
-**Exportação em PDF**: real, gerada com a biblioteca `pdf-lib` (texto corrido, sem gráficos), reaproveitando os mesmos 8 blocos. Botão "Baixar PDF" simples. Sem exportação em CSV/Excel.
+**Exportação em PDF**: real, gerada com a biblioteca `pdf-lib` (texto corrido, sem gráficos), reaproveitando os mesmos 8 blocos — e os MESMOS filtros da tela (o botão "Baixar PDF" sempre carrega a querystring atual, então o PDF nunca diverge do que está sendo exibido). Mostra "Período:", "Veículo:" e "Motorista:" no cabeçalho quando aplicável. Sem exportação em CSV/Excel, sem gráfico (só dados claros, conforme decisão explícita de não instalar biblioteca pesada só pra isso).
 
 **Sem IA envolvida na agregação** — é cálculo puro no servidor a partir das mesmas tabelas dos outros módulos.
 
@@ -331,7 +336,7 @@ Gestor liga o checklist diário em /frota/configuracoes, define horário e itens
 ↓ o cron de checklist já usa essa configuração no próximo disparo pelo WhatsApp
 ```
 
-**Módulos com esse compartilhamento pleno**: Veículos, Motoristas, Manutenção, Documentos, Despesas, Alertas, Radar de Fretes, Empresa, Configurações/Checklist config, Notícias (config). **Módulos onde a escrita só acontece pelo WhatsApp** (o painel só lê): Fretes/análises, Jornadas, Rotas, Agenda/Calendar, Checklist (respostas).
+**Módulos com esse compartilhamento pleno**: Veículos, Motoristas, Manutenção (agora incluindo km/custo), Documentos (metadados), Despesas, Agenda/Calendar (desde 24/08/2026), Rotas (desde 24/08/2026), Alertas, Radar de Fretes, Empresa, Configurações/Checklist config/memória da IA, Notícias (config). **Módulos onde a escrita continua só pelo WhatsApp** (o painel só lê): Fretes/análises, Jornadas, Checklist (respostas), e o **arquivo** de Documentos (o registro/metadado é compartilhado, o binário em si é só painel — ver seção 8).
 
 ---
 
@@ -399,6 +404,8 @@ Cada etapa já grava direto nas tabelas reais (não existe rascunho separado) �
 | `ai_memories` | Memórias da IA |
 | `conversations` / `messages` | Histórico de conversa (WhatsApp e widget do painel) |
 
+**Storage**: bucket privado `vehicle-documents` (Supabase Storage, desde 24/08/2026) — primeiro uso de Storage no projeto, guarda os arquivos anexados em Documentos. Sem policy pública nenhuma; todo acesso passa pelo client admin do servidor, nunca direto do navegador.
+
 ---
 
 ## 22. Fluxo completo do cliente
@@ -423,14 +430,12 @@ CLIENTE CONTRATA GESTÃO
 
 ## 23. O que o Painel NÃO faz (hoje)
 
-- Não tem tela de agenda/Calendar visual (só confirmação de conexão).
-- Não permite excluir veículo, motorista, manutenção ou documento (só ativar/desativar; exclusão só existe em Despesas).
-- Não tem upload de arquivo/foto persistido em Documentos (só metadados; a leitura de foto é feita na hora, pelo WhatsApp, sem guardar a imagem).
-- Não tem formulário de simulação de frete, jornada ou rota — essas telas são só histórico do que já foi calculado/salvo pelo WhatsApp.
-- Não tem filtros de data/veículo nos Relatórios (período fixo de 30 dias).
-- Não permite criar, editar ou cancelar um alerta diretamente (só lê o que já existe).
+- Não permite excluir veículo, motorista, manutenção ou documento (só ativar/desativar; exclusão real só existe em Despesas e, desde 24/08/2026, no arquivo anexado a um Documento — o registro do documento em si continua sem exclusão).
+- Não tem formulário de simulação de frete ou jornada — essas telas continuam só histórico do que já foi calculado/salvo pelo WhatsApp (Rotas deixou de estar nessa lista em 24/08/2026, agora tem CRUD real no painel).
+- Não permite criar, editar ou cancelar um alerta diretamente pelo painel (só lê o que já existe) — fora do escopo da Rodada 1 de evolução funcional.
 - Não automatiza o Plano Empresas (mais de 10 veículos) — venda comercial direta, sem tela própria.
-- Não busca ofertas de frete fora de grupos de WhatsApp cadastrados (Fretebras/Truckpad etc. estão previstos no schema, sem uso real).
+- Não busca ofertas de frete fora de grupos de WhatsApp cadastrados (Fretebras/Truckpad etc. estão previstos no schema, sem uso real) — deliberadamente fora do escopo da Rodada 1.
+- WhatsApp continua sem persistir o arquivo de um documento (só o metadado) — ver limitação documentada na seção 8.
 
 ---
 
@@ -440,16 +445,15 @@ CLIENTE CONTRATA GESTÃO
 Nenhum bloqueador conhecido no funcionamento atual do painel.
 
 ### Importantes
-1. **Rotas (`/frota/rotas`) é só leitura apesar de a RLS já permitir escrita via sessão do navegador** — é uma lacuna de UI (o banco já suporta cadastrar/editar rota pelo painel; a tela ainda não foi construída), não uma limitação de segurança.
-2. **Referência a `middleware.ts` no comentário de `src/lib/supabase/server.ts`, mas o arquivo não existe no repositório** — divergência entre comentário e código real; sem evidência de problema funcional, mas vale corrigir o comentário ou avaliar se um middleware de refresh de sessão deveria existir.
-3. **Vários campos de `company_preferences` existem no banco e são aceitos pela validação, mas nenhuma tela nem ferramenta de IA os grava hoje**: veículo padrão, combustível/preço padrão, velocidade média padrão, margem alvo padrão, moeda, unidade de distância, preferências de memória (perguntar antes de salvar, permitir automática), permitir histórico de análise/ferramenta, modo de análise automática do Radar. São colunas "prontas" sem funcionalidade de produto ligada ainda.
-4. **`freight_radar_analysis_mode`** (modo de pré-análise automática do Radar de Fretes) tem coluna e valor padrão no banco, mas nenhuma tela ou comando de WhatsApp permite trocá-lo hoje.
+1. **Referência a `middleware.ts` no comentário de `src/lib/supabase/server.ts`, mas o arquivo não existe no repositório** — divergência entre comentário e código real; sem evidência de problema funcional, mas vale corrigir o comentário ou avaliar se um middleware de refresh de sessão deveria existir. (Não resolvida na Rodada 1 — fora do escopo pedido.)
+2. **Vários campos de `company_preferences` continuam sem UI, deliberadamente** (confirmado nesta rodada que nenhum tem consumidor real): veículo padrão (`default_vehicle_id` — o mecanismo real é `vehicles.is_default`, campo morto), combustível/preço padrão, velocidade média padrão, margem alvo padrão, moeda, unidade de distância, permitir histórico de análise/ferramenta. `askBeforeSavingMemory`/`allowAutomaticMemory` **saíram desta lista em 24/08/2026** — agora expostos em Configurações.
+3. **`freight_radar_analysis_mode`** (modo de pré-análise automática do Radar de Fretes) tem coluna e valor padrão no banco e efeito real confirmado em `radarMatchingEngine.ts`, mas nenhuma tela ou comando de WhatsApp permite trocá-lo — **deliberadamente adiado pra próxima rodada** (fora do escopo da Rodada 1, item explicitamente listado como "não fazer nesta rodada").
 
 ### Melhorias
-1. Documentos sem upload/armazenamento real de arquivo — hoje só metadados.
-2. Manutenção sem controle de quilometragem/custo — só data.
-3. Sem confirmação de leitura/recebimento nos alertas enviados por WhatsApp.
-4. Radar de Fretes: fontes externas (Fretebras/Truckpad) previstas no schema, sem integração real.
+1. Sem confirmação de leitura/recebimento nos alertas enviados por WhatsApp.
+2. Radar de Fretes: fontes externas (Fretebras/Truckpad) previstas no schema, sem integração real — próxima rodada.
+3. Agenda do painel usa sempre o calendário padrão da empresa — sem seletor de múltiplos calendários na tela (só via IA).
+4. WhatsApp não persiste o arquivo de um documento enviado por foto (só o dado extraído) — upload real de arquivo é exclusivo do painel.
 
 ### Roadmap futuro (não confundir com pendência atual)
 Itens de V3 já conhecidos em `docs/v2-gestao-de-frota-roadmap.md`, fora do escopo desta versão: telemetria, rastreadores, TMS, ERP, pneus avançados, integrações maiores.
@@ -458,4 +462,19 @@ Itens de V3 já conhecidos em `docs/v2-gestao-de-frota-roadmap.md`, fora do esco
 
 ## 25. Quantidade de áreas/módulos encontrados
 
-**17 áreas/telas reais** em `/frota/*` (Dashboard, Veículos, Motoristas, Manutenção, Documentos, Despesas, Checklist, Alertas, Notícias, Oportunidades/Radar, Relatórios, Fretes, Jornadas, Rotas, Empresa, Configurações) + o widget de IA presente em todas elas + o wizard de onboarding (`/frota-ativacao`, fora da árvore de `/frota` por design).
+**18 áreas/telas reais** em `/frota/*` (Dashboard, Veículos, Motoristas, Manutenção, Documentos, Despesas, Checklist, Agenda, Alertas, Notícias, Oportunidades/Radar, Relatórios, Fretes, Jornadas, Rotas, Empresa, Configurações) + o widget de IA presente em todas elas + o wizard de onboarding (`/frota-ativacao`, fora da árvore de `/frota` por design).
+
+---
+
+## 26. Rodada 1 de evolução funcional (24/08/2026)
+
+Depois deste raio-X (23/08/2026) ter identificado os módulos parciais, uma rodada de evolução funcional resolveu 5 das limitações encontradas (commits `7e6a67f`, `f92ba17`, `1d976e4`, `dd7d24c`, `dc580ce`, `c109e2b`):
+
+1. **Manutenção** — km e/ou data, custo vira despesa vinculada sem duplicar (ver seção 7).
+2. **Documentos** — upload real de arquivo via Supabase Storage, bucket privado (ver seção 8).
+3. **Relatórios** — filtros reais de período/veículo/motorista, compartilháveis via URL (ver seção 15).
+4. **Agenda** — tela visual nova (Lista + Mês), Google Calendar como fonte única (ver seção 11).
+5. **Rotas** — CRUD real no painel, antes só leitura (ver seção 17).
+6. **Configurações** — memória da IA (perguntar antes de salvar / guardar automaticamente) exposta, único par de campos de `company_preferences` com efeito real confirmado que ainda não tinha UI.
+
+Nenhuma migration destrutiva — todas aditivas (colunas novas nullable, 1 bucket de Storage novo). Nenhum dado antigo invalidado. `freight_radar_analysis_mode`, evolução de Alertas, confirmação de leitura e integração Fretebras/Truckpad ficaram deliberadamente de fora, para uma próxima rodada.
