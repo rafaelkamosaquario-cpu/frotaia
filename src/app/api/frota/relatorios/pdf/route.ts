@@ -9,37 +9,54 @@ import { listExpenses } from "@/services/supabase/expenseService";
 import { listSavedJourneysForPanel } from "@/services/supabase/savedJourneyService";
 import { listChecklistDispatchesForPanel } from "@/services/supabase/checklistDispatchService";
 import { listAnalysisRuns } from "@/services/supabase/analysisHistoryService";
-import { computeRelatoriosBlocos } from "@/lib/frota/relatoriosAggregation";
+import { computeRelatoriosBlocos, resolvePeriodo, filterRelatoriosInput } from "@/lib/frota/relatoriosAggregation";
 import { gerarPdfRelatorio, type LinhaChaveValor } from "@/services/documents/pdfGenerator";
 
 function statusForAccessReason(reason: "unauthenticated" | "no_company" | "not_entitled") {
   return reason === "unauthenticated" ? 401 : 403;
 }
 
-/** Mesma agregação da tela Relatórios (computeRelatoriosBlocos), só que entregue como PDF pra download direto no navegador — não passa pela IA/gerar_documento, que hoje só entrega por WhatsApp. */
-export async function GET() {
+/**
+ * Mesma agregação da tela Relatórios (computeRelatoriosBlocos), só que
+ * entregue como PDF pra download direto no navegador — não passa pela IA/
+ * gerar_documento, que hoje só entrega por WhatsApp. Lê os MESMOS query
+ * params que a tela usa (period/from/to/vehicleId/driverId) — a tela sempre
+ * manda o link "Baixar PDF" já com a querystring atual, então o PDF nunca
+ * diverge do que está sendo exibido.
+ */
+export async function GET(request: Request) {
   const supabase = await createClient();
   const access = await loadFleetPanelAccess(supabase);
   if (!access.ok) {
     return NextResponse.json({ error: "Sem acesso ao painel de gestão de frota." }, { status: statusForAccessReason(access.reason) });
   }
 
-  const trintaDiasAtras = new Date();
-  trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-  const dataInicio = trintaDiasAtras.toISOString().slice(0, 10);
+  const url = new URL(request.url);
+  const periodo = resolvePeriodo({
+    period: url.searchParams.get("period") ?? undefined,
+    from: url.searchParams.get("from") ?? undefined,
+    to: url.searchParams.get("to") ?? undefined,
+  });
+  const vehicleId = url.searchParams.get("vehicleId") ?? undefined;
+  const driverId = url.searchParams.get("driverId") ?? undefined;
 
   const [veiculos, motoristas, manutencoes, documentos, despesas, jornadas, checklistDispatches, analisesFrete] = await Promise.all([
     listVehiclesForPanel(supabase, access.company.id),
     listDriversForPanel(supabase, access.company.id),
     listMaintenanceSchedulesForPanel(supabase, access.company.id),
     listVehicleDocumentsForPanel(supabase, access.company.id),
-    listExpenses(supabase, { companyId: access.company.id, dateFrom: dataInicio, limit: 500 }),
+    listExpenses(supabase, { companyId: access.company.id, vehicleId, dateFrom: periodo.from, dateTo: periodo.to, limit: 500 }),
     listSavedJourneysForPanel(supabase, access.company.id),
     listChecklistDispatchesForPanel(supabase, access.company.id),
-    listAnalysisRuns(supabase, { companyId: access.company.id, analysisTypes: ["analisar_frete"], dateFrom: dataInicio, limit: 500 }),
+    listAnalysisRuns(supabase, { companyId: access.company.id, analysisTypes: ["analisar_frete"], dateFrom: periodo.from, limit: 500 }),
   ]);
 
-  const blocos = computeRelatoriosBlocos({ veiculos, motoristas, manutencoes, documentos, despesas, jornadas, checklistDispatches, analisesFrete });
+  const filtrado = filterRelatoriosInput(
+    { veiculos, motoristas, manutencoes, documentos, despesas, jornadas, checklistDispatches, analisesFrete },
+    { from: periodo.from, to: periodo.to, vehicleId, driverId }
+  );
+
+  const blocos = computeRelatoriosBlocos(filtrado, periodo.label);
 
   const linhas: LinhaChaveValor[] = blocos.flatMap((bloco) =>
     bloco.linhas.map((linha) => ({
@@ -48,11 +65,17 @@ export async function GET() {
     }))
   );
 
+  const veiculoNome = filtrado.veiculos.find((v) => v.id === vehicleId);
+  const motoristaNome = filtrado.motoristas.find((m) => m.id === driverId);
+  const partesPeriodo = [`Período: ${periodo.label}`];
+  if (veiculoNome) partesPeriodo.push(`Veículo: ${veiculoNome.name || veiculoNome.plate}`);
+  if (motoristaNome) partesPeriodo.push(`Motorista: ${motoristaNome.name}`);
+
   const pdfBytes = await gerarPdfRelatorio({
     titulo: "Relatório Frota IA",
     geradoEm: new Date(),
     nomeEmpresa: access.company.name,
-    periodo: `Últimos 30 dias até ${new Date().toLocaleDateString("pt-BR")}`,
+    periodo: partesPeriodo.join(" · "),
     linhas,
   });
 

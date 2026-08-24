@@ -91,11 +91,11 @@ export interface RelatoriosInput {
   motoristas: DriverRow[];
   manutencoes: MaintenanceScheduleRow[];
   documentos: VehicleDocumentRow[];
-  /** Já vem filtrado aos últimos 30 dias — ver RelatoriosPage. */
+  /** Sem filtro — a filtragem por período/veículo/motorista acontece via filterRelatoriosInput. */
   despesas: ExpenseRow[];
   jornadas: SavedJourneyRow[];
   checklistDispatches: ChecklistDispatchRow[];
-  /** Já vem filtrado a analysis_type='analisar_frete' — ver RelatoriosPage. */
+  /** Já vem filtrado a analysis_type='analisar_frete' na query — ver RelatoriosPage. */
   analisesFrete: AnalysisRunRow[];
 }
 
@@ -103,8 +103,109 @@ export function formatBRL(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-/** Só inclui blocos condicionais (despesas/jornadas/checklists/fretes) quando há dado — mesmo critério da tela. */
-export function computeRelatoriosBlocos(input: RelatoriosInput): RelatoriosBloco[] {
+export type PeriodoPreset = "7d" | "30d" | "90d" | "mes_atual" | "mes_anterior" | "custom";
+
+export const PERIODO_PRESET_LABEL: Record<PeriodoPreset, string> = {
+  "7d": "últimos 7 dias",
+  "30d": "últimos 30 dias",
+  "90d": "últimos 90 dias",
+  mes_atual: "mês atual",
+  mes_anterior: "mês anterior",
+  custom: "período personalizado",
+};
+
+function toIsoDate(data: Date): string {
+  return data.toISOString().slice(0, 10);
+}
+
+/** Única fonte de verdade do cálculo de período — usada pela tela e pelo PDF, garante que os dois nunca divirjam. `agora` é injetável só pra teste. */
+export function resolvePeriodo(
+  params: { period?: string; from?: string; to?: string },
+  agora: Date = new Date()
+): { from: string; to: string; label: string; preset: PeriodoPreset } {
+  const preset: PeriodoPreset = (["7d", "30d", "90d", "mes_atual", "mes_anterior", "custom"] as const).includes(params.period as PeriodoPreset)
+    ? (params.period as PeriodoPreset)
+    : "30d";
+
+  if (preset === "custom" && params.from && params.to) {
+    return { from: params.from, to: params.to, label: `${formatarDataCurta(params.from)} a ${formatarDataCurta(params.to)}`, preset };
+  }
+
+  const hoje = toIsoDate(agora);
+  if (preset === "mes_atual") {
+    const inicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    return { from: toIsoDate(inicio), to: hoje, label: PERIODO_PRESET_LABEL.mes_atual, preset };
+  }
+  if (preset === "mes_anterior") {
+    const inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+    const fim = new Date(agora.getFullYear(), agora.getMonth(), 0);
+    return { from: toIsoDate(inicio), to: toIsoDate(fim), label: PERIODO_PRESET_LABEL.mes_anterior, preset };
+  }
+
+  const dias = preset === "7d" ? 7 : preset === "90d" ? 90 : 30;
+  const inicio = new Date(agora);
+  inicio.setDate(inicio.getDate() - dias);
+  return { from: toIsoDate(inicio), to: hoje, label: PERIODO_PRESET_LABEL[preset], preset };
+}
+
+function formatarDataCurta(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+export interface RelatoriosFiltro {
+  /** YYYY-MM-DD, ambos opcionais — sem os dois, nenhum recorte de período é aplicado. */
+  from?: string;
+  to?: string;
+  vehicleId?: string;
+  driverId?: string;
+}
+
+/** Sem data (ex.: documento sem vencimento) nunca é excluído por filtro de período — esconder dado real seria pior que mostrá-lo fora do recorte. */
+function dentroDoPeriodo(dataIso: string | null | undefined, from?: string, to?: string): boolean {
+  if (!from && !to) return true;
+  if (!dataIso) return true;
+  const data = dataIso.slice(0, 10);
+  if (from && data < from) return false;
+  if (to && data > to) return false;
+  return true;
+}
+
+/**
+ * Filtro real de período/veículo/motorista pra Relatórios (evolução funcional
+ * 08/2026). Aplicado só onde a relação genuinely existe em cada tabela —
+ * nunca finge uma relação que não existe (ex.: despesas não tem driver_id,
+ * então filtro de motorista nunca reduz o bloco de despesas; veículos/
+ * motoristas em si não têm data, então filtro de período nunca os reduz).
+ */
+export function filterRelatoriosInput(input: RelatoriosInput, filtro: RelatoriosFiltro): RelatoriosInput {
+  const { from, to, vehicleId, driverId } = filtro;
+
+  return {
+    veiculos: vehicleId ? input.veiculos.filter((v) => v.id === vehicleId) : input.veiculos,
+    motoristas: driverId
+      ? input.motoristas.filter((m) => m.id === driverId)
+      : vehicleId
+        ? input.motoristas.filter((m) => m.vehicle_id === vehicleId)
+        : input.motoristas,
+    manutencoes: input.manutencoes.filter((m) => (!vehicleId || m.vehicle_id === vehicleId) && dentroDoPeriodo(m.due_date, from, to)),
+    documentos: input.documentos.filter(
+      (d) => (!vehicleId || d.vehicle_id === vehicleId) && (!driverId || d.driver_id === driverId) && dentroDoPeriodo(d.expiry_date, from, to)
+    ),
+    despesas: input.despesas.filter((d) => (!vehicleId || d.vehicle_id === vehicleId) && dentroDoPeriodo(d.expense_date, from, to)),
+    jornadas: input.jornadas.filter(
+      (j) => (!vehicleId || j.vehicle_id === vehicleId) && (!driverId || j.driver_id === driverId) && dentroDoPeriodo(j.scheduled_departure, from, to)
+    ),
+    checklistDispatches: input.checklistDispatches.filter(
+      (c) => (!vehicleId || c.vehicle_id === vehicleId) && (!driverId || c.driver_id === driverId) && dentroDoPeriodo(c.sent_at, from, to)
+    ),
+    // Motorista não filtra fretes analisados (analysis_runs não tem relação com motorista). dateFrom já vem aplicado na query
+    // (listAnalysisRuns não tem dateTo/vehicleId) — o "to" e o veículo são sempre resolvidos aqui, em memória.
+    analisesFrete: input.analisesFrete.filter((a) => (!vehicleId || a.vehicle_id === vehicleId) && dentroDoPeriodo(a.created_at, undefined, to)),
+  };
+}
+
+/** Só inclui blocos condicionais (despesas/jornadas/checklists/fretes) quando há dado — mesmo critério da tela. periodoLabel entra só no título dos blocos que já eram period-scoped (despesas/fretes) — default preserva o texto de antes. */
+export function computeRelatoriosBlocos(input: RelatoriosInput, periodoLabel = "últimos 30 dias"): RelatoriosBloco[] {
   const veiculosPorTipo = Object.entries(contarPor(input.veiculos, (v) => v.vehicle_type ?? "nao_informado")).map(([tipo, valor]) => ({
     label: tipo === "nao_informado" ? "Não informado" : VEHICLE_TYPE_LABEL[tipo],
     valor,
@@ -149,7 +250,7 @@ export function computeRelatoriosBlocos(input: RelatoriosInput): RelatoriosBloco
     { titulo: "Manutenções por status", linhas: manutencoesPorStatus },
   ];
 
-  if (input.despesas.length > 0) blocos.push({ titulo: "Despesas por tipo (últimos 30 dias)", linhas: custoPorTipoDespesa, formatarValor: formatBRL });
+  if (input.despesas.length > 0) blocos.push({ titulo: `Despesas por tipo (${periodoLabel})`, linhas: custoPorTipoDespesa, formatarValor: formatBRL });
   if (input.jornadas.length > 0) blocos.push({ titulo: "Jornadas por status", linhas: jornadasPorStatus });
   if (input.checklistDispatches.length > 0) {
     blocos.push({ titulo: "Checklists por status", linhas: checklistsPorStatus });
@@ -164,7 +265,7 @@ export function computeRelatoriosBlocos(input: RelatoriosInput): RelatoriosBloco
     });
   }
   if (input.analisesFrete.length > 0) {
-    blocos.push({ titulo: "Fretes analisados (últimos 30 dias)", linhas: [{ label: "Total de análises", valor: input.analisesFrete.length }] });
+    blocos.push({ titulo: `Fretes analisados (${periodoLabel})`, linhas: [{ label: "Total de análises", valor: input.analisesFrete.length }] });
   }
 
   return blocos;
