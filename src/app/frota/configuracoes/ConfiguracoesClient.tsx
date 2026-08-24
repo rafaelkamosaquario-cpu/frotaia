@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Newspaper, ClipboardList } from "lucide-react";
+import { Newspaper, ClipboardList, BrainCircuit } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,10 @@ export function ConfiguracoesClient({ preferenciasIniciais, podeEditar }: Config
   const [checklistSendHour, setChecklistSendHour] = useState(preferenciasIniciais.checklist_send_hour);
   const [checklistItemKeys, setChecklistItemKeys] = useState<string[]>(preferenciasIniciais.checklist_item_keys);
   const [isSavingChecklist, setIsSavingChecklist] = useState(false);
+
+  const [askBeforeSavingMemory, setAskBeforeSavingMemory] = useState(preferenciasIniciais.ask_before_saving_memory);
+  const [allowAutomaticMemory, setAllowAutomaticMemory] = useState(preferenciasIniciais.allow_automatic_memory);
+  const [isSavingMemoria, setIsSavingMemoria] = useState(false);
 
   async function salvarPreferencias(body: Record<string, unknown>, sucesso: string): Promise<boolean> {
     try {
@@ -100,6 +104,30 @@ export function ConfiguracoesClient({ preferenciasIniciais, podeEditar }: Config
     setIsSavingChecklist(false);
   }
 
+  async function handleToggleAskBefore() {
+    if (isSavingMemoria) return;
+    const novoValor = !askBeforeSavingMemory;
+    setIsSavingMemoria(true);
+    const ok = await salvarPreferencias(
+      { askBeforeSavingMemory: novoValor },
+      novoValor ? "Agora o Frota IA sempre confirma antes de guardar algo" : "Confirmação antes de guardar desativada"
+    );
+    if (ok) setAskBeforeSavingMemory(novoValor);
+    setIsSavingMemoria(false);
+  }
+
+  async function handleToggleAllowAutomatic() {
+    if (isSavingMemoria) return;
+    const novoValor = !allowAutomaticMemory;
+    setIsSavingMemoria(true);
+    const ok = await salvarPreferencias(
+      { allowAutomaticMemory: novoValor },
+      novoValor ? "Frota IA pode guardar informações sozinho" : "Frota IA agora só guarda informação com sua confirmação"
+    );
+    if (ok) setAllowAutomaticMemory(novoValor);
+    setIsSavingMemoria(false);
+  }
+
   return (
     <div className="flex flex-1 flex-col p-4 sm:p-6">
       <div className="mb-5">
@@ -108,6 +136,8 @@ export function ConfiguracoesClient({ preferenciasIniciais, podeEditar }: Config
       </div>
 
       <div className="flex max-w-xl flex-col gap-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">IA</p>
+
         <Card className="p-4">
           <h2 className="mb-1 text-sm font-semibold text-foreground">Estilo de resposta da IA</h2>
           <p className="mb-3 text-xs text-muted-foreground">
@@ -142,6 +172,74 @@ export function ConfiguracoesClient({ preferenciasIniciais, podeEditar }: Config
             ))}
           </div>
         </Card>
+
+        <Card className="p-4">
+          <div className="mb-3 flex items-center gap-3">
+            <BrainCircuit className="size-4 text-muted-foreground" aria-hidden />
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Memória do Frota IA</h2>
+              <p className="text-xs text-muted-foreground">Permite que o Frota IA lembre informações úteis da sua operação entre conversas.</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col divide-y divide-border border-t border-border">
+            <div className="flex items-center justify-between gap-3 py-3">
+              <div>
+                <p className="text-sm text-foreground">Perguntar antes de guardar</p>
+                <p className="text-xs text-muted-foreground">O Frota IA sempre confirma com você antes de salvar algo novo.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={askBeforeSavingMemory}
+                disabled={!podeEditar || isSavingMemoria}
+                onClick={handleToggleAskBefore}
+                className={cn(
+                  "relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                  askBeforeSavingMemory ? "bg-primary" : "bg-surface-muted"
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 size-5 rounded-full bg-white transition-transform",
+                    askBeforeSavingMemory ? "translate-x-[22px]" : "translate-x-0.5"
+                  )}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 py-3">
+              <div>
+                <p className="text-sm text-foreground">Guardar automaticamente</p>
+                <p className="text-xs text-muted-foreground">
+                  {allowAutomaticMemory
+                    ? "O Frota IA pode guardar informações sozinho, quando fizer sentido."
+                    : "Desativado — o Frota IA só guarda algo depois que você confirmar explicitamente."}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={allowAutomaticMemory}
+                disabled={!podeEditar || isSavingMemoria}
+                onClick={handleToggleAllowAutomatic}
+                className={cn(
+                  "relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                  allowAutomaticMemory ? "bg-primary" : "bg-surface-muted"
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 size-5 rounded-full bg-white transition-transform",
+                    allowAutomaticMemory ? "translate-x-[22px]" : "translate-x-0.5"
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+        </Card>
+
+        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Automação</p>
 
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between gap-3">

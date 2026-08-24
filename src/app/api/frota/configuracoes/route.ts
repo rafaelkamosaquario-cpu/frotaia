@@ -31,6 +31,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: `checklistItemKeys só aceita: ${ITENS_VALIDOS.join(", ")}.` }, { status: 400 });
     }
   }
+  if (body.askBeforeSavingMemory !== undefined && typeof body.askBeforeSavingMemory !== "boolean") {
+    return NextResponse.json({ error: "askBeforeSavingMemory precisa ser verdadeiro ou falso." }, { status: 400 });
+  }
+  if (body.allowAutomaticMemory !== undefined && typeof body.allowAutomaticMemory !== "boolean") {
+    return NextResponse.json({ error: "allowAutomaticMemory precisa ser verdadeiro ou falso." }, { status: 400 });
+  }
 
   try {
     await getOrCreatePreferences(supabase, access.company.id);
