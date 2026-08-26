@@ -195,17 +195,31 @@ describe("registrarTentativaCancelamentoPendente / resolverCancelamentoPendente 
 });
 
 describe("listarAssinaturasComCancelamentoPendente — usado pelo job de reconciliação", () => {
-  it("filtra por pending_preapproval_cancellations diferente de vazio", async () => {
-    const eq = vi.fn();
-    const limit = vi.fn().mockResolvedValue({ data: [BASE], error: null });
-    const neq = vi.fn(() => ({ limit }));
-    const select = vi.fn(() => ({ neq, eq }));
+  /**
+   * Filtra em memória (não via `.neq` do PostgREST contra `[]`) — a
+   * primeira versão tentou filtrar jsonb vazio direto na query e quebrou em
+   * produção (`invalid input syntax for type json`, Postgres `22P02`).
+   */
+  function clienteComAssinaturas(assinaturas: SubscriptionRow[]) {
+    const limit = vi.fn().mockResolvedValue({ data: assinaturas, error: null });
+    const select = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ select }));
-    const client = { from } as unknown as SupabaseDbClient;
+    return { from } as unknown as SupabaseDbClient;
+  }
+
+  it("devolve só as empresas com o array de pendências não vazio", async () => {
+    const semPendencia = BASE; // pending_preapproval_cancellations: []
+    const comPendencia = { ...BASE, company_id: "empresa-2", pending_preapproval_cancellations: [{ preapprovalId: "sub-x", status: "pending", attempts: 1, lastAttemptAt: "x", lastError: null }] } as unknown as SubscriptionRow;
+    const client = clienteComAssinaturas([semPendencia, comPendencia]);
 
     const resultado = await listarAssinaturasComCancelamentoPendente(client);
 
-    expect(neq).toHaveBeenCalledWith("pending_preapproval_cancellations", []);
-    expect(resultado).toEqual([BASE]);
+    expect(resultado).toEqual([comPendencia]);
+  });
+
+  it("nenhuma empresa com pendência devolve array vazio", async () => {
+    const client = clienteComAssinaturas([BASE]);
+    const resultado = await listarAssinaturasComCancelamentoPendente(client);
+    expect(resultado).toEqual([]);
   });
 });

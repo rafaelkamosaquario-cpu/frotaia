@@ -278,9 +278,17 @@ export async function resolverCancelamentoPendente(client: SupabaseDbClient, com
   if (error) throw error;
 }
 
-/** Empresas com ao menos um cancelamento de preapproval ainda não resolvido — usado pelo job de reconciliação. */
+/**
+ * Empresas com ao menos um cancelamento de preapproval ainda não resolvido
+ * — usado pelo job de reconciliação. Filtra em memória (não via `.neq` do
+ * PostgREST contra `[]`) — a tentativa inicial de filtrar jsonb vazio
+ * direto na query quebrou em produção (`invalid input syntax for type
+ * json`, código Postgres `22P02` — PostgREST não serializa um array vazio
+ * corretamente nesse operador). Sem urgência de otimizar: base de empresas
+ * pequena, e a maioria nunca tem pendência (array vazio é o estado normal).
+ */
 export async function listarAssinaturasComCancelamentoPendente(client: SupabaseDbClient, limit = 200): Promise<SubscriptionRow[]> {
-  const { data, error } = await client.from("subscriptions").select("*").neq("pending_preapproval_cancellations", []).limit(limit);
+  const { data, error } = await client.from("subscriptions").select("*").limit(limit);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).filter((assinatura) => Array.isArray(assinatura.pending_preapproval_cancellations) && assinatura.pending_preapproval_cancellations.length > 0);
 }
