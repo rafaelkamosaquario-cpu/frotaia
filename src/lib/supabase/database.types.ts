@@ -1694,6 +1694,7 @@ export type Database = {
           iniciado_em: string | null
           mercadopago_payment_id: string | null
           mercadopago_subscription_id: string | null
+          pending_preapproval_cancellations: Json
           plan: Database["public"]["Enums"]["subscription_plan"]
           status: Database["public"]["Enums"]["subscription_status"]
           trial_avisado_dia5: boolean
@@ -1711,6 +1712,7 @@ export type Database = {
           iniciado_em?: string | null
           mercadopago_payment_id?: string | null
           mercadopago_subscription_id?: string | null
+          pending_preapproval_cancellations?: Json
           plan?: Database["public"]["Enums"]["subscription_plan"]
           status?: Database["public"]["Enums"]["subscription_status"]
           trial_avisado_dia5?: boolean
@@ -1728,6 +1730,7 @@ export type Database = {
           iniciado_em?: string | null
           mercadopago_payment_id?: string | null
           mercadopago_subscription_id?: string | null
+          pending_preapproval_cancellations?: Json
           plan?: Database["public"]["Enums"]["subscription_plan"]
           status?: Database["public"]["Enums"]["subscription_status"]
           trial_avisado_dia5?: boolean
@@ -2261,9 +2264,22 @@ export type Database = {
         Args: { p_google_integration_id: string }
         Returns: string
       }
+      resolve_pending_preapproval_cancellation: {
+        Args: { p_company_id: string; p_preapproval_id: string }
+        Returns: undefined
+      }
       store_google_refresh_token: {
         Args: { p_google_integration_id: string; p_refresh_token: string }
         Returns: string
+      }
+      upsert_pending_preapproval_cancellation: {
+        Args: {
+          p_company_id: string
+          p_error: string
+          p_preapproval_id: string
+          p_status: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

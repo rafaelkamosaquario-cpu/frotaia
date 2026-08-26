@@ -31,8 +31,9 @@ Um único serviço Next.js atende os dois canais (WhatsApp e painel web) e é a 
 | `frotaia-trial-avisos-cron` | 1x/dia, 12:00 UTC (09:00 Brasília) | `/api/subscriptions/trial-warnings/dispatch` | `TRIAL_WARNINGS_DISPATCH_SECRET` |
 | `frotaia-checklist-cron` | a cada 15 min | `/api/checklists/dispatch` | `CHECKLIST_DISPATCH_SECRET` |
 | `frotaia-freight-expire-cron` | de hora em hora | `/api/freight/expire-dispatch` | `FREIGHT_EXPIRE_DISPATCH_SECRET` |
+| `frotaia-mp-reconcile-cron` | de hora em hora | `/api/payments/mercadopago/reconcile-cancellations` | `SUBSCRIPTION_CANCEL_RECONCILE_SECRET` |
 
-  **Os 2 últimos foram ativados em 2026-08-26** (rodada de prontidão de produção) — antes existiam só no código, sem nenhum agendamento real no Railway. Checklist precisa de intervalo curto porque cada empresa tem seu próprio horário configurado de envio (`company_preferences.checklist_send_hour`), não é 1x/dia fixo; freight-expire não tem urgência (é só limpeza de status vencido), hora em hora é suficiente.
+  **Os 2 do meio foram ativados em 2026-08-26** (rodada de prontidão de produção); o último (`frotaia-mp-reconcile-cron`) foi criado na mesma data, numa rodada seguinte — fechamento final do risco de cobrança dupla na troca de plano (ver seção 13 de `docs/FROTA_IA_CHECKOUT_MERCADOPAGO_ATUAL.md`). Todos antes existiam só no código, sem nenhum agendamento real no Railway. Checklist precisa de intervalo curto porque cada empresa tem seu próprio horário configurado de envio (`company_preferences.checklist_send_hour`), não é 1x/dia fixo; freight-expire e mp-reconcile não têm urgência de tempo real (limpeza de status vencido / retry de cancelamento pendente), hora em hora é suficiente.
 
   Cada cron é um serviço Railway **separado** do principal — logo tem sua **própria cópia** das variáveis de ambiente. O mesmo segredo (ex.: `NEWS_DISPATCH_SECRET`) precisa ter o **valor idêntico** no serviço principal (que valida) e no serviço de cron (que envia) — já causou 401 por dessincronia mais de uma vez (ver histórico em `docs/FROTA_IA_CRONS_AUTOMACOES.md`).
 
@@ -86,7 +87,7 @@ Nomes conferidos no serviço principal em 2026-08-22 (valores não são lidos po
 - **Supabase**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`
 - **Google**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALENDAR_REDIRECT_URI`, `GOOGLE_CALENDAR_ENCRYPTION_KEY`, `GOOGLE_MAPS_API_KEY`
 - **WhatsApp**: `ZAPI_INSTANCE_ID`, `ZAPI_INSTANCE_TOKEN`, `ZAPI_CLIENT_TOKEN`, `WHATSAPP_WEBHOOK_SECRET`
-- **Crons/dispatch**: `ALERTS_DISPATCH_SECRET`, `NEWS_DISPATCH_SECRET`, `TRIAL_WARNINGS_DISPATCH_SECRET`, `CHECKLIST_DISPATCH_SECRET`, `FREIGHT_EXPIRE_DISPATCH_SECRET` (todos os 5 crons ativos desde 2026-08-26, ver seção 2 e `docs/FROTA_IA_CRONS_AUTOMACOES.md`)
+- **Crons/dispatch**: `ALERTS_DISPATCH_SECRET`, `NEWS_DISPATCH_SECRET`, `TRIAL_WARNINGS_DISPATCH_SECRET`, `CHECKLIST_DISPATCH_SECRET`, `FREIGHT_EXPIRE_DISPATCH_SECRET`, `SUBSCRIPTION_CANCEL_RECONCILE_SECRET` (todos os 6 crons ativos desde 2026-08-26, ver seção 2 e `docs/FROTA_IA_CRONS_AUTOMACOES.md`)
 - **Pagamento**: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET`
 - **Observabilidade** (opcional — ver seção 9): `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`
 - **App**: `APP_URL`, `CUSTOMER_PANEL_ENABLED`, `ADMIN_PANEL_ENABLED`
@@ -117,3 +118,7 @@ Rodada específica de estabilização antes do piloto com clientes reais, sem ne
 - **Anthropic — tier/RPM/TPM**: não confirmável pelo repositório (precisa consultar console.anthropic.com → Settings → Limits com acesso à conta).
 
 **Fonte completa desta rodada**: relatório entregue no chat em 2026-08-26 e testes automatizados novos (`src/app/api/health/route.test.ts`, `src/lib/anthropic/client.test.ts`).
+
+## 10. Fechamento final Mercado Pago (2026-08-26) — 6º cron
+
+Rodada seguinte, focada só no risco residual de cobrança dupla na troca de plano (auditoria completa em `docs/FROTA_IA_CHECKOUT_MERCADOPAGO_ATUAL.md`, seção 13). Adicionou o 6º cron (`frotaia-mp-reconcile-cron`, ver seção 2) e a variável `SUBSCRIPTION_CANCEL_RECONCILE_SECRET`, configurada tanto no serviço principal quanto no novo serviço de cron, seguindo exatamente o mesmo padrão dos outros 5. Nenhuma outra mudança de infraestrutura — Sentry, health check e os demais 5 crons não foram tocados.

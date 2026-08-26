@@ -100,6 +100,15 @@ function textReply(text: string): OnboardingReply {
  * Explica o produto (incluindo o Radar de Fretes) antes de pedir o nome, e
  * já avisa que a configuração do veículo faz parte do cadastro — reduz a
  * chance de o cliente estranhar as perguntas de placa/consumo mais adiante.
+ *
+ * Fechamento de coerência (08/2026): esta mesma resposta vira tanto
+ * `profiles.full_name` quanto `companies.name` (ver finalizeOnboarding.ts) —
+ * mas a pergunta acontece ANTES de saber se quem responde é motorista
+ * autônomo, motorista, dono de empresa/transportadora ou gestor de frota
+ * (etapa "awaiting_profile" vem depois). "Como posso chamar você?" sozinho
+ * puxa uma resposta de nome pessoal ("Rafael"), que soa estranho quando vira
+ * `companies.name` de uma transportadora de verdade. Copy revisada pra
+ * cobrir os dois casos sem virar pergunta nova.
  */
 export function firstOnboardingMessage(): string {
   return (
@@ -107,7 +116,7 @@ export function firstOnboardingMessage(): string {
     "Posso analisar fretes, calcular custos, organizar despesas, manutenção, documentos e rotas, criar lembretes e ajudar você a encontrar oportunidades de carga com o Radar de Fretes.\n\n" +
     "Você pode falar comigo por texto, áudio, foto, PDF ou planilha.\n\n" +
     "Para eu usar os dados corretos do seu veículo nas análises e recomendações, vou configurar sua operação primeiro.\n\n" +
-    "Como posso chamar você?"
+    "Como posso chamar você (ou sua empresa/operação)?"
   );
 }
 
@@ -460,7 +469,7 @@ export function processOnboardingMessage(
     case "awaiting_name": {
       const name = incomingText.trim();
       if (!name) {
-        return { nextState: state, reply: textReply("Não entendi — como posso te chamar?"), collectedData, finalize: false };
+        return { nextState: state, reply: textReply("Não entendi — como posso te chamar (ou sua empresa/operação)?"), collectedData, finalize: false };
       }
       const updated = { ...collectedData, name };
       return { nextState: "awaiting_profile", reply: askProfile(name), collectedData: updated, finalize: false };

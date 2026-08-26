@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isMercadoPagoConfigured, getMercadoPagoWebhookSecret } from "@/lib/mercadopago/config";
-import { validarAssinaturaWebhook, buscarPagamento, buscarAssinatura, decodificarReferenciaExterna, cancelarAssinatura } from "@/lib/mercadopago/client";
+import { validarAssinaturaWebhook, buscarPagamento, buscarAssinatura, decodificarReferenciaExterna } from "@/lib/mercadopago/client";
 import { CATALOGO_OFERTAS } from "@/lib/mercadopago/catalog";
 import {
   atualizarAssinaturaPorPagamento,
@@ -9,27 +9,33 @@ import {
   eventoPagamentoJaProcessado,
   getSubscription,
 } from "@/services/supabase/subscriptionService";
-import { captureError } from "@/lib/observability/logger";
+import { cancelarComRecuperacao } from "@/services/mercadopago/cancelamentoAssinaturaAnterior";
+import { captureError, logEvent } from "@/lib/observability/logger";
 import type { SupabaseDbClient } from "@/services/supabase/types";
 
 const ROTA = "/api/payments/mercadopago/webhook";
 
 /**
- * Troca de plano (fechamento 08/2026) — antes NENHUM código cancelava a
- * assinatura recorrente anterior no Mercado Pago ao trocar de plano (ex.:
- * Individual → Gestão Mensal), e o próprio `mercadopago_subscription_id`
- * antigo era sobrescrito pelo novo antes de qualquer cancelamento ser
- * possível — risco real de cobrança dupla (a assinatura antiga continuava
- * cobrando pra sempre, sem jeito de rastrear o ID depois).
+ * Troca de plano (fechamento 08/2026, com correção final do risco residual
+ * em 08/2026) — antes NENHUM código cancelava a assinatura recorrente
+ * anterior no Mercado Pago ao trocar de plano (ex.: Individual → Gestão
+ * Mensal), e o próprio `mercadopago_subscription_id` antigo era
+ * sobrescrito pelo novo antes de qualquer cancelamento ser possível —
+ * risco real de cobrança dupla. Depois, o cancelamento em si passou a
+ * existir mas era best-effort SEM persistência: se falhasse, o ID antigo
+ * se perdia. Agora `cancelarComRecuperacao` persiste toda tentativa (via
+ * `src/services/mercadopago/cancelamentoAssinaturaAnterior.ts`) e o job de
+ * reconciliação (`/api/payments/mercadopago/reconcile-cancellations`)
+ * garante que nenhuma pendência fica invisível pra sempre.
  *
  * Ordem de segurança (nunca a inversa): SEMPRE chamado DEPOIS que a nova
  * assinatura já está confirmada ATIVA no banco — o cliente nunca fica sem
  * acesso entre as duas etapas. Só cancela quando `mercadopago_subscription_id`
  * antigo existir E for DIFERENTE do recurso que acabou de ser processado
  * (evita cancelar a própria assinatura que só mudou de status, ex.:
- * pending→authorized). Best-effort: nunca lança — se o cancelamento
- * falhar, a nova assinatura já está ativa (o essencial pro cliente), e o
- * erro fica registrado pra intervenção manual.
+ * pending→authorized). Nunca lança — se o cancelamento falhar (mesmo depois
+ * das tentativas), a nova assinatura já está ativa (o essencial pro
+ * cliente) e a pendência fica registrada e recuperável.
  */
 async function cancelarAssinaturaAnteriorSeTrocouDePlano(
   admin: SupabaseDbClient,
@@ -39,17 +45,15 @@ async function cancelarAssinaturaAnteriorSeTrocouDePlano(
 ): Promise<void> {
   if (!oldPreapprovalId || oldPreapprovalId === novoResourceId) return;
 
-  try {
-    await cancelarAssinatura(oldPreapprovalId);
-  } catch (erro) {
-    captureError({
-      event: "mercadopago_cancelamento_assinatura_anterior_falhou",
-      route: ROTA,
-      company_id: companyId,
-      old_preapproval_id: oldPreapprovalId,
-      error: erro,
-    });
-  }
+  logEvent({
+    event: "subscription_upgrade_started",
+    route: ROTA,
+    company_id: companyId,
+    old_preapproval_id: oldPreapprovalId,
+    new_resource_id: novoResourceId,
+  });
+
+  await cancelarComRecuperacao(admin, ROTA, companyId, oldPreapprovalId, 0);
 }
 
 /**

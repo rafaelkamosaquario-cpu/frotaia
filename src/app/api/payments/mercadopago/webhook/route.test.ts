@@ -19,6 +19,8 @@ const atualizarAssinaturaPorPagamento = vi.fn();
 const registrarEventoPagamento = vi.fn();
 const eventoPagamentoJaProcessado = vi.fn();
 const getSubscription = vi.fn();
+const registrarTentativaCancelamentoPendente = vi.fn();
+const resolverCancelamentoPendente = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
 vi.mock("@/lib/mercadopago/config", () => ({
@@ -40,6 +42,8 @@ vi.mock("@/services/supabase/subscriptionService", () => ({
   registrarEventoPagamento: (...args: unknown[]) => registrarEventoPagamento(...args),
   eventoPagamentoJaProcessado: (...args: unknown[]) => eventoPagamentoJaProcessado(...args),
   getSubscription: (...args: unknown[]) => getSubscription(...args),
+  registrarTentativaCancelamentoPendente: (...args: unknown[]) => registrarTentativaCancelamentoPendente(...args),
+  resolverCancelamentoPendente: (...args: unknown[]) => resolverCancelamentoPendente(...args),
 }));
 
 function chamarWebhook(opts: { body?: unknown; dataId?: string; type?: string; xSignature?: string; xRequestId?: string }) {
@@ -67,6 +71,8 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     eventoPagamentoJaProcessado.mockResolvedValue(false);
     getSubscription.mockResolvedValue(null);
     cancelarAssinatura.mockResolvedValue(undefined);
+    registrarTentativaCancelamentoPendente.mockResolvedValue(undefined);
+    resolverCancelamentoPendente.mockResolvedValue(undefined);
   });
 
   it("503 quando o Mercado Pago não está configurado", async () => {
@@ -220,6 +226,8 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
     validarAssinaturaWebhook.mockReturnValue(true);
     eventoPagamentoJaProcessado.mockResolvedValue(false);
     cancelarAssinatura.mockResolvedValue(undefined);
+    registrarTentativaCancelamentoPendente.mockResolvedValue(undefined);
+    resolverCancelamentoPendente.mockResolvedValue(undefined);
   });
 
   it("A) Individual (MENSAL) → Gestão Mensal: cancela o preapproval antigo DEPOIS de confirmar o novo ativo", async () => {
@@ -239,6 +247,8 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
     expect(cancelarAssinatura).toHaveBeenCalledWith("sub-antigo-mensal");
     expect(ordem).toEqual(["atualizou", "cancelou"]); // nunca cancela antes de confirmar o novo — regra de segurança explícita
+    expect(resolverCancelamentoPendente).toHaveBeenCalledWith(expect.anything(), "empresa-1", "sub-antigo-mensal"); // sucesso: nenhuma pendência fica registrada (e qualquer pendência anterior desse mesmo id é limpa)
+    expect(registrarTentativaCancelamentoPendente).not.toHaveBeenCalled();
   });
 
   it("B) Individual → Gestão Anual cartão: cancela o preapproval antigo (o pagamento novo é único, vem por 'payment', não 'preapproval')", async () => {
@@ -315,7 +325,7 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
     expect(cancelarAssinatura).not.toHaveBeenCalled();
   });
 
-  it("falha ao cancelar a assinatura anterior nunca derruba a resposta do webhook nem desfaz a ativação da nova (best-effort)", async () => {
+  it("falha ao cancelar a assinatura anterior nunca derruba a resposta do webhook nem desfaz a ativação da nova (best-effort) — e a pendência fica persistida, nunca perdida (fechamento final)", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-antigo-mensal" });
     buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|GESTAO_MENSAL" });
     cancelarAssinatura.mockRejectedValue(new Error("Mercado Pago recusou o cancelamento"));
@@ -324,6 +334,8 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
     expect(resposta.status).toBe(200);
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalled(); // a nova assinatura já foi ativada, apesar da falha no cancelamento
+    expect(registrarTentativaCancelamentoPendente).toHaveBeenCalledWith(expect.anything(), "empresa-1", "sub-antigo-mensal", "pending", expect.any(String));
+    expect(resolverCancelamentoPendente).not.toHaveBeenCalled();
   });
 
   it("falha antes do pagamento (evento com status não-aprovado) nunca ativa nem tenta cancelar nada", async () => {

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { isAccessAllowed, isFleetPanelAccessAllowed, getSubscription } from "./subscriptionService";
+import {
+  isAccessAllowed,
+  isFleetPanelAccessAllowed,
+  getSubscription,
+  registrarTentativaCancelamentoPendente,
+  resolverCancelamentoPendente,
+  listarAssinaturasComCancelamentoPendente,
+} from "./subscriptionService";
 import type { SubscriptionRow } from "@/lib/supabase/tables";
 import type { SupabaseDbClient } from "./types";
 
@@ -28,6 +35,7 @@ const BASE: SubscriptionRow = {
   trial_avisado_ultimo_dia: false,
   mercadopago_subscription_id: "sub-mp-1",
   mercadopago_payment_id: null,
+  pending_preapproval_cancellations: [],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -144,5 +152,60 @@ describe("getSubscription — corrige status ATIVA→EXPIRADA de plano anual ven
     const resultado = await getSubscription(client, "empresa-sem-assinatura");
     expect(resultado).toBeNull();
     expect(maybeSingleUpdate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Fechamento final do risco residual de cobrança dupla (08/2026) — wrappers
+ * finos sobre as RPCs `upsert_pending_preapproval_cancellation`/
+ * `resolve_pending_preapproval_cancellation` (migration 20260826140000). A
+ * lógica de retry/classificação de erro em si é testada em
+ * src/services/mercadopago/cancelamentoAssinaturaAnterior.test.ts — aqui só
+ * confirmamos que os wrappers chamam a RPC certa, com os argumentos certos,
+ * e propagam erro do Supabase em vez de escondê-lo.
+ */
+function clienteRpcMock() {
+  const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+  return { client: { rpc } as unknown as SupabaseDbClient, rpc };
+}
+
+describe("registrarTentativaCancelamentoPendente / resolverCancelamentoPendente — RPCs de persistência", () => {
+  it("registrarTentativaCancelamentoPendente chama a RPC certa com os argumentos certos", async () => {
+    const { client, rpc } = clienteRpcMock();
+    await registrarTentativaCancelamentoPendente(client, "empresa-1", "sub-antigo", "pending", "timeout");
+    expect(rpc).toHaveBeenCalledWith("upsert_pending_preapproval_cancellation", {
+      p_company_id: "empresa-1",
+      p_preapproval_id: "sub-antigo",
+      p_status: "pending",
+      p_error: "timeout",
+    });
+  });
+
+  it("registrarTentativaCancelamentoPendente propaga erro do Supabase (nunca esconde falha de persistência)", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: new Error("conexão recusada") });
+    const client = { rpc } as unknown as SupabaseDbClient;
+    await expect(registrarTentativaCancelamentoPendente(client, "empresa-1", "sub-antigo", "failed", "erro")).rejects.toThrow("conexão recusada");
+  });
+
+  it("resolverCancelamentoPendente chama a RPC certa com os argumentos certos", async () => {
+    const { client, rpc } = clienteRpcMock();
+    await resolverCancelamentoPendente(client, "empresa-1", "sub-antigo");
+    expect(rpc).toHaveBeenCalledWith("resolve_pending_preapproval_cancellation", { p_company_id: "empresa-1", p_preapproval_id: "sub-antigo" });
+  });
+});
+
+describe("listarAssinaturasComCancelamentoPendente — usado pelo job de reconciliação", () => {
+  it("filtra por pending_preapproval_cancellations diferente de vazio", async () => {
+    const eq = vi.fn();
+    const limit = vi.fn().mockResolvedValue({ data: [BASE], error: null });
+    const neq = vi.fn(() => ({ limit }));
+    const select = vi.fn(() => ({ neq, eq }));
+    const from = vi.fn(() => ({ select }));
+    const client = { from } as unknown as SupabaseDbClient;
+
+    const resultado = await listarAssinaturasComCancelamentoPendente(client);
+
+    expect(neq).toHaveBeenCalledWith("pending_preapproval_cancellations", []);
+    expect(resultado).toEqual([BASE]);
   });
 });

@@ -3,7 +3,9 @@ import { createHmac } from "node:crypto";
 
 vi.mock("server-only", () => ({}));
 
-const { validarAssinaturaWebhook, decodificarReferenciaExterna, cancelarAssinatura } = await import("./client");
+const { validarAssinaturaWebhook, decodificarReferenciaExterna, cancelarAssinatura, classificarErroCancelamento, MercadoPagoApiError } = await import(
+  "./client"
+);
 
 /**
  * Cobre a lógica de validação de assinatura (manifest + HMAC-SHA256) contra
@@ -156,5 +158,27 @@ describe("cancelarAssinatura — fechamento de troca de plano (08/2026)", () => 
 
     const urlChamada = fetchMock.mock.calls[0][0] as string;
     expect(urlChamada).toBe(`https://api.mercadopago.com/v1/preapproval/${encodeURIComponent("id com espaço/barra")}`);
+  });
+});
+
+describe("classificarErroCancelamento — fechamento final do risco residual (08/2026)", () => {
+  it("timeout/erro de rede (sem httpStatus) é tratado como transitório — retry é seguro", () => {
+    expect(classificarErroCancelamento(new TypeError("fetch failed"))).toBe("transitorio");
+  });
+
+  it("429 (rate limit) é transitório", () => {
+    expect(classificarErroCancelamento(new MercadoPagoApiError("x", 429))).toBe("transitorio");
+  });
+
+  it("5xx é transitório", () => {
+    expect(classificarErroCancelamento(new MercadoPagoApiError("x", 500))).toBe("transitorio");
+    expect(classificarErroCancelamento(new MercadoPagoApiError("x", 503))).toBe("transitorio");
+  });
+
+  it("400/401/403/404 são permanentes — retry nunca resolveria sozinho", () => {
+    expect(classificarErroCancelamento(new MercadoPagoApiError("x", 400))).toBe("permanente");
+    expect(classificarErroCancelamento(new MercadoPagoApiError("x", 401))).toBe("permanente");
+    expect(classificarErroCancelamento(new MercadoPagoApiError("x", 403))).toBe("permanente");
+    expect(classificarErroCancelamento(new MercadoPagoApiError("x", 404))).toBe("permanente");
   });
 });

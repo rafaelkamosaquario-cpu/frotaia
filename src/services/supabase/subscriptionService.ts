@@ -227,3 +227,60 @@ export async function registrarEventoPagamento(client: SupabaseDbClient, input: 
   });
   if (error) throw error;
 }
+
+/**
+ * Fechamento final do risco residual de cobrança dupla (08/2026) — antes,
+ * se o cancelamento do preapproval anterior falhasse, o ID antigo não
+ * ficava persistido em lugar nenhum recuperável. Reaproveita a própria
+ * linha 1:1 de `subscriptions` (coluna `pending_preapproval_cancellations`,
+ * array — uma empresa pode trocar de plano de novo antes da reconciliação
+ * resolver a pendência anterior). Ver `src/services/mercadopago/*`
+ * para a orquestração completa (tentativa → classificação de erro →
+ * persistência → reconciliação).
+ */
+export interface PendingPreapprovalCancellation {
+  preapprovalId: string;
+  status: "pending" | "failed";
+  attempts: number;
+  lastAttemptAt: string;
+  lastError: string | null;
+}
+
+/**
+ * Registra uma tentativa de cancelamento (com ou sem sucesso) via RPC
+ * (`upsert_pending_preapproval_cancellation`) — a trava de linha (`for
+ * update`) dentro da função do banco garante que duas chamadas concorrentes
+ * pra mesma empresa (ex.: webhook + reconciliação ao mesmo tempo) nunca se
+ * sobrescrevem e perdem uma entrada.
+ */
+export async function registrarTentativaCancelamentoPendente(
+  client: SupabaseDbClient,
+  companyId: string,
+  preapprovalId: string,
+  status: "pending" | "failed",
+  erroSeguro: string
+): Promise<void> {
+  const { error } = await client.rpc("upsert_pending_preapproval_cancellation", {
+    p_company_id: companyId,
+    p_preapproval_id: preapprovalId,
+    p_status: status,
+    p_error: erroSeguro,
+  });
+  if (error) throw error;
+}
+
+/** Remove um preapproval do array de pendências — chamado assim que o cancelamento é confirmado (sucesso, direto ou detectado pela reconciliação). Idempotente: remover algo que não está no array não é erro. */
+export async function resolverCancelamentoPendente(client: SupabaseDbClient, companyId: string, preapprovalId: string): Promise<void> {
+  const { error } = await client.rpc("resolve_pending_preapproval_cancellation", {
+    p_company_id: companyId,
+    p_preapproval_id: preapprovalId,
+  });
+  if (error) throw error;
+}
+
+/** Empresas com ao menos um cancelamento de preapproval ainda não resolvido — usado pelo job de reconciliação. */
+export async function listarAssinaturasComCancelamentoPendente(client: SupabaseDbClient, limit = 200): Promise<SubscriptionRow[]> {
+  const { data, error } = await client.from("subscriptions").select("*").neq("pending_preapproval_cancellations", []).limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}

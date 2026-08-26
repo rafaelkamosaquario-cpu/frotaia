@@ -201,6 +201,23 @@ export async function cancelarAssinatura(preapprovalId: string): Promise<void> {
   if (!response.ok) return parseErrorSafely(response);
 }
 
+/**
+ * Fechamento final do risco residual (08/2026): decide se vale a pena
+ * tentar cancelar de novo. Transitório (rede/timeout, 429, 5xx) → retry faz
+ * sentido. Permanente (400/401/403/404 etc.) → o Mercado Pago já disse que
+ * o pedido em si está errado, retry nunca vai resolver sozinho — mais cedo
+ * ação manual é sinalizada, melhor.
+ */
+export function classificarErroCancelamento(erro: unknown): "transitorio" | "permanente" {
+  if (erro instanceof MercadoPagoApiError) {
+    if (erro.httpStatus === 429) return "transitorio";
+    if (erro.httpStatus !== undefined && erro.httpStatus >= 500) return "transitorio";
+    return "permanente";
+  }
+  // Erro de rede/timeout (fetch lançou antes de haver resposta HTTP) — desconhecido, mas retry é seguro (idempotente do lado do MP).
+  return "transitorio";
+}
+
 export interface ValidarWebhookInput {
   xSignature: string | null;
   xRequestId: string | null;
