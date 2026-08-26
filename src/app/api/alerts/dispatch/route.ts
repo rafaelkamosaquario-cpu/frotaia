@@ -5,6 +5,9 @@ import { sendWhatsappText } from "@/lib/whatsapp/zapiClient";
 import { isWhatsappConfigured } from "@/lib/whatsapp/config";
 import { listDueAlerts, markAlertSent, markAlertFailed } from "@/services/supabase/alertService";
 import { listChannelsForUser } from "@/services/supabase/channelIdentityService";
+import { logDispatchStart, logDispatchEnd, captureError } from "@/lib/observability/logger";
+
+const ROTA = "/api/alerts/dispatch";
 
 /**
  * Job de disparo dos alertas agendados (Camada 6, Fase C). Não é chamado
@@ -39,6 +42,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "WhatsApp não configurado." }, { status: 503 });
   }
 
+  const startedAt = logDispatchStart(ROTA);
   const admin = createAdminClient();
   const devidos = await listDueAlerts(admin);
 
@@ -61,11 +65,13 @@ export async function GET(request: Request) {
       await sendWhatsappText(canalWhatsapp.phone_e164, partes.join("\n\n"));
       await markAlertSent(admin, alerta.id);
       enviados += 1;
-    } catch {
+    } catch (erro) {
       await markAlertFailed(admin, alerta.id, "Falha ao enviar a mensagem pelo WhatsApp.");
+      captureError({ event: "alert_dispatch_falhou", route: ROTA, company_id: alerta.company_id, alert_id: alerta.id, error: erro });
       falhas += 1;
     }
   }
 
+  logDispatchEnd(ROTA, startedAt, { processados: devidos.length, sucesso: enviados, falha: falhas });
   return NextResponse.json({ ok: true, verificados: devidos.length, enviados, falhas });
 }

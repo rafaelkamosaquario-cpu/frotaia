@@ -7,6 +7,9 @@ import { listCompaniesDueForNewsDigest, markNewsDigestSent } from "@/services/su
 import { listChannelsForCompany } from "@/services/supabase/channelIdentityService";
 import { gerarResumoNoticias } from "@/services/news/newsDigestService";
 import { saveNewsDigest } from "@/services/supabase/newsDigestArchiveService";
+import { logDispatchStart, logDispatchEnd, captureError } from "@/lib/observability/logger";
+
+const ROTA = "/api/news/dispatch";
 
 /**
  * Job de disparo do resumo diário de notícias do setor (opt-in — ver
@@ -42,24 +45,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "WhatsApp não configurado." }, { status: 503 });
   }
 
+  const startedAt = logDispatchStart(ROTA);
   const admin = createAdminClient();
   const empresasDevidas = await listCompaniesDueForNewsDigest(admin);
 
   if (empresasDevidas.length === 0) {
+    logDispatchEnd(ROTA, startedAt, { processados: 0, sucesso: 0, falha: 0 });
     return NextResponse.json({ ok: true, empresas: 0, enviados: 0, falhas: 0 });
   }
 
   const resumo = await gerarResumoNoticias().catch((erro) => {
-    console.error("[news-dispatch] falha ao gerar o resumo via Claude:", erro);
+    captureError({ event: "news_dispatch_geracao_falhou", route: ROTA, error: erro });
     return null;
   });
 
   if (!resumo) {
+    logDispatchEnd(ROTA, startedAt, { processados: empresasDevidas.length, sucesso: 0, falha: empresasDevidas.length });
     return NextResponse.json({ error: "Não foi possível gerar o resumo de notícias agora." }, { status: 502 });
   }
 
   // Fase 11 do plano de unificação V1+V2: persiste pro painel poder mostrar "notícias de hoje" sem precisar gerar de novo. Best-effort — falha aqui não deve impedir o envio real pelo WhatsApp.
-  await saveNewsDigest(admin, resumo).catch((erro) => console.error("[news-dispatch] falha ao persistir o resumo:", erro));
+  await saveNewsDigest(admin, resumo).catch((erro) => captureError({ event: "news_dispatch_persistencia_falhou", route: ROTA, error: erro }));
 
   let enviados = 0;
   let falhas = 0;
@@ -79,7 +85,7 @@ export async function GET(request: Request) {
         enviados += 1;
         algumEnviado = true;
       } catch (erro) {
-        console.error(`[news-dispatch] falha ao enviar para ${numero}:`, erro);
+        captureError({ event: "news_dispatch_envio_falhou", route: ROTA, company_id: empresa.company_id, error: erro });
         falhas += 1;
       }
     }
@@ -89,5 +95,6 @@ export async function GET(request: Request) {
     }
   }
 
+  logDispatchEnd(ROTA, startedAt, { processados: empresasDevidas.length, sucesso: enviados, falha: falhas });
   return NextResponse.json({ ok: true, empresas: empresasDevidas.length, enviados, falhas });
 }

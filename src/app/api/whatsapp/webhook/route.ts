@@ -26,7 +26,10 @@ import { processarMensagemDeGrupo } from "@/services/freight/groupMessageIntake"
 import { resolverIntencaoComercialLanding, mensagemConfirmacaoOferta, MENSAGEM_INTERESSE_EMPRESAS } from "@/lib/mercadopago/landingIntent";
 import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
 import { isOfertaPlano } from "@/lib/mercadopago/catalog";
+import { captureError } from "@/lib/observability/logger";
 import type { MessageInsert } from "@/lib/supabase/tables";
+
+const ROTA = "/api/whatsapp/webhook";
 
 /**
  * Webhook de mensagem recebida da instância Z-API própria do Frota IA
@@ -226,7 +229,7 @@ export async function POST(request: Request) {
     if (textoGrupo) {
       const adminGrupo = createAdminClient();
       processarMensagemDeGrupo(adminGrupo, body.phone, body.chatName, textoGrupo, body.messageId, body).catch((err) => {
-        console.error(`[whatsapp-webhook] Falha ao processar mensagem de grupo: ${err instanceof Error ? err.message : String(err)}`);
+        captureError({ event: "whatsapp_grupo_processamento_falhou", route: ROTA, error: err });
       });
     }
     return NextResponse.json({ ok: true });
@@ -526,6 +529,7 @@ export async function POST(request: Request) {
 
     const midia = await baixarMidia(body.image.imageUrl);
     if (!midia) {
+      captureError({ event: "whatsapp_midia_download_falhou", route: ROTA, media_type: "image", error: new Error("baixarMidia devolveu null pra imagem") });
       await sendWhatsappText(phoneE164, "Não consegui baixar a imagem agora. Pode tentar enviar de novo?").catch(() => {});
       return NextResponse.json({ ok: true });
     }
@@ -540,6 +544,7 @@ export async function POST(request: Request) {
     if (MIME_TYPES_PLANILHA_SUPORTADOS.has(mimeType)) {
       const midiaPlanilha = await baixarMidia(body.document.documentUrl);
       if (!midiaPlanilha) {
+        captureError({ event: "whatsapp_midia_download_falhou", route: ROTA, media_type: "spreadsheet", error: new Error("baixarMidia devolveu null pra planilha") });
         await sendWhatsappText(phoneE164, "Não consegui baixar a planilha agora. Pode tentar enviar de novo?").catch(() => {});
         return NextResponse.json({ ok: true });
       }
@@ -550,6 +555,7 @@ export async function POST(request: Request) {
         mensagemUsuario = `${legenda ? `${legenda}\n\n` : ""}[planilha recebida: ${fileName}]\n${textoPlanilha}`;
         inboundExtra = { ...inboundBase, content_type: "document", metadata: { fileName, mimeType, planilhaInterpretada: true } };
       } catch (err) {
+        captureError({ event: "whatsapp_planilha_parse_falhou", route: ROTA, error: err });
         const motivo = err instanceof SpreadsheetParseError ? err.message : "Não consegui ler o conteúdo dessa planilha agora.";
         await appendMessage(admin, {
           conversation_id: conversation.id,
@@ -585,6 +591,7 @@ export async function POST(request: Request) {
     } else {
       const midia = await baixarMidia(body.document.documentUrl);
       if (!midia) {
+        captureError({ event: "whatsapp_midia_download_falhou", route: ROTA, media_type: "pdf", error: new Error("baixarMidia devolveu null pro documento") });
         await sendWhatsappText(phoneE164, "Não consegui baixar o documento agora. Pode tentar enviar de novo?").catch(() => {});
         return NextResponse.json({ ok: true });
       }
@@ -614,6 +621,7 @@ export async function POST(request: Request) {
 
     const midiaAudio = await baixarMidia(body.audio.audioUrl);
     if (!midiaAudio) {
+      captureError({ event: "whatsapp_midia_download_falhou", route: ROTA, media_type: "audio", error: new Error("baixarMidia devolveu null pro áudio") });
       await sendWhatsappText(phoneE164, "Não consegui baixar seu áudio agora. Pode tentar enviar de novo, ou escrever a mensagem?").catch(() => {});
       return NextResponse.json({ ok: true });
     }
@@ -622,7 +630,8 @@ export async function POST(request: Request) {
       const textoTranscrito = await transcreverAudio(midiaAudio.bytes, midiaAudio.contentType || audioMimeType);
       mensagemUsuario = textoTranscrito;
       inboundExtra = { ...inboundBase, content_type: "audio", metadata: { mimeType: audioMimeType, transcrito: true } };
-    } catch {
+    } catch (erroTranscricao) {
+      captureError({ event: "whatsapp_transcricao_audio_falhou", route: ROTA, error: erroTranscricao });
       await appendMessage(admin, {
         conversation_id: conversation.id,
         company_id: companyId,
@@ -701,8 +710,7 @@ export async function POST(request: Request) {
     // Catch mais externo do pipeline inteiro (qualquer ferramenta, qualquer
     // parte de gerarRespostaAssistente, chamada à Anthropic) — sem log aqui
     // não dá pra saber o que quebrou quando cai nesse fallback genérico.
-    const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : JSON.stringify(err);
-    console.error(`[webhook] Falha ao gerar resposta: ${detalhe}`);
+    captureError({ event: "whatsapp_resposta_ia_falhou", route: ROTA, company_id: companyId, conversation_id: conversation.id, error: err });
     await sendWhatsappText(phoneE164, "Não consegui processar sua mensagem agora. Tente novamente em instantes.").catch(() => {});
     return NextResponse.json({ ok: true });
   }

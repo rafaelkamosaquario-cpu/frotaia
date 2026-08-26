@@ -5,6 +5,9 @@ import { sendWhatsappText } from "@/lib/whatsapp/zapiClient";
 import { isWhatsappConfigured } from "@/lib/whatsapp/config";
 import { listarTestesParaAvisar, marcarAvisoTrialEnviado } from "@/services/supabase/subscriptionService";
 import { listChannelsForCompany } from "@/services/supabase/channelIdentityService";
+import { logDispatchStart, logDispatchEnd, captureError } from "@/lib/observability/logger";
+
+const ROTA = "/api/subscriptions/trial-warnings/dispatch";
 
 /**
  * Job de disparo dos avisos de teste grátis (Fase 5 do fluxo de pagamento)
@@ -41,6 +44,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "WhatsApp não configurado." }, { status: 503 });
   }
 
+  const startedAt = logDispatchStart(ROTA);
   const admin = createAdminClient();
   const testes = await listarTestesParaAvisar(admin);
 
@@ -70,7 +74,7 @@ export async function GET(request: Request) {
         }
         enviados += 1;
       } catch (erro) {
-        console.error(`[trial-warnings-dispatch] falha ao enviar para ${numero}:`, erro);
+        captureError({ event: "trial_warning_dispatch_falhou", route: ROTA, company_id: teste.company_id, error: erro });
         falhas += 1;
       }
     }
@@ -79,5 +83,6 @@ export async function GET(request: Request) {
     if (ultimoDiaEnviado) await marcarAvisoTrialEnviado(admin, teste.company_id, "ultimoDia");
   }
 
+  logDispatchEnd(ROTA, startedAt, { processados: testes.length, sucesso: enviados, falha: falhas });
   return NextResponse.json({ ok: true, verificados: testes.length, enviados, falhas });
 }

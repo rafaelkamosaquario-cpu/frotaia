@@ -1,6 +1,6 @@
 # Frota IA — Infraestrutura de Produção
 
-**Atualizado em:** 2026-08-22
+**Atualizado em:** 2026-08-26 (rodada de prontidão de produção — ver seção 9)
 **Objetivo:** documentar tudo que o Frota IA Assistente usa por fora do código (contas, serviços, domínios, segredos) para funcionar em produção — e o que quebra se algum desses pontos mudar. Criado depois de um incidente real: renomear o serviço no Railway mudou o domínio público e derrubou o login (ver seção 6).
 
 ## 1. Visão geral
@@ -29,12 +29,14 @@ Um único serviço Next.js atende os dois canais (WhatsApp e painel web) e é a 
 | `frotaia-alertas-cron` | a cada 5 min | `/api/alerts/dispatch` | `ALERTS_DISPATCH_SECRET` |
 | `frotaia-noticias-cron` | 1x/dia, 10:00 UTC (07:00 Brasília) | `/api/news/dispatch` | `NEWS_DISPATCH_SECRET` |
 | `frotaia-trial-avisos-cron` | 1x/dia, 12:00 UTC (09:00 Brasília) | `/api/subscriptions/trial-warnings/dispatch` | `TRIAL_WARNINGS_DISPATCH_SECRET` |
+| `frotaia-checklist-cron` | a cada 15 min | `/api/checklists/dispatch` | `CHECKLIST_DISPATCH_SECRET` |
+| `frotaia-freight-expire-cron` | de hora em hora | `/api/freight/expire-dispatch` | `FREIGHT_EXPIRE_DISPATCH_SECRET` |
+
+  **Os 2 últimos foram ativados em 2026-08-26** (rodada de prontidão de produção) — antes existiam só no código, sem nenhum agendamento real no Railway. Checklist precisa de intervalo curto porque cada empresa tem seu próprio horário configurado de envio (`company_preferences.checklist_send_hour`), não é 1x/dia fixo; freight-expire não tem urgência (é só limpeza de status vencido), hora em hora é suficiente.
 
   Cada cron é um serviço Railway **separado** do principal — logo tem sua **própria cópia** das variáveis de ambiente. O mesmo segredo (ex.: `NEWS_DISPATCH_SECRET`) precisa ter o **valor idêntico** no serviço principal (que valida) e no serviço de cron (que envia) — já causou 401 por dessincronia mais de uma vez (ver histórico em `docs/FROTA_IA_CRONS_AUTOMACOES.md`).
 
-  **Atenção**: o comando de cada cron (`curl ... https://<domínio>/api/...`) tem o domínio **fixo dentro do comando** (`startCommand` do serviço, configurado manualmente no Railway) — não é lido de `APP_URL`. Em 2026-08-22, renomear o serviço principal quebrou os 3 crons ao mesmo tempo, porque todos apontavam pro domínio antigo (`frota-ia-assistente-production.up.railway.app`), já desativado. Corrigido apontando os 3 para `frotaia.up.railway.app`. **Sempre que o domínio público mudar, os 3 `startCommand` de cron precisam ser atualizados manualmente também** — não é automático.
-
-  Existe um 4º endpoint de dispatch, `/api/freight/expire-dispatch` (Radar de Fretes), documentado em `.env.example` mas **sem cron configurado no Railway ainda** — pendência aberta.
+  **Atenção**: o comando de cada cron (`curl ... https://<domínio>/api/...`) tem o domínio **fixo dentro do comando** (`startCommand` do serviço, configurado manualmente no Railway) — não é lido de `APP_URL`. Em 2026-08-22, renomear o serviço principal quebrou os 3 crons ao mesmo tempo, porque todos apontavam pro domínio antigo (`frota-ia-assistente-production.up.railway.app`), já desativado. Corrigido apontando os 3 para `frotaia.up.railway.app`. **Sempre que o domínio público mudar, os 5 `startCommand` de cron precisam ser atualizados manualmente também** — não é automático.
 
 ### Domínios do serviço principal (checado em 2026-08-22)
 
@@ -84,8 +86,9 @@ Nomes conferidos no serviço principal em 2026-08-22 (valores não são lidos po
 - **Supabase**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`
 - **Google**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALENDAR_REDIRECT_URI`, `GOOGLE_CALENDAR_ENCRYPTION_KEY`, `GOOGLE_MAPS_API_KEY`
 - **WhatsApp**: `ZAPI_INSTANCE_ID`, `ZAPI_INSTANCE_TOKEN`, `ZAPI_CLIENT_TOKEN`, `WHATSAPP_WEBHOOK_SECRET`
-- **Crons/dispatch**: `ALERTS_DISPATCH_SECRET`, `NEWS_DISPATCH_SECRET`, `TRIAL_WARNINGS_DISPATCH_SECRET` (+ `CHECKLIST_DISPATCH_SECRET`, `FREIGHT_EXPIRE_DISPATCH_SECRET` — dispatch de checklist e radar de fretes, ver `docs/FROTA_IA_CRONS_AUTOMACOES.md`)
+- **Crons/dispatch**: `ALERTS_DISPATCH_SECRET`, `NEWS_DISPATCH_SECRET`, `TRIAL_WARNINGS_DISPATCH_SECRET`, `CHECKLIST_DISPATCH_SECRET`, `FREIGHT_EXPIRE_DISPATCH_SECRET` (todos os 5 crons ativos desde 2026-08-26, ver seção 2 e `docs/FROTA_IA_CRONS_AUTOMACOES.md`)
 - **Pagamento**: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET`
+- **Observabilidade** (opcional — ver seção 9): `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`
 - **App**: `APP_URL`, `CUSTOMER_PANEL_ENABLED`, `ADMIN_PANEL_ENABLED`
 - **Auto-geradas pelo Railway** (não mexer): `RAILWAY_PUBLIC_DOMAIN`, `RAILWAY_PRIVATE_DOMAIN`, `RAILWAY_STATIC_URL`, `RAILWAY_PROJECT_ID`, `RAILWAY_SERVICE_ID`, etc.
 
@@ -97,4 +100,20 @@ Descrição completa de cada uma (o que é, onde pegar, como gerar) está em `.e
 - Google Calendar (OAuth, Vault): `docs/camada-4-google-calendar.md`
 - WhatsApp/Z-API: `docs/camada-5-whatsapp-zapi.md`
 - V1 centrada no WhatsApp, feature flags do painel: `docs/camada-6-whatsapp-v1.md`
-- Auditoria detalhada dos 4 crons (autenticação, idempotência, riscos): `docs/FROTA_IA_CRONS_AUTOMACOES.md`
+- Auditoria detalhada dos 5 crons (autenticação, idempotência, riscos): `docs/FROTA_IA_CRONS_AUTOMACOES.md`
+
+## 9. Prontidão de produção (2026-08-26) — observabilidade, health check, crons ativados
+
+Rodada específica de estabilização antes do piloto com clientes reais, sem nenhuma mudança de produto/comercial. Resumo do que mudou:
+
+- **Os 2 crons que faltavam (checklist, freight-expire) foram ativados** — ver seção 2. `CHECKLIST_DISPATCH_SECRET` e `FREIGHT_EXPIRE_DISPATCH_SECRET` gerados e configurados tanto no serviço principal quanto nos respectivos serviços de cron.
+- **Correção de "registro fantasma" no checklist**: se o envio pelo WhatsApp falhasse depois do `checklist_dispatches` já ter sido gravado, o motorista ficava sem checklist pelo resto do dia (a query de elegibilidade já contava aquele registro como "enviado hoje"). Agora, se o envio falhar de verdade, o registro é desfeito (`deleteChecklistDispatch`), devolvendo o motorista à fila do próximo cron (até 15 min depois).
+- **Observabilidade mínima**: `@sentry/nextjs` instalado e configurado (`sentry.server.config.ts`, `sentry.edge.config.ts`, `src/instrumentation.ts`, `next.config.ts` com `withSentryConfig`) — tudo condicional a `SENTRY_DSN` estar configurado (sem essa variável, vira no-op seguro, nada quebra). Módulo `src/lib/observability/logger.ts` centraliza log estruturado (JSON de 1 linha, buscável nos logs do Railway) + `captureError`, usado nas rotas de maior risco: webhook WhatsApp, webhook Mercado Pago, os 5 dispatch, `/api/chat`. Nunca loga secrets/tokens/payload financeiro — o webhook do Mercado Pago em particular nunca passa o `body` bruto da notificação pro tracker.
+  - **`SENTRY_DSN` ainda não está configurado em produção** — é preciso criar um projeto em sentry.io e colar o DSN como variável no Railway pra error tracking passar a funcionar de verdade. Até lá, os logs estruturados em JSON já ficam nos logs do Railway (buscáveis por `event`/`route`), só sem o painel do Sentry.
+- **Health check real** (`/api/health`) — confirma app de pé + banco respondendo (`select count` mínimo em `companies`), nunca chama Anthropic nem Z-API. Configurado como `healthcheckPath` do serviço principal no Railway (timeout 30s).
+- **Timeout explícito na Anthropic**: `createAnthropicClient` agora define `timeout: 90_000` (90s por chamada) — o padrão do SDK é 10 minutos, longo demais pra um webhook de chat interativo. `maxRetries` foi deixado no padrão do SDK (2 tentativas) de propósito: o SDK já retry 429/5xx corretamente, incluindo respeitar `retry-after`/`retry-after-ms` — reimplementar isso na aplicação seria redundante.
+- **Retry no envio Z-API — avaliado e descartado**: não existe mecanismo de idempotência no lado de saída (diferente do lado de entrada, que já deduplica por `external_message_id`) — um retry depois de um erro de rede não consegue distinguir "nunca chegou no Z-API" de "chegou e foi enviado, só a resposta se perdeu". Implementar retry aqui arriscaria duplicar mensagem de verdade pro cliente. Mantido como está (best-effort, sem retry).
+- **Z-API — throughput real**: sem limite numérico documentado publicamente (a própria Z-API afirma "sem limite de mensagens enviadas", vinculando o comportamento seguro às políticas do WhatsApp Web em si, não a um número deles). Achado novo: a Z-API **tem sim webhooks de status de entrega/leitura** (`SENT`/`RECEIVED`/`READ`/`READ_BY_ME`/`PLAYED`, endpoint `on-whatsapp-message-status-changes`) — o Frota IA hoje não está inscrito nesse webhook nem processa esses eventos, então a ausência de "confirmação de leitura" documentada em auditorias anteriores é uma limitação de implementação atual, não do fornecedor. Registrado como possível item de roadmap, não implementado nesta rodada (fora do escopo pedido).
+- **Anthropic — tier/RPM/TPM**: não confirmável pelo repositório (precisa consultar console.anthropic.com → Settings → Limits com acesso à conta).
+
+**Fonte completa desta rodada**: relatório entregue no chat em 2026-08-26 e testes automatizados novos (`src/app/api/health/route.test.ts`, `src/lib/anthropic/client.test.ts`).

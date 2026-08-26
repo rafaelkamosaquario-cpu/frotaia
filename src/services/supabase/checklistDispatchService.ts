@@ -131,6 +131,20 @@ export async function createChecklistDispatch(client: SupabaseDbClient, input: C
 }
 
 /**
+ * Compensação pro caso de "registro fantasma" (prontidão de produção,
+ * 08/2026): o dispatch é gravado ANTES do envio pelo WhatsApp (de propósito
+ * — garante que uma resposta rápida demais do motorista já encontre o
+ * registro `pendente`). Se o envio falhar de verdade, `listDriversDueForChecklist`
+ * passaria a ignorar esse motorista pelo resto do dia (já tem dispatch
+ * "hoje"), mesmo sem ele ter recebido nada. Chamado só nesse caminho de
+ * falha, pra devolver o motorista à fila de elegíveis do próximo cron.
+ */
+export async function deleteChecklistDispatch(client: SupabaseDbClient, dispatchId: string): Promise<void> {
+  const { error } = await client.from("checklist_dispatches").delete().eq("id", dispatchId);
+  if (error) throw error;
+}
+
+/**
  * Acha o checklist pendente mais recente de um motorista pelo telefone —
  * usado pelo webhook do WhatsApp pra saber se a mensagem que chegou é
  * resposta de checklist, antes de tentar resolver como usuário/onboarding

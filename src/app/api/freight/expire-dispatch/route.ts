@@ -3,6 +3,9 @@ import { timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { expireOverdueRadars } from "@/services/supabase/freightRadarService";
 import { expireOverdueOpportunities } from "@/services/supabase/freightOpportunityService";
+import { logDispatchStart, logDispatchEnd, captureError } from "@/lib/observability/logger";
+
+const ROTA = "/api/freight/expire-dispatch";
 
 /**
  * Radar de Fretes (MVP) — job de expiração (etapa 33 da spec): só marca
@@ -31,10 +34,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Token inválido." }, { status: 401 });
   }
 
+  const startedAt = logDispatchStart(ROTA);
   const admin = createAdminClient();
-  const radaresExpirados = await expireOverdueRadars(admin);
-  const oportunidadesExpiradas = await expireOverdueOpportunities(admin);
 
-  console.log(`[freight-radar] estagio=expiracao radares=${radaresExpirados} oportunidades=${oportunidadesExpiradas}`);
-  return NextResponse.json({ ok: true, radaresExpirados, oportunidadesExpiradas });
+  try {
+    const radaresExpirados = await expireOverdueRadars(admin);
+    const oportunidadesExpiradas = await expireOverdueOpportunities(admin);
+
+    logDispatchEnd(ROTA, startedAt, { processados: radaresExpirados + oportunidadesExpiradas, sucesso: radaresExpirados + oportunidadesExpiradas, falha: 0 });
+    return NextResponse.json({ ok: true, radaresExpirados, oportunidadesExpiradas });
+  } catch (erro) {
+    captureError({ event: "freight_expire_dispatch_falhou", route: ROTA, error: erro });
+    logDispatchEnd(ROTA, startedAt, { processados: 0, sucesso: 0, falha: 1 });
+    return NextResponse.json({ error: "Falha ao expirar radares/oportunidades." }, { status: 500 });
+  }
 }

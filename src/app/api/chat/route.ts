@@ -5,6 +5,9 @@ import { AnthropicConfigError } from "@/lib/anthropic/client";
 import { loadCustomerContext, loadVehicleContext } from "@/ai/context/customerContext";
 import { getConversationById, getOrCreateOpenConversation } from "@/services/supabase/conversationService";
 import { gerarRespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
+import { captureError } from "@/lib/observability/logger";
+
+const ROTA = "/api/chat";
 
 /** Mesmo conjunto aceito pelo webhook do WhatsApp (ver TIPOS_IMAGEM_SUPORTADOS em src/app/api/whatsapp/webhook/route.ts). */
 const TIPOS_IMAGEM_SUPORTADOS = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -91,6 +94,7 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
+    captureError({ event: "chat_resposta_ia_falhou", route: ROTA, company_id: companyId, conversation_id: conversation.id, error: err });
     return NextResponse.json({ error: "Não foi possível obter resposta da IA agora. Tente novamente." }, { status: 502 });
   }
 }

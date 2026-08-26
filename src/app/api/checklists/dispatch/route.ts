@@ -6,10 +6,14 @@ import { isWhatsappConfigured } from "@/lib/whatsapp/config";
 import {
   listDriversDueForChecklist,
   createChecklistDispatch,
+  deleteChecklistDispatch,
   listChecklistItemKeysByCompany,
   CHECKLIST_ITEM_LABELS,
 } from "@/services/supabase/checklistDispatchService";
 import { getVehicle } from "@/services/supabase/vehicleService";
+import { logDispatchStart, logDispatchEnd, captureError } from "@/lib/observability/logger";
+
+const ROTA = "/api/checklists/dispatch";
 
 /**
  * Job de disparo do checklist diário (Fase 6 do plano de unificação V1+V2,
@@ -53,6 +57,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "WhatsApp não configurado." }, { status: 503 });
   }
 
+  const startedAt = logDispatchStart(ROTA);
   const admin = createAdminClient();
   const motoristas = await listDriversDueForChecklist(admin);
   const itemKeysPorEmpresa = await listChecklistItemKeysByCompany(admin, [...new Set(motoristas.map((m) => m.company_id))]);
@@ -63,24 +68,34 @@ export async function GET(request: Request) {
   for (const motorista of motoristas) {
     if (!motorista.vehicle_id || !motorista.phone_e164) continue;
 
+    let dispatchId: string | null = null;
     try {
       const veiculo = await getVehicle(admin, motorista.vehicle_id);
       const nomeVeiculo = veiculo ? veiculo.name || veiculo.plate || "veículo" : "veículo";
       const itemKeys = itemKeysPorEmpresa.get(motorista.company_id) ?? ["oleo", "agua", "pneus", "luzes"];
 
-      await createChecklistDispatch(admin, {
+      const dispatch = await createChecklistDispatch(admin, {
         companyId: motorista.company_id,
         driverId: motorista.id,
         vehicleId: motorista.vehicle_id,
       });
+      dispatchId = dispatch.id;
 
       await sendWhatsappText(motorista.phone_e164, montarTextoChecklist(nomeVeiculo, itemKeys));
       enviados += 1;
     } catch (erro) {
-      console.error(`[checklist-dispatch] falha ao enviar para motorista ${motorista.id}:`, erro);
+      // Registro fantasma: se o dispatch já foi criado mas o envio falhou de verdade, desfaz — senão o
+      // motorista fica marcado como "já recebeu hoje" e nunca mais é tentado até amanhã (ver checklistDispatchService.ts).
+      if (dispatchId) {
+        await deleteChecklistDispatch(admin, dispatchId).catch((erroRollback) => {
+          captureError({ event: "checklist_dispatch_rollback_falhou", route: ROTA, company_id: motorista.company_id, driver_id: motorista.id, error: erroRollback });
+        });
+      }
+      captureError({ event: "checklist_dispatch_falhou", route: ROTA, company_id: motorista.company_id, driver_id: motorista.id, error: erro });
       falhas += 1;
     }
   }
 
+  logDispatchEnd(ROTA, startedAt, { processados: motoristas.length, sucesso: enviados, falha: falhas });
   return NextResponse.json({ ok: true, elegiveis: motoristas.length, enviados, falhas });
 }

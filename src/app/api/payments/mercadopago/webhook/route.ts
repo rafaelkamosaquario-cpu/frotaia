@@ -8,6 +8,9 @@ import {
   registrarEventoPagamento,
   eventoPagamentoJaProcessado,
 } from "@/services/supabase/subscriptionService";
+import { captureError } from "@/lib/observability/logger";
+
+const ROTA = "/api/payments/mercadopago/webhook";
 
 /**
  * Webhook do Mercado Pago (Fase 2 do fluxo de pagamento). Nunca confia no
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
 
   const secret = getMercadoPagoWebhookSecret();
   if (!secret) {
-    console.error("[mercadopago-webhook] MERCADOPAGO_WEBHOOK_SECRET não configurado — notificação rejeitada.");
+    captureError({ event: "mercadopago_webhook_sem_secret", route: ROTA, error: new Error("MERCADOPAGO_WEBHOOK_SECRET não configurado") });
     return NextResponse.json({ error: "Webhook não configurado." }, { status: 503 });
   }
 
@@ -51,7 +54,8 @@ export async function POST(request: Request) {
 
   const assinaturaValida = validarAssinaturaWebhook({ xSignature, xRequestId, dataIdQueryParam, secret });
   if (!assinaturaValida) {
-    console.error("[mercadopago-webhook] assinatura HMAC inválida — notificação rejeitada.");
+    // Nunca loga x-signature/segredo — só o fato de ter sido rejeitada.
+    captureError({ event: "mercadopago_assinatura_invalida", route: ROTA, error: new Error("HMAC do webhook do Mercado Pago não bateu") });
     return NextResponse.json({ error: "Assinatura inválida." }, { status: 401 });
   }
 
@@ -139,10 +143,11 @@ export async function POST(request: Request) {
       }
     }
   } catch (erro) {
-    console.error("[mercadopago-webhook] falha processando notificação:", erro instanceof Error ? erro.message : JSON.stringify(erro));
+    // Nunca passa `body` (payload bruto do MP, pode conter dado de pagador) pro tracker — só IDs técnicos e a mensagem do erro (buscarPagamento/buscarAssinatura já nunca incluem o corpo da resposta na mensagem, ver parseErrorSafely em client.ts).
+    captureError({ event: "mercadopago_webhook_falhou", route: ROTA, resource_id: resourceId, tipo, error: erro });
     // Responde 200 mesmo assim: erro nosso (ex.: Supabase fora do ar) não deve fazer o
     // Mercado Pago reenviar em loop indefinido — o registro em payment_events (se chegou
-    // a acontecer) e o log acima já dão o que precisa pra investigar depois.
+    // a acontecer) e o evento acima já dão o que precisa pra investigar depois.
   }
 
   return NextResponse.json({ ok: true });
