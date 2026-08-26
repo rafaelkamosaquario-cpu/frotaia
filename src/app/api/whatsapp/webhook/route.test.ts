@@ -348,3 +348,149 @@ describe("Guia de Primeiros Passos V1 — dispatch no webhook do WhatsApp (08/20
     expect(resposta.status).toBe(200);
   });
 });
+
+describe("Guia V1 — oferta automática exige isAccessAllowed (validação 08/2026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
+    loadVehicleContext.mockResolvedValue({ vehicle: null, costProfile: null, tireProfiles: [], insuranceExpiryDate: null, licensingExpiryDate: null });
+    getOrCreateOpenConversation.mockResolvedValue({ id: "conv-1" });
+    appendMessage.mockResolvedValue(undefined);
+    sendWhatsappText.mockResolvedValue(undefined);
+    sendWhatsappOptionList.mockResolvedValue(undefined);
+    saveGuideState.mockResolvedValue(undefined);
+    markGuideOffered.mockResolvedValue(undefined);
+    getGuideState.mockResolvedValue({ status: "not_started", step: null, offeredAt: null });
+    finalizeOnboarding.mockResolvedValue({ id: EMPRESA });
+  });
+
+  function finalizarOnboarding() {
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_consumption", collected_data: { name: "Rafael" } });
+    processOnboardingMessage.mockReturnValue({
+      nextState: "completed",
+      collectedData: { name: "Rafael" },
+      finalize: true,
+      reply: { kind: "text", text: "ok" },
+    });
+    return chamarWebhook(mensagemTexto("2.8"))();
+  }
+
+  const FUTURO = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const PASSADO = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  it("1. cliente novo com trial válido — guia oferecido", async () => {
+    getSubscription.mockResolvedValue({ status: "TRIAL", valido_ate: FUTURO, fleet_panel_included: false });
+    await finalizarOnboarding();
+    expect(markGuideOffered).toHaveBeenCalledWith(expect.anything(), EMPRESA, "v1");
+  });
+
+  it("2. cliente pago (assinatura ATIVA recorrente) — guia oferecido", async () => {
+    getSubscription.mockResolvedValue({ status: "ATIVA", valido_ate: null, fleet_panel_included: false });
+    await finalizarOnboarding();
+    expect(markGuideOffered).toHaveBeenCalled();
+  });
+
+  it("4. cliente sem assinatura nenhuma (null) — guia NÃO oferecido", async () => {
+    getSubscription.mockResolvedValue(null);
+    await finalizarOnboarding();
+    expect(markGuideOffered).not.toHaveBeenCalled();
+    expect(sendWhatsappOptionList).not.toHaveBeenCalledWith("+5541999998888", expect.stringContaining("guia rápido"), expect.anything(), expect.anything(), expect.anything());
+  });
+
+  it("5. trial expirado (valido_ate no passado) — guia NÃO oferecido", async () => {
+    getSubscription.mockResolvedValue({ status: "TRIAL", valido_ate: PASSADO, fleet_panel_included: false });
+    await finalizarOnboarding();
+    expect(markGuideOffered).not.toHaveBeenCalled();
+  });
+
+  it("6. telefone já usou trial antes (criarAssinaturaTeste grava EXPIRADA na hora) — guia NÃO oferecido", async () => {
+    getSubscription.mockResolvedValue({ status: "EXPIRADA", valido_ate: PASSADO, fleet_panel_included: false });
+    await finalizarOnboarding();
+    expect(markGuideOffered).not.toHaveBeenCalled();
+  });
+
+  it("7. assinatura CANCELADA — guia NÃO oferecido", async () => {
+    getSubscription.mockResolvedValue({ status: "CANCELADA", valido_ate: null, fleet_panel_included: false });
+    await finalizarOnboarding();
+    expect(markGuideOffered).not.toHaveBeenCalled();
+  });
+
+  it("8. assinatura EXPIRADA — guia NÃO oferecido", async () => {
+    getSubscription.mockResolvedValue({ status: "EXPIRADA", valido_ate: null, fleet_panel_included: false });
+    await finalizarOnboarding();
+    expect(markGuideOffered).not.toHaveBeenCalled();
+  });
+
+  it("9. assinatura INADIMPLENTE — guia NÃO oferecido", async () => {
+    getSubscription.mockResolvedValue({ status: "INADIMPLENTE", valido_ate: null, fleet_panel_included: false });
+    await finalizarOnboarding();
+    expect(markGuideOffered).not.toHaveBeenCalled();
+  });
+
+  it("10. guia já dispensado (offeredAt já preenchido) — nunca reoferece, mesmo com acesso válido", async () => {
+    getSubscription.mockResolvedValue({ status: "ATIVA", valido_ate: null, fleet_panel_included: false });
+    getGuideState.mockResolvedValue({ status: "dismissed", step: null, offeredAt: "2026-08-01T00:00:00.000Z" });
+    await finalizarOnboarding();
+    expect(markGuideOffered).not.toHaveBeenCalled();
+  });
+
+  it("sem acesso válido: cadastro conclui normalmente mesmo assim (o guia é o único bloqueado, nunca o onboarding)", async () => {
+    getSubscription.mockResolvedValue(null);
+    const resposta = await finalizarOnboarding();
+    expect(resposta.status).toBe(200);
+    expect(finalizeOnboarding).toHaveBeenCalled();
+  });
+});
+
+describe("Guia V1 — interação manual/em andamento também exige isAccessAllowed (validação 08/2026)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "completed", collected_data: {} });
+    loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
+    loadVehicleContext.mockResolvedValue({ vehicle: null, costProfile: null, tireProfiles: [], insuranceExpiryDate: null, licensingExpiryDate: null });
+    getOrCreateOpenConversation.mockResolvedValue({ id: "conv-1" });
+    appendMessage.mockResolvedValue(undefined);
+    sendWhatsappText.mockResolvedValue(undefined);
+    sendWhatsappOptionList.mockResolvedValue(undefined);
+    saveGuideState.mockResolvedValue(undefined);
+    findPendingChecklistDispatchByPhone.mockResolvedValue(null);
+  });
+
+  it("guia em andamento + assinatura vencida: 'Próximo' NÃO avança o passo (sem acesso, o toque não tem efeito nenhum no guia)", async () => {
+    getGuideState.mockResolvedValue({ status: "in_progress", step: "veiculo", offeredAt: "x" });
+    getSubscription.mockResolvedValue({ status: "EXPIRADA", valido_ate: null, fleet_panel_included: false });
+
+    const resposta = await chamarWebhook(mensagemLista("guide_v1_next"))();
+
+    expect(resposta.status).toBe(200);
+    expect(saveGuideState).not.toHaveBeenCalled();
+    expect(gerarRespostaAssistente).not.toHaveBeenCalled();
+  });
+
+  it("comando manual ('primeiros passos') + assinatura vencida: NÃO reabre o guia, cai no gate normal de assinatura", async () => {
+    getGuideState.mockResolvedValue({ status: "dismissed", step: null, offeredAt: "x" });
+    getSubscription.mockResolvedValue({ status: "CANCELADA", valido_ate: null, fleet_panel_included: false });
+
+    await chamarWebhook(mensagemTexto("primeiros passos"))();
+
+    expect(sendWhatsappOptionList).not.toHaveBeenCalledWith(
+      "+5541999998888",
+      expect.stringContaining("guia rápido"),
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("teste gratuito"));
+  });
+
+  it("comando manual funciona normalmente quando o cliente TEM acesso válido (não regrediu)", async () => {
+    getGuideState.mockResolvedValue({ status: "dismissed", step: null, offeredAt: "x" });
+    getSubscription.mockResolvedValue({ status: "ATIVA", valido_ate: null, fleet_panel_included: false });
+
+    await chamarWebhook(mensagemTexto("primeiros passos"))();
+
+    expect(sendWhatsappOptionList).toHaveBeenCalled();
+  });
+});

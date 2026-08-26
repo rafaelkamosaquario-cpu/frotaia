@@ -93,3 +93,17 @@ Confirmado nos 4: o código trata sucesso da chamada HTTP ao Z-API como "enviado
 | 9 | Nenhuma configuração de cron versionada no repositório | Todos os 4 | Informativo — depende de configuração manual no Railway, fora do controle de versão |
 
 Nenhum item acima foi corrigido — aguardando decisão sobre quais valem a pena implementar.
+
+---
+
+## 2026-08-26 — Causa raiz do 401 intermitente (investigado com evidência, corrigido)
+
+Achado numa rodada de validação do Guia de Primeiros Passos: os 6 crons (4 originais + `frotaia-checklist-cron`/`frotaia-freight-expire-cron`, ativados em 26/08, + `frotaia-mp-reconcile-cron`, criado em 26/08) apresentavam 401 ("Token inválido") de forma intermitente — às vezes sucesso, às vezes falha, no MESMO cron, sem qualquer alteração no secret.
+
+**Investigação** (via `railway-agent`, cruzando histórico de deploy do serviço principal com os horários exatos de cada falha 401 registrada nos logs HTTP): todas as falhas caem dentro de uma janela de poucos segundos logo após um redeploy do serviço principal (`frota-ia-assistente`) — especificamente durante a fase `DRAIN_INSTANCES` do rolling deploy do Railway, quando a instância antiga do container ainda responde a requisições por 1 a poucos segundos enquanto a nova já está no ar. Não há múltiplas réplicas simultâneas nem dessincronia real de secret entre os serviços — é uma corrida de poucos segundos inerente ao próprio mecanismo de rolling deploy do Railway, não um erro de configuração deste projeto.
+
+**Por que intermitente**: só falha quando o tick do cron coincide, por acaso, com essa janela de troca — o que acontecia com mais frequência nesta sessão porque o serviço principal foi redeployado várias vezes seguidas (vários pushes de código no mesmo dia).
+
+**Correção aplicada**: `--retry 3 --retry-delay 2 --retry-all-errors` adicionado ao `curl` de todos os 6 `startCommand` (mesma técnica em todos, nenhuma mudança de arquitetura, nenhuma fila/worker) — `--retry-all-errors` é necessário porque o `--retry` padrão do curl não reconta em HTTP 401 por padrão, só em erros "transitórios" (timeout, alguns 5xx). Também padronizado o wrapper `sh -c '...'` nos 2 crons que não tinham (`frotaia-noticias-cron`, `frotaia-trial-avisos-cron`) — não era a causa raiz, mas ficou inconsistente com os outros 4 sem necessidade.
+
+**Validação**: 12/12 execuções bem-sucedidas (2 rodadas de 6 crons cada, com intervalo, via redeploy manual de cada serviço de cron).
