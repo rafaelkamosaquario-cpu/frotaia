@@ -183,6 +183,24 @@ export async function buscarAssinatura(preapprovalId: string): Promise<Assinatur
   return { status: body.status, externalReference: body.external_reference };
 }
 
+/**
+ * Cancela uma assinatura recorrente (preapproval) — fechamento de troca de
+ * plano (08/2026). API confirmada: `PUT /v1/preapproval/{id}` com
+ * `{status: "cancelled"}` (não é DELETE). Usada SÓ pra encerrar a
+ * assinatura ANTERIOR depois que a NOVA já está confirmada ativa no banco —
+ * nunca antes, pra nunca deixar o cliente sem acesso entre as duas etapas.
+ * Idempotente do lado do Mercado Pago: cancelar uma assinatura já cancelada
+ * não é tratado como erro grave aqui — quem chama decide como reagir.
+ */
+export async function cancelarAssinatura(preapprovalId: string): Promise<void> {
+  const response = await fetch(`${MP_API_BASE}/v1/preapproval/${encodeURIComponent(preapprovalId)}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ status: "cancelled" }),
+  });
+  if (!response.ok) return parseErrorSafely(response);
+}
+
 export interface ValidarWebhookInput {
   xSignature: string | null;
   xRequestId: string | null;

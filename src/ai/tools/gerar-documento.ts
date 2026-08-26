@@ -7,6 +7,7 @@ import { recordGeneratedDocument } from "@/services/supabase/generatedDocumentSe
 import { getProfile } from "@/services/supabase/profileService";
 import { getCompany } from "@/services/supabase/companyService";
 import { getVehicle } from "@/services/supabase/vehicleService";
+import { buildGeneratedDocumentStoragePath, uploadGeneratedDocumentFile } from "@/lib/storage/generatedDocumentsStorage";
 
 /**
  * Ferramenta: gerar_documento
@@ -127,6 +128,19 @@ async function executar(entrada: GerarDocumentoEntrada): Promise<GerarDocumentoR
 
     await sendWhatsappPdf(canalWhatsapp.phone_e164, pdfBytes, nomeArquivo);
 
+    // Persiste o PDF no Storage pra aparecer no histórico do Painel depois
+    // (fechamento de coerência 08/2026 — antes só o WhatsApp tinha o
+    // arquivo, sem jeito de recuperar). Best-effort: falha no upload nunca
+    // desfaz o envio já feito, só fica sem "baixar de novo" no Painel.
+    let storagePath: string | undefined;
+    try {
+      storagePath = buildGeneratedDocumentStoragePath(companyId, nomeArquivo);
+      await uploadGeneratedDocumentFile(admin, storagePath, pdfBytes);
+    } catch (erroUpload) {
+      storagePath = undefined;
+      console.error(`[gerar-documento] Falha ao persistir o PDF no Storage (documento já foi enviado por WhatsApp normalmente): ${erroUpload instanceof Error ? erroUpload.message : String(erroUpload)}`);
+    }
+
     const registro = await recordGeneratedDocument(admin, {
       companyId,
       userId,
@@ -136,6 +150,7 @@ async function executar(entrada: GerarDocumentoEntrada): Promise<GerarDocumentoR
       title: tituloFinal,
       fileName: nomeArquivo,
       delivered: true,
+      storagePath,
     });
 
     return {

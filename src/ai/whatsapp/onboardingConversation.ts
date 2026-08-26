@@ -58,6 +58,8 @@ export interface OnboardingCollectedData {
   axleCount?: number | null;
   /** true enquanto aguarda a resposta da lista de desambiguação (cavalo mecânico/carreta) — nunca persiste além do próximo turno. */
   awaitingVehicleConfigChoice?: boolean;
+  /** Rede de segurança contra loop infinito (achado real, 08/2026): conta respostas não reconhecidas na etapa de configuração (principal ou desambiguação). Depois de 2 tentativas sem sucesso, a 3ª resposta qualquer força vehicleType="outro" e segue — nunca deixa o onboarding travado pra sempre. */
+  vehicleConfigAttempts?: number;
   /** Sempre preenchido assim que a etapa é respondida (cai em "outro" quando não reconhece) — nunca fica indefinido depois de perguntado. */
   bodyType?: VehicleBodyTypeEnum;
   averageConsumptionKmL?: number;
@@ -549,22 +551,43 @@ export function processOnboardingMessage(
     }
 
     case "awaiting_vehicle_configuration": {
+      const tentativas = collectedData.vehicleConfigAttempts ?? 0;
+
       // Meio da desambiguação (cavalo mecânico/carreta): esta mensagem é a
       // escolha da lista anterior, não uma nova descrição livre.
       if (collectedData.awaitingVehicleConfigChoice) {
         const resolvido = resolverDesambiguacaoArticulado(incomingText);
         if (!resolvido) {
+          // Rede de segurança (achado real — loop sem saída): depois de 2
+          // tentativas sem reconhecer a escolha, assume "só o cavalo" (eixos
+          // indefinidos) e segue — nunca trava o onboarding pra sempre.
+          if (tentativas >= 2) {
+            const updated = {
+              ...collectedData,
+              vehicleType: "cavalo_mecanico" as VehicleTypeEnum,
+              axleCount: null,
+              awaitingVehicleConfigChoice: false,
+              vehicleConfigAttempts: 0,
+            };
+            return {
+              nextState: "awaiting_body_type",
+              reply: textReply("Sem problema — vou seguir sem definir a composição exata agora. Você pode ajustar isso depois no painel ou me contando os detalhes."),
+              collectedData: updated,
+              finalize: false,
+            };
+          }
           // Toque inválido/texto solto no meio da desambiguação: repete a
           // mesma lista, sem sair do estado (nunca conclui sem os dois campos).
           const classificacao = classificarConfiguracaoVeiculo("cavalo mecanico");
           const reply = classificacao.status === "precisa_desambiguar" ? classificacao.reply : askVehicleConfiguration();
-          return { nextState: state, reply, collectedData, finalize: false };
+          return { nextState: state, reply, collectedData: { ...collectedData, vehicleConfigAttempts: tentativas + 1 }, finalize: false };
         }
         const updated = {
           ...collectedData,
           vehicleType: resolvido.vehicleType,
           axleCount: resolvido.axleCount,
           awaitingVehicleConfigChoice: false,
+          vehicleConfigAttempts: 0,
         };
         return { nextState: "awaiting_body_type", reply: askBodyType(), collectedData: updated, finalize: false };
       }
@@ -572,19 +595,29 @@ export function processOnboardingMessage(
       const classificacao = classificarConfiguracaoVeiculo(incomingText);
 
       if (classificacao.status === "resolvido") {
-        const updated = { ...collectedData, vehicleType: classificacao.vehicleType, axleCount: classificacao.axleCount };
+        const updated = { ...collectedData, vehicleType: classificacao.vehicleType, axleCount: classificacao.axleCount, vehicleConfigAttempts: 0 };
         return { nextState: "awaiting_body_type", reply: askBodyType(), collectedData: updated, finalize: false };
       }
 
       if (classificacao.status === "precisa_desambiguar") {
-        const updated = { ...collectedData, awaitingVehicleConfigChoice: true };
+        const updated = { ...collectedData, awaitingVehicleConfigChoice: true, vehicleConfigAttempts: 0 };
         return { nextState: state, reply: classificacao.reply, collectedData: updated, finalize: false };
       }
 
-      // "nao_reconhecido": pergunta obrigatória, nunca pula — repete
-      // reformulada até classificar (ver decisão de produto: configuração
-      // do veículo é essencial demais pra deixar sem preencher).
-      return { nextState: state, reply: classificacao.reply, collectedData, finalize: false };
+      // "nao_reconhecido": pergunta obrigatória, tenta orientar/reformular
+      // até 2 vezes — mas nunca trava pra sempre (achado real: a própria
+      // opção "Outro/não sei" da lista caía aqui sem nunca resolver). Na
+      // 3ª tentativa sem sucesso, assume vehicleType="outro" e segue.
+      if (tentativas >= 2) {
+        const updated = { ...collectedData, vehicleType: "outro" as VehicleTypeEnum, axleCount: null, vehicleConfigAttempts: 0 };
+        return {
+          nextState: "awaiting_body_type",
+          reply: textReply("Sem problema — vou seguir com a configuração como \"outro\" por enquanto. Você pode ajustar isso depois no painel ou me contando os detalhes numa conversa."),
+          collectedData: updated,
+          finalize: false,
+        };
+      }
+      return { nextState: state, reply: classificacao.reply, collectedData: { ...collectedData, vehicleConfigAttempts: tentativas + 1 }, finalize: false };
     }
 
     case "awaiting_body_type": {

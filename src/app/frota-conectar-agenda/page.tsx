@@ -2,11 +2,15 @@ import { LogoMark } from "@/components/icons/Logo";
 import { Card } from "@/components/ui/Card";
 
 /**
- * Destino de quem tem acesso ao painel (fleet_panel_enabled=true) mas a
- * empresa ainda não conectou a Agenda Google — obrigatória pra usar o
- * painel (decisão do Rafael, unificação de identidade WhatsApp+Painel).
- * Fica FORA de src/app/frota (que herda o layout gated) pra não criar loop
- * de redirect — mesmo motivo de frota-indisponivel/page.tsx.
+ * Página standalone de conexão da Agenda Google — usada como destino do
+ * link "conectar agora" no resumo do onboarding do painel e na tela
+ * /frota/agenda quando desconectada. Fica FORA de src/app/frota, mesmo
+ * padrão de frota-indisponivel/page.tsx (evita herdar layout gated).
+ *
+ * Fechamento de coerência (08/2026): Google Calendar DEIXOU de ser
+ * obrigatório pra usar o painel (só a tela Agenda depende dele de
+ * verdade) — o texto abaixo reflete isso, nunca mais afirma que é
+ * requisito pro painel inteiro.
  */
 export default function ConectarAgendaPage() {
   return (
@@ -17,8 +21,8 @@ export default function ConectarAgendaPage() {
         </div>
         <h1 className="text-lg font-semibold text-foreground">Conecte sua Agenda Google</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Pra usar o painel Frota IA e manter lembretes, jornadas, manutenções e vencimentos sincronizados, conecte a
-          Agenda Google da sua empresa.
+          Pra usar a Agenda do Frota IA e manter compromissos, lembretes e vencimentos sincronizados, conecte a Agenda
+          Google da sua empresa. O resto do painel funciona normalmente sem isso.
         </p>
         <a
           href="/auth/calendar/connect"

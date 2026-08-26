@@ -16,7 +16,35 @@ const DIAS_TESTE_GRATIS = 7;
 export async function getSubscription(client: SupabaseDbClient, companyId: string): Promise<SubscriptionRow | null> {
   const { data, error } = await client.from("subscriptions").select("*").eq("company_id", companyId).maybeSingle();
   if (error) throw error;
-  return data;
+  if (!data) return null;
+  return corrigirStatusExpiradoSeNecessario(client, data);
+}
+
+/**
+ * Fechamento de coerência (08/2026): um plano ANUAL vencido ficava com
+ * `status="ATIVA"` e `valido_ate` no passado pra sempre — `isAccessAllowed`
+ * já bloqueava certo (compara a data), mas o status em si ficava
+ * semanticamente incoerente (dizia "ativa" pra uma assinatura vencida).
+ * Correção REATIVA, nunca um cron novo: na primeira leitura depois do
+ * vencimento, corrige `status` pra `EXPIRADA` — se renovar depois, o
+ * webhook já volta a gravar `ATIVA` normalmente (mesmo fluxo de sempre).
+ * Nunca mexe em plano recorrente (`valido_ate=null` é o estado normal de
+ * um plano ATIVA recorrente, nunca "vencido").
+ */
+async function corrigirStatusExpiradoSeNecessario(client: SupabaseDbClient, subscription: SubscriptionRow): Promise<SubscriptionRow> {
+  const venceu = subscription.status === "ATIVA" && !!subscription.valido_ate && new Date(subscription.valido_ate).getTime() <= Date.now();
+  if (!venceu) return subscription;
+
+  const { data: atualizado, error } = await client
+    .from("subscriptions")
+    .update({ status: "EXPIRADA" })
+    .eq("company_id", subscription.company_id)
+    .eq("status", "ATIVA") // compare-and-swap simples — nunca sobrescreve uma mudança concorrente (ex.: renovação processada entre a leitura e aqui)
+    .select("*")
+    .maybeSingle();
+
+  // Falha ao corrigir nunca quebra a leitura — isAccessAllowed já bloqueia certo pela data de qualquer forma.
+  return error || !atualizado ? subscription : atualizado;
 }
 
 /** true se a empresa tem acesso liberado agora (assinatura ativa, ou teste dentro do prazo). */

@@ -97,11 +97,25 @@ const ARTICULADOS_EXPLICITOS: Array<{ palavras: string[]; vehicleType: VehicleTy
 /** Menções só de carroceria/implemento (não são configuração de eixos) — pede esclarecimento, não trata como reconhecido. */
 const CARROCERIAS = ["bau", "graneleiro", "sider", "cacamba", "tanque", "silo", "grade baixa", "prancha"];
 
+/**
+ * "Outro / não sei" — mesma opção que já existe na lista nativa
+ * (OPCOES_CONFIG_VEICULO, onboardingConversation.ts) e no enum do banco
+ * (vehicle_type='outro'), mas que o classificador nunca reconhecia (achado
+ * real: quem tocava essa opção caía direto em "não reconhecido" e ficava
+ * preso repetindo a pergunta pra sempre — exatamente quem mais precisava
+ * dessa saída). Sempre resolve, nunca deixa o onboarding travado.
+ */
+const NAO_SEI_OU_OUTRO = ["outro", "nao sei", "num sei", "sei la", "nenhum desses", "nenhuma dessas"];
+
 export function classificarConfiguracaoVeiculo(textoBruto: string): ResultadoClassificacao {
   const t = norm(textoBruto);
 
   if (!t) {
     return { status: "nao_reconhecido", reply: perguntaNaoReconhecida() };
+  }
+
+  if (NAO_SEI_OU_OUTRO.some((p) => t.includes(norm(p)))) {
+    return { status: "resolvido", vehicleType: "outro", axleCount: null };
   }
 
   for (const item of ARTICULADOS_EXPLICITOS) {
@@ -132,9 +146,17 @@ export function classificarConfiguracaoVeiculo(textoBruto: string): ResultadoCla
   return { status: "nao_reconhecido", reply: perguntaNaoReconhecida() };
 }
 
-/** Resolve a escolha feita na lista de desambiguação (id da opção tocada). */
+/**
+ * Resolve a escolha feita na lista de desambiguação (id da opção tocada).
+ * Reconhece também "outro/não sei" (mesmo vocabulário do classificador
+ * principal) — cai como "só o cavalo" (eixos indefinidos), única opção da
+ * lista que já representa "não sei a composição completa".
+ */
 export function resolverDesambiguacaoArticulado(idOuTexto: string): ConfiguracaoResolvida | null {
   const t = norm(idOuTexto);
+  if (NAO_SEI_OU_OUTRO.some((p) => t.includes(norm(p)))) {
+    return { status: "resolvido", vehicleType: "cavalo_mecanico", axleCount: null };
+  }
   const opcao = OPCOES_ARTICULADO.find((o) => norm(o.id) === t || norm(o.title) === t);
   if (!opcao) return null;
   return { status: "resolvido", vehicleType: opcao.vehicleType, axleCount: opcao.axleCount };

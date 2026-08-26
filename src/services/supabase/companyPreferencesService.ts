@@ -105,3 +105,17 @@ export async function saveDashboardInsight(client: SupabaseDbClient, companyId: 
 
   if (error) throw error;
 }
+
+/**
+ * Grava a região de atuação informada no onboarding como dado ESTRUTURAL
+ * (fechamento de coerência 08/2026) — antes só existia em ai_memories,
+ * sujeita a sair do top-12 do prompt da IA conforme a empresa acumulasse
+ * memórias mais recentes. Garante a linha de preferências antes de
+ * atualizar (onboarding roda antes de qualquer outro código que crie essa
+ * linha lazy).
+ */
+export async function setOperatingRegion(client: SupabaseDbClient, companyId: string, region: string): Promise<void> {
+  await getOrCreatePreferences(client, companyId);
+  const { error } = await client.from("company_preferences").update({ operating_region: region }).eq("company_id", companyId);
+  if (error) throw error;
+}

@@ -105,6 +105,13 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
     linhas.push("", `Empresa: ${customer.company.name} (${customer.company.company_type}).`);
   }
 
+  // Dado estrutural (fechamento de coerência 08/2026, não memória volátil)
+  // — precisa ser injetado aqui de propósito, senão a IA nunca "vê" a
+  // região de atuação informada no onboarding.
+  if (customer.preferences?.operating_region) {
+    linhas.push(`Região de atuação informada pelo cliente: ${customer.preferences.operating_region}.`);
+  }
+
   if (vehicle.vehicle) {
     const v = vehicle.vehicle;
     const detalhes = [

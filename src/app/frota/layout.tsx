@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
-import { checkCalendarConnection } from "@/services/google/googleCalendarService";
 import { FrotaShell } from "@/components/frota/FrotaShell";
 
 /**
@@ -10,18 +9,19 @@ import { FrotaShell } from "@/components/frota/FrotaShell";
  * empresa, ver fleetPanelAccess.ts). Não usa CUSTOMER_PANEL_ENABLED nem
  * profiles.is_admin — são controles do V1, não tocados aqui.
  *
- * Google Calendar conectado é obrigatório pra usar o painel (unificação de
- * identidade WhatsApp+Painel, decisão do Rafael) — checado por empresa
- * (`checkCalendarConnection`, não mais por usuário, ver A.1). O destino
- * fica FORA de src/app/frota (frota-conectar-agenda, mesmo motivo de
- * frota-indisponivel) pra não entrar em loop de redirect com este layout.
+ * Google Calendar (fechamento de coerência, 08/2026): DEIXOU de ser
+ * requisito global pra acessar o painel — era bloqueio pra 15 das 17 telas
+ * que nunca tocam Google. Agora é contextual: só `/frota/agenda` (e o
+ * gate do próprio onboarding do painel, ver frota-ativacao) checa Calendar
+ * conectado, cada uma na própria tela. As rotas de API de agenda já
+ * tratavam "desconectado" com 409 próprio, independente deste layout.
  *
- * Onboarding 2 (Frota IA Gestão, 08/2026): depois de Calendar conectado,
- * falta só confirmar que o cliente já passou pelo wizard de ativação do
- * painel (`companies.fleet_onboarding_completed_at`) — que reaproveita a
+ * Onboarding 2 (Frota IA Gestão, 08/2026): só falta confirmar que o
+ * cliente já passou pelo wizard de ativação do painel
+ * (`companies.fleet_onboarding_completed_at`) — que reaproveita a
  * empresa/veículo já criados pelo onboarding V1 do WhatsApp, nunca
  * duplica. Fica em `/frota-ativacao` (fora de src/app/frota, mesmo motivo
- * das outras duas rotas acima).
+ * de frota-indisponivel — evitar loop de redirect com este layout).
  */
 export default async function FrotaLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -32,12 +32,6 @@ export default async function FrotaLayout({ children }: { children: React.ReactN
     if (access.reason === "no_company") redirect("/onboarding");
     redirect("/frota-indisponivel");
   }
-
-  const calendarConnected = await checkCalendarConnection(access.company.id)
-    .then((status) => status.connected)
-    .catch(() => false);
-
-  if (!calendarConnected) redirect("/frota-conectar-agenda");
 
   if (!access.company.fleet_onboarding_completed_at) redirect("/frota-ativacao");
 

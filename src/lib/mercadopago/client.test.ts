@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createHmac } from "node:crypto";
 
 vi.mock("server-only", () => ({}));
 
-const { validarAssinaturaWebhook, decodificarReferenciaExterna } = await import("./client");
+const { validarAssinaturaWebhook, decodificarReferenciaExterna, cancelarAssinatura } = await import("./client");
 
 /**
  * Cobre a lógica de validação de assinatura (manifest + HMAC-SHA256) contra
@@ -111,5 +111,50 @@ describe("decodificarReferenciaExterna", () => {
     expect(decodificarReferenciaExterna("sem-separador")).toBeNull();
     expect(decodificarReferenciaExterna("empresa-1|PLANO_INEXISTENTE")).toBeNull();
     expect(decodificarReferenciaExterna("")).toBeNull();
+  });
+});
+
+describe("cancelarAssinatura — fechamento de troca de plano (08/2026)", () => {
+  const originalToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    process.env.MERCADOPAGO_ACCESS_TOKEN = "token-de-teste";
+  });
+
+  afterEach(() => {
+    process.env.MERCADOPAGO_ACCESS_TOKEN = originalToken;
+    global.fetch = originalFetch;
+  });
+
+  it("chama PUT /v1/preapproval/{id} com status=cancelled — API real confirmada na documentação oficial do Mercado Pago", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await cancelarAssinatura("preapproval-123");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.mercadopago.com/v1/preapproval/preapproval-123",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ status: "cancelled" }),
+      })
+    );
+  });
+
+  it("lança MercadoPagoApiError sem incluir o corpo da resposta quando a API recusa (mesmo padrão de segurança das outras chamadas)", async () => {
+    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: "dado sensível de pagador" }), { status: 400 })) as unknown as typeof fetch;
+
+    await expect(cancelarAssinatura("preapproval-invalido")).rejects.toThrow("Falha na comunicação com o Mercado Pago.");
+  });
+
+  it("codifica o id na URL (nunca interpola direto — proteção contra id malformado)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await cancelarAssinatura("id com espaço/barra");
+
+    const urlChamada = fetchMock.mock.calls[0][0] as string;
+    expect(urlChamada).toBe(`https://api.mercadopago.com/v1/preapproval/${encodeURIComponent("id com espaço/barra")}`);
   });
 });

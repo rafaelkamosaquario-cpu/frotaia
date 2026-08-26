@@ -18,9 +18,11 @@ export interface RecordGeneratedDocumentInput {
   title: string;
   fileName: string;
   delivered: boolean;
+  /** Caminho no bucket privado generated-documents (fechamento 08/2026) — opcional: nulo quando o upload falhou ou não foi tentado, o registro de metadados continua valendo mesmo sem arquivo. */
+  storagePath?: string;
 }
 
-/** Só o registro do que foi gerado — nunca guarda o PDF em si (ver src/services/documents/pdfGenerator.ts). */
+/** Registro do que foi gerado — o PDF em si (quando o upload deu certo) fica no Storage, ver src/lib/storage/generatedDocumentsStorage.ts. */
 export async function recordGeneratedDocument(
   client: SupabaseDbClient,
   input: RecordGeneratedDocumentInput
@@ -36,10 +38,18 @@ export async function recordGeneratedDocument(
       title: input.title,
       file_name: input.fileName,
       delivered: input.delivered,
+      storage_path: input.storagePath,
     })
     .select("*")
     .single();
 
+  if (error) throw error;
+  return data;
+}
+
+/** Usado antes de gerar a signed URL de download — nunca confia só no id vindo da URL, sempre filtra por company_id também. */
+export async function getGeneratedDocument(client: SupabaseDbClient, documentId: string, companyId: string): Promise<GeneratedDocumentRow | null> {
+  const { data, error } = await client.from("generated_documents").select("*").eq("id", documentId).eq("company_id", companyId).maybeSingle();
   if (error) throw error;
   return data;
 }

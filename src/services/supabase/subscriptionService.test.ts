@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { isAccessAllowed, isFleetPanelAccessAllowed } from "./subscriptionService";
+import { describe, it, expect, vi } from "vitest";
+import { isAccessAllowed, isFleetPanelAccessAllowed, getSubscription } from "./subscriptionService";
 import type { SubscriptionRow } from "@/lib/supabase/tables";
+import type { SupabaseDbClient } from "./types";
 
 /**
  * Regressão do bug de valido_ate residual (08/2026): ao converter TRIAL →
@@ -62,5 +63,86 @@ describe("isAccessAllowed / isFleetPanelAccessAllowed — conversão TRIAL → r
     const foraDoPrazo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
     expect(isAccessAllowed({ ...BASE, plan: "ANUAL_PIX", status: "ATIVA", valido_ate: emDentroDoPrazo })).toBe(true);
     expect(isAccessAllowed({ ...BASE, plan: "ANUAL_PIX", status: "ATIVA", valido_ate: foraDoPrazo })).toBe(false);
+  });
+});
+
+/**
+ * Fechamento de coerência (08/2026): plano ANUAL vencido ficava com
+ * status="ATIVA" pra sempre (isAccessAllowed já bloqueava certo pela data,
+ * mas o status em si nunca refletia isso). getSubscription agora corrige
+ * isso de forma reativa (nunca um cron novo) na primeira leitura depois do
+ * vencimento — este bloco mocka o client Supabase pra cobrir esse caminho.
+ */
+function clienteMock(selecionado: SubscriptionRow | null, atualizado?: SubscriptionRow | null) {
+  const maybeSingleSelect = vi.fn().mockResolvedValue({ data: selecionado, error: null });
+  const maybeSingleUpdate = vi.fn().mockResolvedValue({ data: atualizado ?? null, error: null });
+
+  const selectChain = { eq: vi.fn(() => ({ maybeSingle: maybeSingleSelect })) };
+  const updateChain = { eq: vi.fn(() => ({ eq: vi.fn(() => ({ select: vi.fn(() => ({ maybeSingle: maybeSingleUpdate })) })) })) };
+
+  const from = vi.fn(() => ({
+    select: vi.fn(() => selectChain),
+    update: vi.fn(() => updateChain),
+  }));
+
+  return { client: { from } as unknown as SupabaseDbClient, maybeSingleUpdate };
+}
+
+describe("getSubscription — corrige status ATIVA→EXPIRADA de plano anual vencido (08/2026)", () => {
+  it("plano anual vencido (status ATIVA, valido_ate no passado) é corrigido pra EXPIRADA na leitura", async () => {
+    const vencido: SubscriptionRow = { ...BASE, plan: "ANUAL_PIX", status: "ATIVA", valido_ate: new Date(Date.now() - 86400000).toISOString() };
+    const corrigido: SubscriptionRow = { ...vencido, status: "EXPIRADA" };
+    const { client, maybeSingleUpdate } = clienteMock(vencido, corrigido);
+
+    const resultado = await getSubscription(client, "empresa-1");
+
+    expect(resultado?.status).toBe("EXPIRADA");
+    expect(maybeSingleUpdate).toHaveBeenCalled();
+  });
+
+  it("plano anual dentro do prazo (ATIVA, valido_ate no futuro) NUNCA é corrigido", async () => {
+    const emDia: SubscriptionRow = { ...BASE, plan: "ANUAL_PIX", status: "ATIVA", valido_ate: new Date(Date.now() + 86400000).toISOString() };
+    const { client, maybeSingleUpdate } = clienteMock(emDia);
+
+    const resultado = await getSubscription(client, "empresa-1");
+
+    expect(resultado?.status).toBe("ATIVA");
+    expect(maybeSingleUpdate).not.toHaveBeenCalled();
+  });
+
+  it("plano recorrente ATIVA com valido_ate=null NUNCA é tratado como vencido (regra explícita: nunca quebrar recorrente)", async () => {
+    const recorrente: SubscriptionRow = { ...BASE, plan: "GESTAO_MENSAL", status: "ATIVA", valido_ate: null };
+    const { client, maybeSingleUpdate } = clienteMock(recorrente);
+
+    const resultado = await getSubscription(client, "empresa-1");
+
+    expect(resultado?.status).toBe("ATIVA");
+    expect(maybeSingleUpdate).not.toHaveBeenCalled();
+  });
+
+  it("status já EXPIRADA/CANCELADA/INADIMPLENTE nunca dispara nova correção", async () => {
+    const jaExpirada: SubscriptionRow = { ...BASE, plan: "ANUAL_PIX", status: "EXPIRADA", valido_ate: new Date(Date.now() - 86400000).toISOString() };
+    const { client, maybeSingleUpdate } = clienteMock(jaExpirada);
+
+    const resultado = await getSubscription(client, "empresa-1");
+
+    expect(resultado?.status).toBe("EXPIRADA");
+    expect(maybeSingleUpdate).not.toHaveBeenCalled();
+  });
+
+  it("falha ao corrigir o status nunca quebra a leitura — devolve o dado original (isAccessAllowed já bloqueia certo pela data de qualquer forma)", async () => {
+    const vencido: SubscriptionRow = { ...BASE, plan: "ANUAL_PIX", status: "ATIVA", valido_ate: new Date(Date.now() - 86400000).toISOString() };
+    const { client } = clienteMock(vencido, null); // update não encontra linha (ex.: corrida concorrente) — devolve null
+
+    const resultado = await getSubscription(client, "empresa-1");
+
+    expect(resultado?.status).toBe("ATIVA"); // fallback pro dado original, nunca lança
+  });
+
+  it("empresa sem assinatura nenhuma devolve null sem tentar corrigir nada", async () => {
+    const { client, maybeSingleUpdate } = clienteMock(null);
+    const resultado = await getSubscription(client, "empresa-sem-assinatura");
+    expect(resultado).toBeNull();
+    expect(maybeSingleUpdate).not.toHaveBeenCalled();
   });
 });

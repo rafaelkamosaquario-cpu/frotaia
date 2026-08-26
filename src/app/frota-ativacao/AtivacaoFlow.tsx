@@ -53,6 +53,8 @@ interface AtivacaoFlowProps {
   motoristasIniciais: DriverRow[];
   documentos: VehicleDocumentRow[];
   preferenciasIniciais: CompanyPreferencesRow;
+  /** Google Calendar deixou de ser pré-requisito pra chegar aqui (fechamento de coerência 08/2026) — mostrado só como status no resumo, com link pra conectar se ainda não tiver. */
+  calendarConectado: boolean;
 }
 
 const TITULOS: Record<number, string> = {
@@ -63,7 +65,7 @@ const TITULOS: Record<number, string> = {
   5: "Tudo pronto",
 };
 
-export function AtivacaoFlow({ company, veiculosIniciais, motoristasIniciais, documentos, preferenciasIniciais }: AtivacaoFlowProps) {
+export function AtivacaoFlow({ company, veiculosIniciais, motoristasIniciais, documentos, preferenciasIniciais, calendarConectado }: AtivacaoFlowProps) {
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
 
@@ -391,7 +393,17 @@ export function AtivacaoFlow({ company, veiculosIniciais, motoristasIniciais, do
               </p>
               <p>
                 <span className="text-muted-foreground">Agenda Google: </span>
-                <span className="font-medium text-foreground">Conectada ✅</span>
+                {calendarConectado ? (
+                  <span className="font-medium text-foreground">Conectada ✅</span>
+                ) : (
+                  <span className="font-medium text-foreground">
+                    Não conectada —{" "}
+                    <a href="/auth/calendar/connect" className="text-primary underline">
+                      conectar agora
+                    </a>{" "}
+                    (opcional, só precisa quando for usar a Agenda)
+                  </span>
+                )}
               </p>
             </Card>
 

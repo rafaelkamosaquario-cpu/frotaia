@@ -1,16 +1,56 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isMercadoPagoConfigured, getMercadoPagoWebhookSecret } from "@/lib/mercadopago/config";
-import { validarAssinaturaWebhook, buscarPagamento, buscarAssinatura, decodificarReferenciaExterna } from "@/lib/mercadopago/client";
+import { validarAssinaturaWebhook, buscarPagamento, buscarAssinatura, decodificarReferenciaExterna, cancelarAssinatura } from "@/lib/mercadopago/client";
 import { CATALOGO_OFERTAS } from "@/lib/mercadopago/catalog";
 import {
   atualizarAssinaturaPorPagamento,
   registrarEventoPagamento,
   eventoPagamentoJaProcessado,
+  getSubscription,
 } from "@/services/supabase/subscriptionService";
 import { captureError } from "@/lib/observability/logger";
+import type { SupabaseDbClient } from "@/services/supabase/types";
 
 const ROTA = "/api/payments/mercadopago/webhook";
+
+/**
+ * Troca de plano (fechamento 08/2026) — antes NENHUM código cancelava a
+ * assinatura recorrente anterior no Mercado Pago ao trocar de plano (ex.:
+ * Individual → Gestão Mensal), e o próprio `mercadopago_subscription_id`
+ * antigo era sobrescrito pelo novo antes de qualquer cancelamento ser
+ * possível — risco real de cobrança dupla (a assinatura antiga continuava
+ * cobrando pra sempre, sem jeito de rastrear o ID depois).
+ *
+ * Ordem de segurança (nunca a inversa): SEMPRE chamado DEPOIS que a nova
+ * assinatura já está confirmada ATIVA no banco — o cliente nunca fica sem
+ * acesso entre as duas etapas. Só cancela quando `mercadopago_subscription_id`
+ * antigo existir E for DIFERENTE do recurso que acabou de ser processado
+ * (evita cancelar a própria assinatura que só mudou de status, ex.:
+ * pending→authorized). Best-effort: nunca lança — se o cancelamento
+ * falhar, a nova assinatura já está ativa (o essencial pro cliente), e o
+ * erro fica registrado pra intervenção manual.
+ */
+async function cancelarAssinaturaAnteriorSeTrocouDePlano(
+  admin: SupabaseDbClient,
+  companyId: string,
+  oldPreapprovalId: string | null | undefined,
+  novoResourceId: string
+): Promise<void> {
+  if (!oldPreapprovalId || oldPreapprovalId === novoResourceId) return;
+
+  try {
+    await cancelarAssinatura(oldPreapprovalId);
+  } catch (erro) {
+    captureError({
+      event: "mercadopago_cancelamento_assinatura_anterior_falhou",
+      route: ROTA,
+      company_id: companyId,
+      old_preapproval_id: oldPreapprovalId,
+      error: erro,
+    });
+  }
+}
 
 /**
  * Webhook do Mercado Pago (Fase 2 do fluxo de pagamento). Nunca confia no
@@ -97,6 +137,12 @@ export async function POST(request: Request) {
         pagamento.status === "approved" &&
         CATALOGO_OFERTAS[referencia.plano].cobranca === "unica"
       ) {
+        // Captura o preapproval ANTES de sobrescrever — só ele sabe se
+        // existia uma assinatura recorrente ativa (ex.: veio do MENSAL ou
+        // GESTAO_MENSAL) que agora precisa ser cancelada no MP.
+        const assinaturaAnterior = await getSubscription(admin, referencia.companyId);
+        const preapprovalAnterior = assinaturaAnterior?.mercadopago_subscription_id;
+
         await atualizarAssinaturaPorPagamento(admin, {
           companyId: referencia.companyId,
           plan: referencia.plano,
@@ -106,6 +152,9 @@ export async function POST(request: Request) {
           mercadopagoPaymentId: resourceId,
           validoAte: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         });
+
+        // Só depois da nova assinatura já confirmada ATIVA no banco.
+        await cancelarAssinaturaAnteriorSeTrocouDePlano(admin, referencia.companyId, preapprovalAnterior, resourceId);
       }
     } else if (TIPOS_ASSINATURA.has(tipo)) {
       const assinatura = await buscarAssinatura(resourceId);
@@ -126,6 +175,12 @@ export async function POST(request: Request) {
       // external_reference — corrigido pra suportar GESTAO_MENSAL também
       // (senão o upsell nunca resultaria em entitlement de painel correto).
       if (referencia && !jaProcessado && statusMapeado) {
+        // Captura o preapproval ANTERIOR antes de sobrescrever — só assim
+        // dá pra saber depois se existia uma assinatura recorrente diferente
+        // desta (troca de plano real) que precisa ser cancelada no MP.
+        const assinaturaAnterior = statusMapeado === "ATIVA" ? await getSubscription(admin, referencia.companyId) : null;
+        const preapprovalAnterior = assinaturaAnterior?.mercadopago_subscription_id;
+
         await atualizarAssinaturaPorPagamento(admin, {
           companyId: referencia.companyId,
           plan: referencia.plano,
@@ -140,6 +195,13 @@ export async function POST(request: Request) {
           // controle de expiração (isso é exclusivo dos planos anuais).
           validoAte: statusMapeado === "ATIVA" ? null : undefined,
         });
+
+        // Só quando o novo preapproval ficou ATIVA de verdade, e só depois
+        // de já estar confirmado no banco — nunca cancela a anterior por
+        // causa de um evento "pending"/"paused" desta mesma troca.
+        if (statusMapeado === "ATIVA") {
+          await cancelarAssinaturaAnteriorSeTrocouDePlano(admin, referencia.companyId, preapprovalAnterior, resourceId);
+        }
       }
     }
   } catch (erro) {

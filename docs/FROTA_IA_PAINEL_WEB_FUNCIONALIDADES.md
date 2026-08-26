@@ -26,26 +26,27 @@ O Painel Web (`/frota/*`) é a segunda interface do Frota IA — o assistente na
 ```
 PAINEL FROTA IA (/frota/*)
 │
-├── Dashboard        — indicadores e alertas, só leitura
+├── Dashboard        — indicadores e alertas, read-only por design
 ├── Veículos         — CRUD (sem exclusão real, só ativar/desativar)
 ├── Motoristas        — CRUD (sem exclusão real, só ativar/desativar)
 ├── Manutenção        — criar/editar (km e/ou data, custo vira despesa vinculada; sem exclusão)
 ├── Documentos         — criar/editar/anexar arquivo real (PDF/JPG/PNG, sem exclusão do registro)
+├── Documentos gerados   — histórico de PDFs gerados pela IA, visualizar/baixar (novo, 26/08/2026)
 ├── Despesas         — CRUD completo (único módulo com exclusão real)
-├── Checklist          — só leitura (configuração fica em Configurações)
-├── Agenda            — CRUD real, Google Calendar como fonte única de verdade
-├── Alertas            — só leitura
+├── Checklist          — read-only por design (configuração fica em Configurações; resposta é via WhatsApp)
+├── Agenda            — CRUD real quando Google conectado; conexão agora é CONTEXTUAL, não bloqueia o resto do painel (26/08/2026)
+├── Alertas            — CRUD real (manuais); alertas automáticos (manutenção/documento) só editáveis pela origem
 ├── Notícias do setor    — toggle + leitura do último resumo
 ├── Radar de Fretes (Fretes/Oportunidades) — CRUD completo
 ├── Relatórios          — leitura + filtros reais (período/veículo/motorista) + exportação em PDF
-├── Fretes (análises)    — só leitura (histórico de análises do WhatsApp)
-├── Jornadas          — só leitura (histórico de jornadas do WhatsApp)
+├── Fretes (análises)    — read-only por design (histórico de análises do WhatsApp)
+├── Jornadas          — read-only por enquanto (jornada só é salva via WhatsApp hoje)
 ├── Rotas             — CRUD real (antes só leitura)
-├── Empresa            — editar dados cadastrais
+├── Empresa            — editar dados cadastrais (nunca gestão de membros — ver seção 20)
 └── Configurações       — estilo de resposta da IA, memória da IA, config de checklist
 ```
 
-Agenda visual existe desde a Rodada 1 de evolução funcional (24/08/2026) — ver seção 11. Um widget de chat de IA (`FrotaAiWidget`) fica disponível em **todas** as telas acima (ver seção 16).
+Agenda visual existe desde a Rodada 1 de evolução funcional (24/08/2026) — ver seção 11. Um widget de chat de IA (`FrotaAiWidget`) fica disponível em **todas** as telas acima (ver seção 16). Classificação completa e atualizada de cada módulo (com a distinção entre "read-only por design" e "limitação real") está na seção 28.
 
 ---
 
@@ -500,3 +501,111 @@ Segunda rodada, focada nas duas lacunas deixadas de fora da Rodada 1 (commit `11
 **Radar de Fretes** (ver seção 12 atualizada): `freight_radar_analysis_mode` — que já tinha lógica de leitura pronta mas era impossível de mudar por qualquer superfície — agora é gravável pelo painel (`/frota/oportunidades`), sempre em linguagem simples ("Avisar primeiro" / "Analisar antes de avisar"), nunca expondo o nome do campo. A pré-análise automática do modo "Analisar antes" foi corrigida: antes calculava o resultado mas nunca refletia isso na notificação; agora a mensagem muda de verdade quando há custo/margem real, e explica quando não há dado suficiente (nunca inventa número). Nesse processo foi encontrado e corrigido um bug onde essa explicação de "dado insuficiente" nunca aparecia (condição invertida). A ação "Analisar" do painel passou a mostrar o resultado (ou a ausência dele) direto no card, e cada oportunidade ganhou a explicação em linguagem simples do porquê do score (mesmos dados da função de matching, nunca um texto inventado). A tela de Fontes deixa explícito que hoje só WhatsApp funciona — Fretebras/Truckpad continuam roadmap, sem scraping nem integração fake.
 
 Migration nova: nenhuma (a coluna `freight_radar_analysis_mode` já existia desde a v1 do Radar — só destravamos a escrita). Nenhuma migration destrutiva. Regressão completa (388 testes, typecheck, lint, build) rodada depois das duas partes, sem quebrar nenhum módulo anterior.
+
+---
+
+## 28. Rodada 3 de evolução funcional (26/08/2026) — Fechamento de onboarding, planos e coerência
+
+Terceira rodada — correções pontuais e fechamento de coerência entre Onboarding V1, dados do cliente, troca de plano no Mercado Pago e classificação do Painel. Sem mudança de preço, sem redesenho, sem nova arquitetura, sem alterar Radar/Alertas/infraestrutura desta vez.
+
+### 28.1 — Onboarding V1: loop de configuração de veículo corrigido
+
+Achado real e crítico: a opção **"Outro / não sei"** já existia na lista nativa da etapa de configuração do veículo e no enum do banco (`vehicle_type='outro'`), mas o classificador (`vehicleConfigClassifier.ts`) nunca fazia essa ponte — quem tocava "Outro" caía direto em "não reconhecido" e ficava **preso repetindo a mesma pergunta pra sempre**, exatamente quem mais precisava dessa saída. Corrigido: reconhece "outro"/"não sei"/sinônimos e resolve na hora (`vehicleType: "outro"`). Reforçado com uma rede de segurança final — depois de 2 tentativas não reconhecidas (principal ou na desambiguação cavalo/carreta), a 3ª resposta qualquer força avanço com `vehicleType="outro"` (ou "cavalo mecânico" com eixos indefinidos, na desambiguação). **O onboarding nunca mais trava indefinidamente**, mesmo pra texto totalmente sem sentido. 11 testes novos de regressão.
+
+### 28.2 — Nome do cliente/empresa: coerência sem pergunta nova
+
+A pergunta "Como posso chamar você?" gravava só em `companies.name` — `profiles.full_name` (coluna que já existia, usada por `gerar_documento` como "nome da pessoa") ficava sempre vazia pra conta criada via WhatsApp. Corrigido: a mesma resposta agora grava nos dois lugares (`finalizeOnboarding.ts`), sem pergunta adicional — funciona tanto pro autônomo (nome = identidade da operação) quanto pra transportadora (nome de quem respondeu, distinto do nome da empresa).
+
+### 28.3 — Marca/modelo/ano do veículo, estruturados sem pergunta nova
+
+`vehicles.brand`/`model`/`model_year` já existiam no schema desde a criação da tabela, mas o onboarding sempre gravava o texto livre ("Scania R450 2022") só em `name`/`notes`, deixando essas 3 colunas vazias — o mesmo veículo aparecia sem marca/modelo no Painel (`/frota/veiculos`) mesmo o cliente já tendo informado isso. Corrigido com um parser determinístico novo (`vehicleDescriptionParser.ts`, sem IA — mesmo espírito do classificador de configuração): só preenche marca/modelo/ano quando reconhece uma marca de fabricante conhecida com confiança (lista fechada, fronteira de palavra pra nunca casar "Fordson" com "Ford") — fora isso, nunca inventa, e o texto bruto continua sempre salvo em `name`/`notes` como já era. 12 testes cobrindo casos com/sem marca reconhecida.
+
+### 28.4 — Intenção inicial passa a ser lembrada
+
+"O que você quer resolver primeiro?" era usada só pra personalizar a mensagem de conclusão do onboarding e descartada — a IA nunca mais "sabia" disso depois. Agora vira uma memória de perfil (`ai_memories`, `memory_type="profile"`, `key="initial_intent"`) — contexto disponível pra IA depois, nunca um filtro rígido do que ela pode fazer. "Ver tudo" (sem intenção específica) nunca vira memória.
+
+### 28.5 — Região de atuação vira dado estrutural
+
+Achado real: `region` (Norte/Nordeste/Sudeste/Sul/etc.) ficava só em `ai_memories`, ordenada por `updated_at desc` com limite de 12 no prompt — como a região é gravada uma única vez no onboarding e nunca mais tocada, o `updated_at` dela ficava "congelado", e ela podia sair do contexto da IA assim que a empresa acumulasse 12+ memórias mais recentes de qualquer tipo. Corrigido: migration aditiva `company_preferences.operating_region` (nullable) — mesmo padrão de cidade-base (`companies.city/state`, que também é estrutural). A IA nunca mais "esquece" a região por causa de memórias mais novas; o system prompt foi ajustado pra injetar esse dado explicitamente (senão a IA nunca veria o campo).
+
+### 28.6 — Mercado Pago: cobrança dupla na troca de plano corrigida (achado crítico)
+
+A auditoria confirmou um risco real e grave: **nenhum código cancelava a assinatura recorrente anterior no Mercado Pago ao trocar de plano** (ex.: Individual → Gestão Mensal) — o `mercadopago_subscription_id` antigo era sobrescrito pelo novo antes de qualquer cancelamento ser possível, e a assinatura antiga continuava cobrando pra sempre, sem jeito de rastrear o ID depois. Corrigido no webhook (`/api/payments/mercadopago/webhook`): captura o preapproval anterior ANTES de sobrescrever, confirma a nova assinatura ativa no banco primeiro (cliente nunca fica sem acesso entre as duas etapas), e só depois cancela a anterior via `PUT /v1/preapproval/{id}` (`status: "cancelled"` — API real confirmada na documentação oficial do Mercado Pago). Nunca cancela a própria assinatura reportando mudança de status nela mesma (compara os IDs). Best-effort: falha no cancelamento nunca desfaz a ativação da nova, fica registrada pra intervenção manual. 10 cenários de teste cobrindo os 6 fluxos de troca pedidos (Individual→Gestão Mensal, Individual→Anual cartão/Pix, Gestão Mensal→Anual, renovação de anual expirado, cliente novo) mais idempotência e falha isolada.
+
+### 28.7 — Plano anual vencido vira `EXPIRADA` de verdade
+
+Achado: um plano anual vencido ficava com `status="ATIVA"` e `valido_ate` no passado pra sempre — o gate (`isAccessAllowed`) já bloqueava certo comparando a data, mas o status em si nunca refletia isso. Corrigido de forma **reativa** (sem cron novo, conforme pedido): `getSubscription` agora corrige o status pra `EXPIRADA` na primeira leitura depois do vencimento (compare-and-swap simples, nunca sobrescreve uma renovação concorrente). Nunca mexe em plano recorrente (`valido_ate=null` continua o estado normal de um `ATIVA` recorrente). Se o cliente renovar depois, o webhook volta a gravar `ATIVA` normalmente.
+
+### 28.8 — Confirmado: regra 1 cliente = 1 telefone = 1 conta
+
+Auditoria confirmou que **não existe hoje nenhum caminho alcançável pelo cliente** (painel ou IA) pra convidar um segundo humano ou vincular um segundo telefone à mesma empresa:
+- `inviteMember` (convite de membro) existe no código mas **nunca é chamado** por nenhuma rota/ferramenta — infraestrutura morta.
+- `/auth/whatsapp/connect` (vincular um 2º telefone a uma conta já existente) também existe, mas o gerador do link que o aciona (`buildWhatsappConnectLink`) **nunca é chamado** por nada — órfão.
+- `vincular_painel` (a única ferramenta ativa de vínculo de identidade) faz algo diferente: liga o login Google do painel à MESMA pessoa que já usa o WhatsApp (mesmo `user_id` numa segunda linha de `company_members` como owner) — nunca cria um segundo usuário humano.
+- `/frota/empresa` não tem nem nunca teve tela de "membros" — só edita dados cadastrais.
+
+A estrutura `company_members`/roles continua existindo internamente (necessária pro próprio vínculo WhatsApp↔Painel), **não foi removida**, só confirmado que não é oferecida ao cliente hoje.
+
+### 28.9 — Google Calendar deixa de ser requisito global do Painel
+
+Achado: o gate de `src/app/frota/layout.tsx` exigia Google Calendar conectado antes de liberar **qualquer** tela do painel — mas só a tela Agenda de fato usa Calendar (Rotas usa Google Maps, API key separada, sem OAuth). Ou seja, 15 das 17 telas do painel eram bloqueadas por uma dependência que nunca usam. Corrigido:
+- `src/app/frota/layout.tsx`: checagem de Calendar removida — só sessão, empresa, entitlement e onboarding do painel concluído continuam obrigatórios.
+- `/frota-ativacao` (onboarding do painel): não exige mais Calendar pra começar o wizard — o resumo final mostra o status real (conectada ✅ ou link pra conectar) em vez de sempre afirmar "Conectada".
+- `/frota/agenda`: passou a checar a conexão por conta própria (antes mascarava "desconectado" como "sem eventos") — mostra um convite claro pra conectar quando não há Calendar.
+- Ferramenta de IA `gerenciar_google_calendar`: já tratava isso graciosamente antes (nunca dependeu do gate do painel) — nenhuma mudança necessária, virou o modelo copiado pras telas.
+
+**Sem Google conectado**, o cliente Gestão pago já entra e usa normalmente: Dashboard, Veículos, Motoristas, Manutenção, Documentos, Documentos gerados, Despesas, Checklist, Alertas, Radar, Relatórios, Rotas, Empresa, Configurações. **Só a Agenda** pede conexão, contextualmente, quando o cliente tenta usá-la.
+
+### 28.10 — Nova tela: histórico de documentos gerados
+
+Achado crítico da auditoria: `generated_documents`/`gerar_documento` já existiam, mas (a) não havia nenhuma tela no painel pra consultar o que já foi gerado, e (b) **o PDF em si nunca era persistido em lugar nenhum** — só mandado por WhatsApp em base64 e descartado, sem Storage nenhum preparado. Implementado:
+- Migration aditiva: bucket privado novo `generated-documents` + coluna `generated_documents.storage_path` (nullable — documentos gerados antes desta rodada continuam aparecendo no histórico, só sem opção de baixar).
+- `gerar_documento` (ferramenta de IA) agora também persiste o PDF no Storage, best-effort — se o upload falhar, o envio por WhatsApp já aconteceu normalmente, só fica sem "baixar de novo" no painel depois.
+- Nova tela `/frota/documentos-gerados` — lista título, origem (análise ou relatório livre), data, e um botão "Visualizar/baixar" via signed URL de 60s (mesmo padrão de segurança de Documentos: client de sessão pra confirmar acesso, admin só pra gerar a URL assinada, isolamento por `company_id` sempre, nunca link público permanente).
+- PDF gerado pela IA/WhatsApp aparece automaticamente no histórico do painel — o painel só consulta/baixa, não tem editor nem gerador próprio.
+
+### 28.11 — Classificação nova e definitiva dos módulos do Painel
+
+Documentação anterior misturava "read-only por design" com "parcial" sob o mesmo rótulo, gerando contradição (e uma achada de verdade: o mapa da seção 2 dizia "Alertas: só leitura" numa parte do documento enquanto a seção 13 já descrevia CRUD real, desde a Rodada 2 — corrigido nesta rodada). Nova classificação, com evidência de código:
+
+| Módulo | Classificação | Motivo |
+|---|---|---|
+| Dashboard | 🔵 READ-ONLY POR DESIGN | Propósito é acompanhamento — agrega dados que as outras telas já gerenciam, nunca deveria ter formulário próprio |
+| Veículos | ✅ COMPLETO | CRUD real; exclusão é sempre soft (ativar/desativar) por decisão de auditoria/histórico, não uma limitação |
+| Motoristas | ✅ COMPLETO | Mesmo padrão de Veículos |
+| Manutenção | ✅ COMPLETO | CRUD real, sincroniza despesa e alerta automaticamente sem duplicar |
+| Documentos | ✅ COMPLETO | CRUD + upload/download real de arquivo (Storage privado, signed URL) |
+| **Documentos gerados** | ✅ COMPLETO (novo, 26/08) | Histórico real com Storage — ver 28.10 |
+| Despesas | ✅ COMPLETO | Único módulo com exclusão física real |
+| Checklist | 🔵 READ-ONLY POR DESIGN | Propósito é acompanhamento/aderência — disparo e resposta são via WhatsApp por desenho; configuração mora em Configurações |
+| Alertas | ✅ COMPLETO | CRUD real de alertas manuais; automáticos (manutenção/documento) bloqueados de edição direta por design, redirecionando pra origem |
+| Notícias | 🟡 PARCIAL | Limitação real: o resumo em si só é gerado por um cron externo, 1x/dia, geral do setor — painel não tem "gerar agora" |
+| Radar de Fretes / Oportunidades | ✅ COMPLETO (parte) + 🔵 ROADMAP (parte) | Radares/fontes/ações sobre oportunidades: completo. Fretebras/Truckpad: roadmap explícito, nunca fingido como funcional |
+| Relatórios | 🔵 READ-ONLY POR DESIGN | Propósito é consulta agregada — PDF usa exatamente os mesmos filtros da tela |
+| Fretes (análises) | 🔵 READ-ONLY POR DESIGN | Histórico do que `analisar_frete` (WhatsApp) já gravou — painel nunca teve a proposta de rodar análise nova |
+| Jornadas | 🟡 PARCIAL | Diferente de Fretes: o próprio código já marca isso como "por enquanto" — jornada só é salva via WhatsApp hoje, é uma lacuna real, não um design definitivo |
+| Rotas | ✅ COMPLETO | CRUD real incluindo exclusão (soft) |
+| Agenda | ✅ COMPLETO (quando conectado) | CRUD real ao vivo no Google Calendar; conexão agora é pedida contextualmente (28.9), não é mais limitação do painel em si |
+| Empresa | ✅ COMPLETO | Cumpre integralmente o que se propõe (dados cadastrais) — nunca teve proposta de gestão de membros |
+| Configurações | 🟡 PARCIAL | O próprio código já reconhece: assinatura/alertas ainda não têm mecanismo configurável aqui — só o que tem efeito real tem UI (ver 28.12) |
+| Widget de IA embutido | ✅ COMPLETO | Mesmo motor do WhatsApp, mesmas ferramentas, mesmo contexto |
+
+Nenhum item foi classificado como completo só por ter interface — todos os "✅ COMPLETO" têm CRUD/persistência real confirmada em código.
+
+### 28.12 — `company_preferences`: campos sem efeito real, documentados
+
+Reauditoria completa confirmou 9 colunas graváveis via `PATCH /api/frota/configuracoes` que **não têm nenhum consumidor real** em nenhuma ferramenta de IA, rota de API ou tela do painel — write-only, nunca expostas na UI:
+
+`default_vehicle_id`, `default_fuel_type`, `default_fuel_price`, `default_average_speed_kmh`, `default_target_margin_percent`, `default_currency`, `distance_unit`, `allow_analysis_history`, `allow_tool_history`.
+
+Status: **legado/reservado** — existem no schema desde a criação da tabela (26/07/2026), com constraints de validação (`fuel_price_non_negative`, `speed_plausible`, `margin_range`), mas a integração pretendida (valores padrão pra cálculos) nunca foi implementada. Continuam fora da UI de propósito, seguindo a mesma regra já aplicada nas rodadas anteriores: só expor campo com efeito funcional real confirmado.
+
+### 28.13 — Resumo da regra oficial (Individual vs. Gestão)
+
+**Individual**: 1 cliente, 1 telefone, 1 veículo ativo, 35 ferramentas via WhatsApp, sem Painel.
+**Gestão**: 1 cliente, 1 telefone, até 10 veículos, 35 ferramentas via WhatsApp, Painel Web completo (Google Calendar é requisito só da função Agenda, nunca do painel inteiro).
+**Memória da IA**: sem UI própria — continua infraestrutura interna, decisão deliberada (nada mudou aqui).
+
+### 28.14 — Migrations e verificação
+
+2 migrations novas, ambas aditivas: `20260826120000_add_operating_region_to_company_preferences.sql`, `20260826130000_generated_documents_storage.sql`. Nenhuma migration destrutiva. 457 testes (34 novos desta rodada), typecheck/lint/build limpos.

@@ -101,7 +101,12 @@ describe("classificarConfiguracaoVeiculo — não reconhecido / carroceria", () 
   });
 
   it("pede esclarecimento pra texto não reconhecido", () => {
-    const r = classificarConfiguracaoVeiculo("sei lá, um caminhão qualquer");
+    const r = classificarConfiguracaoVeiculo("um veículo azul bem grande");
     expect(r.status).toBe("nao_reconhecido");
+  });
+
+  it('"sei lá" e sinônimos de "não sei" agora resolvem direto como outro (correção de loop, 08/2026) — não pedem mais esclarecimento', () => {
+    const r = classificarConfiguracaoVeiculo("sei lá, um caminhão qualquer");
+    expect(r.status).toBe("resolvido");
   });
 });

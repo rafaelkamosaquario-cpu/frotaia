@@ -16,6 +16,7 @@ import {
   Newspaper,
   Settings,
   CalendarDays,
+  FileClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -54,6 +55,7 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/agenda", label: "Agenda", icon: CalendarDays, group: "Acompanhamento", disponivel: true },
   { href: "/frota/alertas", label: "Alertas", icon: Bell, group: "Acompanhamento", disponivel: true },
   { href: "/frota/relatorios", label: "Relatórios", icon: BarChart3, group: "Acompanhamento", disponivel: true },
+  { href: "/frota/documentos-gerados", label: "Documentos gerados", icon: FileClock, group: "Acompanhamento", disponivel: true },
   { href: "/frota/noticias", label: "Notícias", icon: Newspaper, group: "Acompanhamento", disponivel: true },
 
   { href: "/frota/empresa", label: "Empresa", icon: Building2, group: "Administração", disponivel: true },

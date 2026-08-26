@@ -206,6 +206,71 @@ describe("awaiting_vehicle_configuration — agora segue pra carroceria, não co
   });
 });
 
+describe("awaiting_vehicle_configuration — nunca trava em loop infinito (correção 08/2026)", () => {
+  it('tocar a própria opção "Outro / não sei" da lista resolve na hora, nunca repete', () => {
+    const resultado = processOnboardingMessage("awaiting_vehicle_configuration", {}, "outro");
+    expect(resultado.nextState).toBe("awaiting_body_type");
+    expect(resultado.collectedData.vehicleType).toBe("outro");
+    expect(resultado.collectedData.axleCount).toBeNull();
+  });
+
+  it('texto livre "não sei" também resolve como "outro", sem repetir a pergunta', () => {
+    const resultado = processOnboardingMessage("awaiting_vehicle_configuration", {}, "não sei");
+    expect(resultado.nextState).toBe("awaiting_body_type");
+    expect(resultado.collectedData.vehicleType).toBe("outro");
+  });
+
+  it("resposta não reconhecida soma tentativa e continua pedindo (1ª e 2ª vez)", () => {
+    const r1 = processOnboardingMessage("awaiting_vehicle_configuration", {}, "blablabla sem sentido");
+    expect(r1.nextState).toBe("awaiting_vehicle_configuration");
+    expect(r1.collectedData.vehicleConfigAttempts).toBe(1);
+
+    const r2 = processOnboardingMessage("awaiting_vehicle_configuration", r1.collectedData, "outra coisa qualquer");
+    expect(r2.nextState).toBe("awaiting_vehicle_configuration");
+    expect(r2.collectedData.vehicleConfigAttempts).toBe(2);
+  });
+
+  it("na 3ª resposta não reconhecida seguida, força vehicleType=outro e SEMPRE avança — nunca fica preso pra sempre", () => {
+    const r1 = processOnboardingMessage("awaiting_vehicle_configuration", {}, "xyz");
+    const r2 = processOnboardingMessage("awaiting_vehicle_configuration", r1.collectedData, "abc");
+    const r3 = processOnboardingMessage("awaiting_vehicle_configuration", r2.collectedData, "123");
+
+    expect(r3.nextState).toBe("awaiting_body_type");
+    expect(r3.collectedData.vehicleType).toBe("outro");
+    expect(r3.collectedData.axleCount).toBeNull();
+    expect(r3.collectedData.vehicleConfigAttempts).toBe(0);
+  });
+
+  it("contador zera ao resolver com sucesso (não fica manchando etapas futuras)", () => {
+    const r1 = processOnboardingMessage("awaiting_vehicle_configuration", {}, "resposta ruim");
+    const r2 = processOnboardingMessage("awaiting_vehicle_configuration", r1.collectedData, "toco");
+    expect(r2.nextState).toBe("awaiting_body_type");
+    expect(r2.collectedData.vehicleConfigAttempts).toBe(0);
+  });
+
+  it('desambiguação (cavalo/carreta) também reconhece "não sei" e resolve sem travar', () => {
+    const resultado = processOnboardingMessage(
+      "awaiting_vehicle_configuration",
+      { awaitingVehicleConfigChoice: true },
+      "não sei"
+    );
+    expect(resultado.nextState).toBe("awaiting_body_type");
+    expect(resultado.collectedData.vehicleType).toBe("cavalo_mecanico");
+    expect(resultado.collectedData.axleCount).toBeNull();
+  });
+
+  it("desambiguação com escolha inválida repetida 3x força avanço (nunca trava)", () => {
+    const r1 = processOnboardingMessage("awaiting_vehicle_configuration", { awaitingVehicleConfigChoice: true }, "invalido");
+    const r2 = processOnboardingMessage("awaiting_vehicle_configuration", r1.collectedData, "tambem invalido");
+    const r3 = processOnboardingMessage("awaiting_vehicle_configuration", r2.collectedData, "ainda invalido");
+
+    expect(r3.nextState).toBe("awaiting_body_type");
+    expect(r3.collectedData.vehicleType).toBe("cavalo_mecanico");
+    expect(r3.collectedData.axleCount).toBeNull();
+    expect(r3.collectedData.awaitingVehicleConfigChoice).toBe(false);
+  });
+});
+
 describe("awaiting_body_type (nova etapa — nunca bloqueia, sempre resolve)", () => {
   it("carroceria reconhecida por palavra-chave avança pra consumo", () => {
     const resultado = processOnboardingMessage("awaiting_body_type", {}, "uso sider");
