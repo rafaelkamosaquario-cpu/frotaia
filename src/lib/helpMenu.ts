@@ -149,6 +149,32 @@ export function ehPedidoDeFuncionalidades(texto: string | undefined | null): boo
 }
 
 /**
+ * Guia de Primeiros Passos V1 (08/2026) — comando permanente pra
+ * (re)abrir o guia manualmente a qualquer momento, mesmo depois de
+ * dispensado. Deliberadamente SEM "o que você faz"/variações — essa frase
+ * já tem dono (PALAVRAS_GATILHO_FUNCOES acima) e não deve virar ambíguo
+ * entre o catálogo completo e o guia passo a passo.
+ */
+const PALAVRAS_GATILHO_GUIA = [
+  "primeiros passos",
+  "guia rápido",
+  "guia rapido",
+  "guia de primeiros passos",
+  "tutorial",
+  "como usar o frota ia",
+  "como usar o frotaia",
+  "me ensina a usar",
+  "quero um guia",
+];
+
+export function ehPedidoDeGuia(texto: string | undefined | null): boolean {
+  if (!texto) return false;
+  const normalizado = texto.trim().toLowerCase();
+  if (normalizado.length > 60) return false;
+  return PALAVRAS_GATILHO_GUIA.some((gatilho) => normalizado === gatilho || normalizado.includes(gatilho));
+}
+
+/**
  * Versão em texto corrido (painel web / WhatsApp determinístico via
  * ehPedidoDeFuncionalidades / referência no system prompt) — sem sintaxe
  * de lista nativa do WhatsApp. Formato numerado com descrição + exemplos

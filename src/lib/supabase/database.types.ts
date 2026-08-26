@@ -455,6 +455,12 @@ export type Database = {
           default_vehicle_id: string | null
           distance_unit: string
           freight_radar_analysis_mode: string
+          guide_v1_offered_at: string | null
+          guide_v1_status: string
+          guide_v1_step: string | null
+          guide_v2_offered_at: string | null
+          guide_v2_status: string
+          guide_v2_step: string | null
           id: string
           operating_region: string | null
           preferred_response_style: string
@@ -483,6 +489,12 @@ export type Database = {
           default_vehicle_id?: string | null
           distance_unit?: string
           freight_radar_analysis_mode?: string
+          guide_v1_offered_at?: string | null
+          guide_v1_status?: string
+          guide_v1_step?: string | null
+          guide_v2_offered_at?: string | null
+          guide_v2_status?: string
+          guide_v2_step?: string | null
           id?: string
           operating_region?: string | null
           preferred_response_style?: string
@@ -511,6 +523,12 @@ export type Database = {
           default_vehicle_id?: string | null
           distance_unit?: string
           freight_radar_analysis_mode?: string
+          guide_v1_offered_at?: string | null
+          guide_v1_status?: string
+          guide_v1_step?: string | null
+          guide_v2_offered_at?: string | null
+          guide_v2_status?: string
+          guide_v2_step?: string | null
           id?: string
           operating_region?: string | null
           preferred_response_style?: string

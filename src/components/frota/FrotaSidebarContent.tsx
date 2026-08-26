@@ -32,6 +32,7 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                     <Link
                       href={item.href}
                       onClick={onNavigate}
+                      data-tour-href={item.href}
                       className={cn(
                         "flex items-center gap-2.5 rounded-lg border-l-2 px-2.5 py-2 text-sm transition-colors",
                         isActive

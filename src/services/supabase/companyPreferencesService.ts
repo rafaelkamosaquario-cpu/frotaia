@@ -119,3 +119,52 @@ export async function setOperatingRegion(client: SupabaseDbClient, companyId: st
   const { error } = await client.from("company_preferences").update({ operating_region: region }).eq("company_id", companyId);
   if (error) throw error;
 }
+
+/**
+ * Guia de Primeiros Passos (V1 WhatsApp + V2 Painel, 08/2026) — estado
+ * reaproveita `company_preferences` (mesmo padrão de `dashboard_insight_*`/
+ * `daily_news_last_sent_at`: cache/estado simples por empresa, sem tabela
+ * nova). "Experiência" V1/V2 é só um prefixo de coluna (`guide_v1_*`/
+ * `guide_v2_*`) — as duas nunca se misturam, ver migration
+ * 20260826150000. Guia ≠ onboarding — nunca lê/grava `onboarding_sessions`.
+ */
+export type GuideExperience = "v1" | "v2";
+export type GuideStatus = "not_started" | "in_progress" | "completed" | "dismissed";
+
+export interface GuideState {
+  status: GuideStatus;
+  step: string | null;
+  offeredAt: string | null;
+}
+
+export async function getGuideState(client: SupabaseDbClient, companyId: string, experiencia: GuideExperience): Promise<GuideState> {
+  const prefs = await getOrCreatePreferences(client, companyId);
+  return experiencia === "v1"
+    ? { status: prefs.guide_v1_status as GuideStatus, step: prefs.guide_v1_step, offeredAt: prefs.guide_v1_offered_at }
+    : { status: prefs.guide_v2_status as GuideStatus, step: prefs.guide_v2_step, offeredAt: prefs.guide_v2_offered_at };
+}
+
+export interface SaveGuideStateInput {
+  status: GuideStatus;
+  step: string | null;
+}
+
+/** Update com chaves literais (nunca computadas): o tipo gerado pelo Supabase rejeita index signature dinâmica num `.update()`. */
+export async function saveGuideState(
+  client: SupabaseDbClient,
+  companyId: string,
+  experiencia: GuideExperience,
+  input: SaveGuideStateInput
+): Promise<void> {
+  const update = experiencia === "v1" ? { guide_v1_status: input.status, guide_v1_step: input.step } : { guide_v2_status: input.status, guide_v2_step: input.step };
+  const { error } = await client.from("company_preferences").update(update).eq("company_id", companyId);
+  if (error) throw error;
+}
+
+/** Marca o convite inicial como já mostrado — garante oferta automática única (comando manual sempre funciona independentemente disso). Idempotente: chamar de novo só reescreve o mesmo timestamp mais recente. */
+export async function markGuideOffered(client: SupabaseDbClient, companyId: string, experiencia: GuideExperience): Promise<void> {
+  const agora = new Date().toISOString();
+  const update = experiencia === "v1" ? { guide_v1_offered_at: agora } : { guide_v2_offered_at: agora };
+  const { error } = await client.from("company_preferences").update(update).eq("company_id", companyId);
+  if (error) throw error;
+}

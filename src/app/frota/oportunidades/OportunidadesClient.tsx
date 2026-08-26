@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
 import type { FreightRadarRow, FreightSourceRow, VehicleRow } from "@/lib/supabase/tables";
 import type { MatchComOportunidade } from "@/services/supabase/freightMatchService";
+import { ContextualHelp } from "@/components/frota/ContextualHelp";
 
 type OportunidadeComDetalhes = MatchComOportunidade & { detalhes: string[] };
 
@@ -196,9 +197,12 @@ export function OportunidadesClient({ radaresIniciais, oportunidadesIniciais, fo
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">⚡ Oportunidades</h1>
-        <p className="text-sm text-muted-foreground">Radar de Fretes — buscas ativas e cargas encontradas compatíveis com seus veículos.</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">⚡ Oportunidades</h1>
+          <p className="text-sm text-muted-foreground">Radar de Fretes — buscas ativas e cargas encontradas compatíveis com seus veículos.</p>
+        </div>
+        <ContextualHelp topic="radar" />
       </div>
 
       {podeEditar && (

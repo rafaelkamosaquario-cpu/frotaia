@@ -8,7 +8,7 @@ import { baixarMidia, paraBase64 } from "@/lib/whatsapp/mediaDownloader";
 import { isWhisperConfigured } from "@/lib/openai/whisperConfig";
 import { transcreverAudio } from "@/lib/openai/whisperClient";
 import { planilhaParaTexto, MIME_TYPES_PLANILHA_SUPORTADOS, SpreadsheetParseError } from "@/lib/spreadsheet/spreadsheetParser";
-import { ehPedidoDeAjuda, ehPedidoDeFuncionalidades, construirTextoAjudaCompleto } from "@/lib/helpMenu";
+import { ehPedidoDeAjuda, ehPedidoDeFuncionalidades, ehPedidoDeGuia, construirTextoAjudaCompleto } from "@/lib/helpMenu";
 import { FROTA_SUGGESTIONS, SUGESTOES_LISTA_NATIVA_WHATSAPP, resolverSelecaoNumerada } from "@/lib/frotaSuggestions";
 import { toPhoneE164 } from "@/lib/identity/phoneNormalizer";
 import { resolveOrCreateUserByPhone } from "@/services/supabase/userIdentityService";
@@ -26,7 +26,16 @@ import { processarMensagemDeGrupo } from "@/services/freight/groupMessageIntake"
 import { resolverIntencaoComercialLanding, mensagemConfirmacaoOferta, MENSAGEM_INTERESSE_EMPRESAS } from "@/lib/mercadopago/landingIntent";
 import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
 import { isOfertaPlano } from "@/lib/mercadopago/catalog";
-import { captureError } from "@/lib/observability/logger";
+import { captureError, logEvent } from "@/lib/observability/logger";
+import { getGuideState, saveGuideState, markGuideOffered } from "@/services/supabase/companyPreferencesService";
+import {
+  buildGuideOfferV1,
+  buildGuideReabrirV1,
+  buildGuideRetomarNudgeV1,
+  interpretarControleGuiaV1,
+  processGuideControlV1,
+  type GuideStepV1,
+} from "@/ai/whatsapp/guideConversationV1";
 import type { MessageInsert } from "@/lib/supabase/tables";
 
 const ROTA = "/api/whatsapp/webhook";
@@ -363,6 +372,24 @@ export async function POST(request: Request) {
           const link = buildCheckoutLinkUrl(empresaFinalizada.id, ofertaPretendida);
           await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(ofertaPretendida)}\n\n${link}`).catch(() => {});
         }
+
+        // Guia de Primeiros Passos V1 (08/2026) — oferecido uma única vez,
+        // logo após o cadastro (nunca antes: onboarding/pagamento/entitlement
+        // não são tocados por este bloco). `guide_v1_offered_at` garante a
+        // unicidade mesmo que o webhook seja reentregue — best-effort, nunca
+        // bloqueia a finalização do onboarding se falhar.
+        if (empresaFinalizada) {
+          try {
+            const guideState = await getGuideState(admin, empresaFinalizada.id, "v1");
+            if (!guideState.offeredAt) {
+              await enviarRespostaOnboarding(phoneE164, buildGuideOfferV1()).catch(() => {});
+              await markGuideOffered(admin, empresaFinalizada.id, "v1");
+              logEvent({ event: "guide_v1_offered", route: ROTA, company_id: empresaFinalizada.id });
+            }
+          } catch {
+            // Nunca bloqueia a finalização do onboarding por causa do guia.
+          }
+        }
       }
       return NextResponse.json({ ok: true });
     }
@@ -386,6 +413,54 @@ export async function POST(request: Request) {
   const vehicleContext = await loadVehicleContext(admin, companyId);
   const conversation = await getOrCreateOpenConversation(admin, companyId, userId, channelId);
   const inboundBase: Partial<MessageInsert> = body.messageId ? { external_message_id: body.messageId } : {};
+
+  // Guia de Primeiros Passos V1 (08/2026) — determinístico, nunca a IA
+  // decide passo/transição/conclusão. `guideStateV1` é lido uma vez por
+  // mensagem (cheap: 1 select indexado) e usado em 2 pontos: interceptação
+  // de controle (abaixo, ANTES de ehPedidoDeAjuda — um toque em "Próximo"
+  // do guia não deve cair em nenhum outro interceptador) e, mais adiante,
+  // no lembrete pós-resposta da IA (nunca perde o passo atual — seção 8 da
+  // spec: dúvida durante o guia não trava nem reinicia o progresso).
+  const guideStateV1 = await getGuideState(admin, companyId, "v1");
+  const guideStepV1 = guideStateV1.step as GuideStepV1 | null;
+  let guideV1PrecisaLembrete = false;
+
+  if (guideStateV1.status === "in_progress") {
+    const controle = interpretarControleGuiaV1(entradaOnboarding);
+    if (controle) {
+      const intentId = customerContext.memories.find((m) => m.memory_type === "profile" && m.key === "initial_intent");
+      const intentIdValor = (intentId?.value_json as { intentId?: string } | null)?.intentId;
+      const veiculo = vehicleContext.vehicle;
+      const resultado = processGuideControlV1(controle, guideStepV1, {
+        intentId: intentIdValor,
+        vehicle: veiculo
+          ? {
+              label: [veiculo.brand, veiculo.model, veiculo.model_year].filter(Boolean).join(" ") || "veículo cadastrado",
+              consumo: veiculo.average_consumption_km_l ? `${veiculo.average_consumption_km_l} km/l` : undefined,
+            }
+          : undefined,
+      });
+
+      await saveGuideState(admin, companyId, "v1", { status: resultado.nextStatus, step: resultado.nextStep });
+      await enviarRespostaOnboarding(phoneE164, resultado.reply).catch(() => {});
+      logEvent({ event: `guide_v1_${resultado.nextStatus}`, route: ROTA, company_id: companyId, step: resultado.nextStep ?? guideStepV1 ?? "none" });
+      return NextResponse.json({ ok: true });
+    }
+    // Controle não reconhecido: não intercepta — a mensagem segue pro
+    // fluxo normal (IA responde de verdade), e um lembrete curto é
+    // enviado depois, sem alterar o passo salvo.
+    guideV1PrecisaLembrete = true;
+  }
+
+  // Comando permanente ("primeiros passos"/"tutorial"/"guia"/etc, ver
+  // ehPedidoDeGuia em helpMenu.ts) — funciona mesmo depois de dispensado
+  // (seção 21: "não mostrar novamente" só desliga a oferta AUTOMÁTICA, o
+  // comando manual sempre reabre). Interceptado antes de ehPedidoDeAjuda
+  // pra não colidir com o menu de sugestões.
+  if (ehPedidoDeGuia(textoDireto) && guideStateV1.status !== "in_progress") {
+    await enviarRespostaOnboarding(phoneE164, buildGuideReabrirV1(guideStateV1.status, guideStepV1)).catch(() => {});
+    return NextResponse.json({ ok: true });
+  }
 
   // Reabertura do menu por palavra-chave ("ajuda"/"menu"/"opções"/
   // "sugestões" etc.) — interceptado ANTES da IA, resposta determinística,
@@ -693,6 +768,15 @@ export async function POST(request: Request) {
     });
 
     await sendWhatsappText(phoneE164, resposta.message.content);
+
+    // Guia em andamento, mas esta mensagem não era um controle do guia (o
+    // cliente perguntou/pediu algo de verdade, já respondido acima pela IA
+    // de verdade — inclusive uma análise real, se foi o caso, seção 8/17 da
+    // spec). Lembra que o guia continua pausado no mesmo passo, sem alterar
+    // o estado salvo.
+    if (guideV1PrecisaLembrete && guideStepV1) {
+      await enviarRespostaOnboarding(phoneE164, buildGuideRetomarNudgeV1(guideStepV1)).catch(() => {});
+    }
   } catch (err) {
     if (isUniqueViolation(err)) {
       // Reentrega do mesmo webhook (mesmo external_message_id) — já respondemos antes, não faz de novo.

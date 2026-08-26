@@ -609,3 +609,7 @@ Status: **legado/reservado** — existem no schema desde a criação da tabela (
 ### 28.14 — Migrations e verificação
 
 2 migrations novas, ambas aditivas: `20260826120000_add_operating_region_to_company_preferences.sql`, `20260826130000_generated_documents_storage.sql`. Nenhuma migration destrutiva. 457 testes (34 novos desta rodada), typecheck/lint/build limpos.
+
+## 29 — Guia de Primeiros Passos (2026-08-26, rodada seguinte)
+
+Novo recurso opcional (não é onboarding): tour visual de 8 passos com spotlight, oferecido uma única vez na primeira entrada em `/frota/dashboard` depois do Onboarding 2 concluído, mais ajuda contextual ("?") num subconjunto de telas (Dashboard, Manutenção, Despesas, Radar de Fretes). Reabertura manual em `/frota/configuracoes`. Nunca bloqueia o painel, nunca substitui `/frota-ativacao`. Detalhe completo, incluindo a versão WhatsApp (V1): `docs/FROTA_IA_GUIA_PRIMEIROS_PASSOS.md`.

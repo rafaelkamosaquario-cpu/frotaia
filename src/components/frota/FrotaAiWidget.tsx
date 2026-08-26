@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/Loading";
 import { cn } from "@/lib/utils";
 import { FROTA_NAV_ITEMS } from "./frotaNavItems";
+import { FROTA_AI_WIDGET_ASK_EVENT, type FrotaAiWidgetAskDetail } from "./frotaAiWidgetBus";
 
 /**
  * Widget "Pergunte ao Frota IA" (Fase 13 do plano de unificação V1+V2) —
@@ -61,6 +62,20 @@ export function FrotaAiWidget() {
   useEffect(() => {
     fimDaListaRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens, isLoading]);
+
+  // Ajuda contextual (08/2026) — abre o MESMO widget com a pergunta
+  // pré-preenchida (nunca envia sozinho: o cliente revisa/edita e manda),
+  // ver frotaAiWidgetBus.ts. Nunca cria um segundo chat.
+  useEffect(() => {
+    function aoReceberPergunta(event: Event) {
+      const detalhe = (event as CustomEvent<FrotaAiWidgetAskDetail>).detail;
+      if (!detalhe?.pergunta) return;
+      setTexto(detalhe.pergunta);
+      setOpen(true);
+    }
+    window.addEventListener(FROTA_AI_WIDGET_ASK_EVENT, aoReceberPergunta);
+    return () => window.removeEventListener(FROTA_AI_WIDGET_ASK_EVENT, aoReceberPergunta);
+  }, []);
 
   const paginaAtualLabel = FROTA_NAV_ITEMS.find((item) => pathname?.startsWith(item.href))?.label;
 
@@ -130,6 +145,7 @@ export function FrotaAiWidget() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Fechar o Frota IA" : "Pergunte ao Frota IA"}
+        data-tour="ia-widget"
         className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex size-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-105 sm:right-5 lg:bottom-5"
       >
         {open ? <X className="size-5" aria-hidden /> : <Sparkles className="size-5" aria-hidden />}

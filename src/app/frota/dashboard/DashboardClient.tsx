@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import type { ChecklistDispatchRow, DriverRow, ExpenseRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
 import { computeFleetAlerts } from "@/services/supabase/fleetAlertsService";
 import { dispatchesFromToday } from "@/services/supabase/checklistDispatchService";
+import { ContextualHelp } from "@/components/frota/ContextualHelp";
 
 interface DashboardClientProps {
   veiculos: VehicleRow[];
@@ -78,13 +79,16 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
 
   return (
     <div className="flex flex-1 flex-col p-4 sm:p-6">
-      <div className="mb-5">
-        <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Visão geral da frota</p>
+      <div className="mb-5 flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Visão geral da frota</p>
+        </div>
+        <ContextualHelp topic="dashboard" />
       </div>
 
       {insight && (
-        <Card className="mb-4 flex items-start gap-3 p-4">
+        <Card data-tour="ia-sugere" className="mb-4 flex items-start gap-3 p-4">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Sparkles className="size-4" aria-hidden />
           </div>
@@ -95,7 +99,7 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div data-tour="kpis" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {kpis.map(({ label, value, icon: Icon, color }) => (
           <Card key={label} className="flex flex-col gap-3 p-5">
             <div

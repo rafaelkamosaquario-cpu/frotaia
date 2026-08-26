@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { MaintenanceScheduleRow, VehicleRow, ExpenseRow } from "@/lib/supabase/tables";
 import { MaintenanceFormModal } from "./MaintenanceFormModal";
+import { ContextualHelp } from "@/components/frota/ContextualHelp";
 
 interface ManutencaoClientProps {
   manutencoesIniciais: MaintenanceScheduleRow[];
@@ -73,10 +74,13 @@ export function ManutencaoClient({ manutencoesIniciais, veiculos, despesasVincul
           <h1 className="text-lg font-semibold text-foreground">Manutenção</h1>
           <p className="text-sm text-muted-foreground">{manutencoes.length} registro(s) de manutenção</p>
         </div>
-        <Button onClick={() => setFormTarget(null)} className="gap-1.5">
-          <SquarePen className="size-4" aria-hidden />
-          Nova manutenção
-        </Button>
+        <div className="flex items-center gap-2">
+          <ContextualHelp topic="manutencao" />
+          <Button onClick={() => setFormTarget(null)} className="gap-1.5">
+            <SquarePen className="size-4" aria-hidden />
+            Nova manutenção
+          </Button>
+        </div>
       </div>
 
       {manutencoes.length === 0 ? (

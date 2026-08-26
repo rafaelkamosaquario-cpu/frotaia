@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/hooks/useToast";
 import type { ExpenseRow, ExpenseTypeEnum, VehicleRow } from "@/lib/supabase/tables";
 import { ExpenseFormModal } from "./ExpenseFormModal";
+import { ContextualHelp } from "@/components/frota/ContextualHelp";
 
 interface DespesasClientProps {
   despesasIniciais: ExpenseRow[];
@@ -94,10 +95,13 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
             {despesasFiltradas.length} despesa(s) · total {formatBRL(totalFiltrado)}
           </p>
         </div>
-        <Button onClick={() => setFormTarget(null)} className="gap-1.5">
-          <SquarePen className="size-4" aria-hidden />
-          Nova despesa
-        </Button>
+        <div className="flex items-center gap-2">
+          <ContextualHelp topic="despesas" />
+          <Button onClick={() => setFormTarget(null)} className="gap-1.5">
+            <SquarePen className="size-4" aria-hidden />
+            Nova despesa
+          </Button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">

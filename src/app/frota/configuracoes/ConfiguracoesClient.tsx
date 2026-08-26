@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Newspaper, ClipboardList, BrainCircuit } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Newspaper, ClipboardList, BrainCircuit, Compass } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
@@ -30,8 +31,26 @@ const HORAS = Array.from({ length: 24 }, (_, h) => h);
 
 export function ConfiguracoesClient({ preferenciasIniciais, podeEditar }: ConfiguracoesClientProps) {
   const { showToast } = useToast();
+  const router = useRouter();
   const [estilo, setEstilo] = useState(preferenciasIniciais.preferred_response_style ?? "objetivo");
   const [isSaving, setIsSaving] = useState(false);
+  const [isReabrindoGuia, setIsReabrindoGuia] = useState(false);
+
+  /** Guia de Primeiros Passos V2 (08/2026) — reabertura manual (seção 21: "não mostrar novamente" nunca esconde essa opção). Vai direto pro tour (não pro convite), pois é um pedido explícito. */
+  async function reabrirGuia() {
+    setIsReabrindoGuia(true);
+    try {
+      await fetch("/api/frota/guide-v2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "in_progress", step: "dashboard" }),
+      });
+      router.push("/frota/dashboard");
+    } catch {
+      showToast({ title: "Não foi possível abrir o guia agora", description: "Verifique sua conexão e tente de novo.", variant: "error" });
+      setIsReabrindoGuia(false);
+    }
+  }
 
   const [checklistEnabled, setChecklistEnabled] = useState(preferenciasIniciais.checklist_enabled);
   const [checklistSendHour, setChecklistSendHour] = useState(preferenciasIniciais.checklist_send_hour);
@@ -325,6 +344,24 @@ export function ConfiguracoesClient({ preferenciasIniciais, podeEditar }: Config
           <Link href="/frota/noticias" className="text-sm font-medium text-primary hover:underline">
             Abrir
           </Link>
+        </Card>
+
+        <Card className="flex items-center justify-between gap-4 p-4">
+          <div className="flex items-center gap-3">
+            <Compass className="size-4 text-muted-foreground" aria-hidden />
+            <div>
+              <p className="text-sm font-medium text-foreground">Guia de primeiros passos</p>
+              <p className="text-xs text-muted-foreground">Reveja o tour rápido pelo painel sempre que quiser.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={reabrirGuia}
+            disabled={isReabrindoGuia}
+            className="text-sm font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Abrir
+          </button>
         </Card>
       </div>
     </div>

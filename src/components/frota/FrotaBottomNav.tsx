@@ -42,6 +42,7 @@ export function FrotaBottomNav({ onOpenMore }: FrotaBottomNavProps) {
             <li key={item.href} className="flex-1">
               <Link
                 href={item.href}
+                data-tour-href={item.href}
                 className={cn(
                   "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
                   isActive ? "text-primary" : "text-muted-foreground"
@@ -57,6 +58,7 @@ export function FrotaBottomNav({ onOpenMore }: FrotaBottomNavProps) {
           <button
             type="button"
             onClick={onOpenMore}
+            data-tour-more-button
             className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground transition-colors"
           >
             <Menu className="size-5" aria-hidden />

@@ -6,6 +6,7 @@ import { FrotaSidebar } from "./FrotaSidebar";
 import { FrotaMobileSidebar } from "./FrotaMobileSidebar";
 import { FrotaBottomNav } from "./FrotaBottomNav";
 import { FrotaAiWidget } from "./FrotaAiWidget";
+import { PanelTour } from "./PanelTour";
 import type { CompanyMemberRole } from "@/lib/supabase/tables";
 
 interface FrotaShellProps {
@@ -29,6 +30,7 @@ export function FrotaShell({ companyName, role, children }: FrotaShellProps) {
       </div>
       <FrotaBottomNav onOpenMore={() => setIsMoreOpen(true)} />
       <FrotaAiWidget />
+      <PanelTour />
     </div>
   );
 }
