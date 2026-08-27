@@ -1,19 +1,14 @@
 // Gera variantes coloridas dos ícones neon pro Dashboard (KPIs + cabeçalho de
 // Alertas urgentes/Checklists hoje) a partir dos MESMOS PNGs já usados na
-// sidebar (public/icons/sidebar/*.png). Aqui só giramos o matiz do anel/glow
-// neon (pixels saturados na faixa do verde) pro tom semântico de cada card,
-// mantendo o traço branco do ícone praticamente intacto.
+// sidebar (public/icons/sidebar/*.png, modelo "com card" — fundo escuro +
+// borda neon). Aqui só giramos o matiz do anel/glow neon (pixels saturados
+// na faixa do verde) pro tom semântico de cada card, mantendo o traço
+// branco do ícone e o interior escuro do card praticamente intactos.
 //
-// ATENÇÃO (08/2026): a partir da rodada "sidebar sem card", os PNGs de
-// public/icons/sidebar/ passaram a ser o modelo SEM card/borda própria
-// (glifo neon puro sobre transparente) — diferente do modelo "com card"
-// (fundo escuro + borda) usado quando este script foi escrito originalmente.
-// Os arquivos já gerados em public/icons/dashboard/ (rodada anterior, ainda
-// com card) NÃO foram regenerados nem tocados — o Dashboard usa outra rodada
-// própria, não mexer nele sem pedido explícito. Se um dia regenerar os
-// ícones do Dashboard de novo, considerar se ainda faz sentido herdar o
-// visual "sem card" da sidebar ou se o Dashboard precisa continuar com o
-// card (decisão do produto, não técnica).
+// Dependência: pressupõe que public/icons/sidebar/*.png estejam no modelo
+// "com card" (não o modelo "sem card"/glifo puro, usado brevemente numa
+// rodada intermediária e depois revertido) — se a sidebar mudar de estilo
+// de novo no futuro, reavaliar se este script ainda faz sentido como está.
 import sharp from "sharp";
 import path from "path";
 import fs from "fs";
