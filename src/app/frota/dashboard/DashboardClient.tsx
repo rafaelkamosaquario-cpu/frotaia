@@ -46,10 +46,12 @@ function glowB(tom: Tom, forte = false): CSSProperties {
 }
 
 /**
- * Ícones customizados (public/icons/dashboard/*.png) — mesmos assets neon da
- * sidebar, com o anel/glow recolorido por tom via scripts/generate-dashboard-icons.mjs
- * (giro de matiz só nos pixels saturados; traço branco e interior escuro do
- * card praticamente intocados). A sidebar continua 100% verde, não usa estes.
+ * Ícones customizados (public/icons/dashboard/*.png) — cards neon "com
+ * card" fornecidos prontos já na cor semântica certa (verde/azul/âmbar/
+ * vermelho), gerados via scripts/process-dashboard-icons.mjs (remove só o
+ * fundo preto sólido dos PNGs originais, preserva cor/traço/glow do card).
+ * Pasta de origem própria do Dashboard — não tem relação com os ícones da
+ * sidebar (public/icons/sidebar/), que são um pacote visual independente.
  */
 const KPI_ICON: Record<string, string> = {
   veiculos: "/icons/dashboard/veiculos-primary.png",
@@ -302,7 +304,7 @@ export function DashboardClient({
                 className={cn("absolute inset-y-0 left-0 rounded-l-xl", destaque ? "w-1" : "w-[3px]", A_BARRA[tom])}
               />
             )}
-            <Image src={icon} alt="" width={48} height={48} className="size-11 shrink-0 object-contain" aria-hidden />
+            <Image src={icon} alt="" width={52} height={52} className="size-10 shrink-0 object-contain sm:size-12" aria-hidden />
             <div className="min-w-0">
               <p
                 className={cn(
@@ -331,7 +333,7 @@ export function DashboardClient({
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <Image src={KPI_ICON.alertas} alt="" width={40} height={40} className="size-9 shrink-0 object-contain" aria-hidden />
+              <Image src={KPI_ICON.alertas} alt="" width={40} height={40} className="size-8 shrink-0 object-contain sm:size-9" aria-hidden />
               <h2 className="text-sm font-semibold text-foreground">Alertas urgentes</h2>
             </div>
             {alertas.length > 0 && <Pill label={`${alertas.length} pendente${alertas.length === 1 ? "" : "s"}`} tom="danger" variante={variante} />}
@@ -375,7 +377,7 @@ export function DashboardClient({
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <Image src={KPI_ICON.checklists} alt="" width={40} height={40} className="size-9 shrink-0 object-contain" aria-hidden />
+              <Image src={KPI_ICON.checklists} alt="" width={40} height={40} className="size-8 shrink-0 object-contain sm:size-9" aria-hidden />
               <h2 className="text-sm font-semibold text-foreground">Checklists hoje</h2>
             </div>
             {checklistsHoje.length > 0 && (
