@@ -34,7 +34,7 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                       onClick={onNavigate}
                       data-tour-href={item.href}
                       className={cn(
-                        "group flex items-center gap-2.5 rounded-lg border px-2 py-1 text-sm transition-colors duration-150",
+                        "group flex items-center gap-2.5 rounded-lg border px-2 py-0.5 text-sm transition-colors duration-150",
                         isActive
                           ? "border-primary/30 bg-primary/[0.08] font-medium text-foreground shadow-[0_0_16px_-8px_color-mix(in_srgb,var(--primary)_55%,transparent)]"
                           : "border-transparent text-muted-foreground hover:border-primary/20 hover:bg-primary/[0.05] hover:text-foreground"
@@ -43,10 +43,10 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                       <Image
                         src={item.icon}
                         alt=""
-                        width={30}
-                        height={30}
+                        width={34}
+                        height={34}
                         className={cn(
-                          "size-7 shrink-0 object-contain transition-opacity duration-150",
+                          "size-8 shrink-0 object-contain transition-opacity duration-150",
                           isActive ? "opacity-100" : "opacity-80 group-hover:opacity-95"
                         )}
                         aria-hidden
