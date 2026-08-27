@@ -101,11 +101,12 @@ async function floodRemoveBackground(srcPath) {
     outRGBA[i * 4 + 3] = blurredMask[i];
   }
 
-  // 256px basta com folga pra exibição a ~34px (até DPR 3x) — os cards brutos vêm em ~1250px
-  // com textura/ruído de fundo que comprime muito mal (~1.5MB/ícone); reduzido isso cai pra ~25-30KB.
+  // 128px basta com folga (~4x) pra exibição a ~28-30px na sidebar — os cards brutos vêm em
+  // ~1250px com textura/ruído de fundo que comprime muito mal (~1.5MB/ícone); reduzido isso
+  // cai pra poucos KB por ícone.
   return sharp(outRGBA, { raw: { width: w, height: h, channels: 4 } })
     .extract({ left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 })
-    .resize({ width: 256, height: 256, fit: "inside" })
+    .resize({ width: 128, height: 128, fit: "inside" })
     .png({ compressionLevel: 9, palette: true, quality: 90 });
 }
 
