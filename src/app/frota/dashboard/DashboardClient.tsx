@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Sparkles, Truck, Users, Wrench, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -9,6 +9,9 @@ import type { ChecklistDispatchRow, DriverRow, ExpenseRow, MaintenanceScheduleRo
 import { computeFleetAlerts, type FleetAlertItem } from "@/services/supabase/fleetAlertsService";
 import { dispatchesFromToday } from "@/services/supabase/checklistDispatchService";
 import { ContextualHelp } from "@/components/frota/ContextualHelp";
+
+/** "a" (sóbria/executiva) ou "b" (premium/destacada) — ver rodada "REFINAMENTO VISUAL DOS CARDS". Comparar ao vivo com ?cardStyle=a / ?cardStyle=b. Default de produção: "b". */
+export type CardStyleVariant = "a" | "b";
 
 interface DashboardClientProps {
   veiculos: VehicleRow[];
@@ -20,20 +23,28 @@ interface DashboardClientProps {
   checklistDispatches: ChecklistDispatchRow[];
   /** Gerado por IA a partir dos dados acima, cacheado em company_preferences — ver DashboardPage. null se nunca gerado ou se a chamada falhou. */
   insight: string | null;
+  cardStyle: CardStyleVariant;
 }
 
-/** Tons semânticos reaproveitando só os tokens já existentes em globals.css (--primary/--accent/--warning/--danger/--success) — nenhuma cor nova adicionada. */
+/** Tons semânticos reaproveitando só os tokens já existentes em globals.css (--primary/--accent/--warning/--danger/--success) — nenhuma cor nova adicionada em nenhuma das duas variantes. */
 type Tom = "primary" | "accent" | "warning" | "danger" | "success";
 
-const TOM_BARRA: Record<Tom, string> = {
-  primary: "bg-primary",
-  accent: "bg-accent",
-  warning: "bg-warning",
-  danger: "bg-danger",
-  success: "bg-success",
+const TOM_VAR: Record<Tom, string> = {
+  primary: "--primary",
+  accent: "--accent",
+  warning: "--warning",
+  danger: "--danger",
+  success: "--success",
 };
 
-const TOM_ICONE: Record<Tom, string> = {
+/** Glow só existe na Variante B — inspirado no box-shadow colorido do card de plano em destaque da landing page (`.plano-destaque`). Inline style (não classe Tailwind) pra evitar qualquer risco de parsing de vírgula/parênteses em valor arbitrário. */
+function glowB(tom: Tom, forte = false): CSSProperties {
+  return {
+    boxShadow: `0 ${forte ? 14 : 9}px ${forte ? 34 : 24}px ${forte ? -12 : -14}px color-mix(in srgb, var(${TOM_VAR[tom]}) ${forte ? 60 : 38}%, transparent)`,
+  };
+}
+
+const A_ICONE: Record<Tom, string> = {
   primary: "bg-primary/10 text-primary",
   accent: "bg-accent/10 text-accent",
   warning: "bg-warning/10 text-warning",
@@ -41,7 +52,40 @@ const TOM_ICONE: Record<Tom, string> = {
   success: "bg-success/10 text-success",
 };
 
-const TOM_PILL: Record<Tom, string> = {
+const B_ICONE: Record<Tom, string> = {
+  primary: "bg-primary/15 text-primary ring-1 ring-inset ring-primary/25",
+  accent: "bg-accent/15 text-accent ring-1 ring-inset ring-accent/25",
+  warning: "bg-warning/15 text-warning ring-1 ring-inset ring-warning/25",
+  danger: "bg-danger/15 text-danger ring-1 ring-inset ring-danger/25",
+  success: "bg-success/15 text-success ring-1 ring-inset ring-success/25",
+};
+
+const B_BORDA: Record<Tom, string> = {
+  primary: "border-primary/25",
+  accent: "border-accent/25",
+  warning: "border-warning/25",
+  danger: "border-danger/35",
+  success: "border-success/25",
+};
+
+const B_FUNDO: Record<Tom, string> = {
+  primary: "bg-primary/[0.05]",
+  accent: "bg-accent/[0.05]",
+  warning: "bg-warning/[0.05]",
+  danger: "bg-danger/[0.06]",
+  success: "bg-success/[0.05]",
+};
+
+/** Barra de acento à esquerda (Variante A) — mesma assinatura estrutural de `.problema-card`/`.depo` da landing page (border-left tonal), recriada com um span absoluto pra não brigar com o border-color base do Card. */
+const A_BARRA: Record<Tom, string> = {
+  primary: "bg-primary",
+  accent: "bg-accent",
+  warning: "bg-warning",
+  danger: "bg-danger",
+  success: "bg-success",
+};
+
+const A_PILL: Record<Tom, string> = {
   primary: "bg-primary/10 text-primary",
   accent: "bg-accent/10 text-accent",
   warning: "bg-warning/15 text-warning",
@@ -49,8 +93,26 @@ const TOM_PILL: Record<Tom, string> = {
   success: "bg-success/10 text-success",
 };
 
-function Pill({ label, tom }: { label: string; tom: Tom }) {
-  return <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold", TOM_PILL[tom])}>{label}</span>;
+const B_PILL: Record<Tom, string> = {
+  primary: "bg-primary/20 text-primary",
+  accent: "bg-accent/20 text-accent",
+  warning: "bg-warning/20 text-warning",
+  danger: "bg-danger/20 text-danger",
+  success: "bg-success/20 text-success",
+};
+
+function Pill({ label, tom, variante }: { label: string; tom: Tom; variante: CardStyleVariant }) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full font-semibold",
+        variante === "a" ? "px-2 py-0.5 text-[10px] uppercase tracking-wide" : "px-2.5 py-1 text-[11px] font-bold",
+        variante === "a" ? A_PILL[tom] : B_PILL[tom]
+      )}
+    >
+      {label}
+    </span>
+  );
 }
 
 const MAX_ALERTAS_PREVIEW = 5;
@@ -122,8 +184,18 @@ function diasAte(iso: string): number {
   return Math.round((alvo.getTime() - hoje.getTime()) / 86_400_000);
 }
 
-export function DashboardClient({ veiculos, motoristas, manutencoes, documentos, despesasRecentes, checklistDispatches, insight }: DashboardClientProps) {
+export function DashboardClient({
+  veiculos,
+  motoristas,
+  manutencoes,
+  documentos,
+  despesasRecentes,
+  checklistDispatches,
+  insight,
+  cardStyle,
+}: DashboardClientProps) {
   const hojeIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const variante = cardStyle;
 
   const kpis = useMemo(() => {
     const veiculosAtivos = veiculos.filter((v) => v.active).length;
@@ -184,7 +256,10 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
       <div className="mb-4 flex items-start justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Visão geral da frota</p>
+          <p className="text-sm text-muted-foreground">
+            Visão geral da frota
+            {process.env.NODE_ENV !== "production" && <span className="ml-2 text-xs text-muted-foreground/60">[cards: {variante}]</span>}
+          </p>
         </div>
         <ContextualHelp topic="dashboard" />
       </div>
@@ -211,19 +286,42 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
         {kpis.map(({ label, value, icon: Icon, tom, status, destaque }) => (
           <Card
             key={label}
-            className={cn("relative flex flex-col gap-3 overflow-hidden p-5", destaque && "ring-1 ring-danger/25")}
+            className={cn(
+              "relative flex flex-col gap-3 overflow-hidden p-5",
+              variante === "a" && "border-border",
+              variante === "a" && destaque && "ring-1 ring-danger/20",
+              variante === "b" && [B_BORDA[tom], B_FUNDO[tom]]
+            )}
+            style={variante === "b" ? glowB(tom, destaque) : undefined}
           >
-            <span aria-hidden className={cn("absolute inset-x-0 top-0 h-[3px] opacity-70", TOM_BARRA[tom])} />
-            <div className={cn("flex size-11 items-center justify-center rounded-xl", TOM_ICONE[tom])}>
-              <Icon className="size-5" aria-hidden />
+            {variante === "a" && (
+              <span
+                aria-hidden
+                className={cn("absolute inset-y-0 left-0 rounded-l-xl", destaque ? "w-1" : "w-[3px]", A_BARRA[tom])}
+              />
+            )}
+            <div
+              className={cn(
+                "flex items-center justify-center",
+                variante === "a" ? "size-11 rounded-xl" : "size-12 rounded-2xl",
+                variante === "a" ? A_ICONE[tom] : B_ICONE[tom]
+              )}
+            >
+              <Icon className={variante === "a" ? "size-5" : "size-5.5"} aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className={cn("text-2xl tracking-tight tabular-nums text-foreground sm:text-3xl", destaque ? "font-bold" : "font-semibold")}>
+              <p
+                className={cn(
+                  "tracking-tight tabular-nums text-foreground",
+                  variante === "a" ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl",
+                  destaque ? "font-extrabold" : "font-bold"
+                )}
+              >
                 {value}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 <p className="text-sm text-muted-foreground">{label}</p>
-                {status && <Pill label={status.label} tom={status.tom} />}
+                {status && <Pill label={status.label} tom={status.tom} variante={variante} />}
               </div>
             </div>
           </Card>
@@ -231,17 +329,26 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-5">
+        <Card
+          className={cn(
+            "p-5",
+            variante === "b" && ["border-danger/15", "bg-danger/[0.025]"]
+          )}
+        >
           <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="size-4.5 text-danger" aria-hidden />
+            <div className="flex items-center gap-2.5">
+              <div
+                className={cn(
+                  "flex items-center justify-center",
+                  variante === "a" ? "size-9 rounded-lg" : "size-10 rounded-xl",
+                  variante === "a" ? A_ICONE.danger : B_ICONE.danger
+                )}
+              >
+                <AlertTriangle className="size-4.5" aria-hidden />
+              </div>
               <h2 className="text-sm font-semibold text-foreground">Alertas urgentes</h2>
             </div>
-            {alertas.length > 0 && (
-              <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-danger">
-                {alertas.length} pendente{alertas.length === 1 ? "" : "s"}
-              </span>
-            )}
+            {alertas.length > 0 && <Pill label={`${alertas.length} pendente${alertas.length === 1 ? "" : "s"}`} tom="danger" variante={variante} />}
           </div>
 
           {alertas.length === 0 ? (
@@ -258,7 +365,7 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
                     >
                       <span className={cn("size-1.5 shrink-0 rounded-full", SEVERIDADE_DOT[severidade])} aria-hidden />
                       <span className="flex-1 truncate text-foreground">{item.descricao}</span>
-                      <Pill label={SEVERIDADE_PILL_LABEL[severidade]} tom={SEVERIDADE_PILL_TOM[severidade]} />
+                      <Pill label={SEVERIDADE_PILL_LABEL[severidade]} tom={SEVERIDADE_PILL_TOM[severidade]} variante={variante} />
                     </Link>
                   </li>
                 );
@@ -274,16 +381,27 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
           )}
         </Card>
 
-        <Card className="p-5">
+        <Card
+          className={cn(
+            "p-5",
+            variante === "b" && ["border-success/15", "bg-success/[0.025]"]
+          )}
+        >
           <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="size-4.5 text-success" aria-hidden />
+            <div className="flex items-center gap-2.5">
+              <div
+                className={cn(
+                  "flex items-center justify-center",
+                  variante === "a" ? "size-9 rounded-lg" : "size-10 rounded-xl",
+                  variante === "a" ? A_ICONE.success : B_ICONE.success
+                )}
+              >
+                <ClipboardList className="size-4.5" aria-hidden />
+              </div>
               <h2 className="text-sm font-semibold text-foreground">Checklists hoje</h2>
             </div>
             {checklistsHoje.length > 0 && (
-              <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                {checklistsRespondidos}/{checklistsHoje.length} respondidos
-              </span>
+              <Pill label={`${checklistsRespondidos}/${checklistsHoje.length} respondidos`} tom="success" variante={variante} />
             )}
           </div>
 
@@ -292,7 +410,10 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
           ) : (
             <>
               <div className="mb-4 h-2 overflow-hidden rounded-full bg-surface-muted">
-                <div className="h-full rounded-full bg-success transition-all" style={{ width: `${checklistPercent}%` }} />
+                <div
+                  className="h-full rounded-full bg-success transition-all"
+                  style={{ width: `${checklistPercent}%`, ...(variante === "b" ? { boxShadow: "0 0 8px color-mix(in srgb, var(--success) 55%, transparent)" } : {}) }}
+                />
               </div>
               <ul className="flex flex-col gap-1">
                 {checklistsHoje.map((dispatch) => (

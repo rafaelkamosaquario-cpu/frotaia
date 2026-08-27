@@ -9,7 +9,7 @@ import { listChecklistDispatchesForPanel, dispatchesFromToday } from "@/services
 import { computeFleetAlerts } from "@/services/supabase/fleetAlertsService";
 import { getOrCreatePreferences, saveDashboardInsight } from "@/services/supabase/companyPreferencesService";
 import { gerarInsightDashboard } from "@/services/dashboard/dashboardInsightService";
-import { DashboardClient } from "./DashboardClient";
+import { DashboardClient, type CardStyleVariant } from "./DashboardClient";
 
 /** Insight regenerado no máximo 1x a cada 20h por empresa — mesmo espírito do daily_news_last_sent_at, evita custo de IA a cada carregamento de página. */
 const INSIGHT_CACHE_HORAS = 20;
@@ -51,7 +51,12 @@ function montarResumoParaInsight(input: {
 }
 
 /** O layout de src/app/frota já garante o acesso. Só leitura — os KPIs agregam dados que as telas de Veículos/Motoristas/Manutenção/Documentos/Despesas já buscam. */
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ cardStyle?: string }> }) {
+  const { cardStyle: cardStyleParam } = await searchParams;
+  // Rodada "REFINAMENTO VISUAL DOS CARDS" (08/2026): duas variantes visuais comparáveis ao vivo via ?cardStyle=a/b.
+  // Default de produção é "b" (Premium) — recomendação registrada em docs/FROTA_IA_..._REFINAMENTO_CARDS.md.
+  const cardStyle: CardStyleVariant = cardStyleParam === "a" ? "a" : "b";
+
   const supabase = await createClient();
   const access = await loadFleetPanelAccess(supabase);
 
@@ -109,6 +114,7 @@ export default async function DashboardPage() {
       despesasRecentes={despesasRecentes}
       checklistDispatches={checklistDispatches}
       insight={insight}
+      cardStyle={cardStyle}
     />
   );
 }
