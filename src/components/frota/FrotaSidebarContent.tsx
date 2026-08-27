@@ -43,10 +43,10 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                       <Image
                         src={item.icon}
                         alt=""
-                        width={30}
-                        height={30}
+                        width={32}
+                        height={32}
                         className={cn(
-                          "size-7 shrink-0 object-contain transition-opacity duration-150",
+                          "size-6 shrink-0 object-contain transition-opacity duration-150 lg:size-7",
                           isActive ? "opacity-100" : "opacity-80 group-hover:opacity-95"
                         )}
                         aria-hidden
