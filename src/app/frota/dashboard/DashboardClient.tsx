@@ -2,7 +2,8 @@
 
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Sparkles, Truck, Users, Wrench, WalletCards } from "lucide-react";
+import Image from "next/image";
+import { CheckCircle2, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 import type { ChecklistDispatchRow, DriverRow, ExpenseRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
@@ -44,20 +45,21 @@ function glowB(tom: Tom, forte = false): CSSProperties {
   };
 }
 
-const A_ICONE: Record<Tom, string> = {
-  primary: "bg-primary/10 text-primary",
-  accent: "bg-accent/10 text-accent",
-  warning: "bg-warning/10 text-warning",
-  danger: "bg-danger/10 text-danger",
-  success: "bg-success/10 text-success",
-};
-
-const B_ICONE: Record<Tom, string> = {
-  primary: "bg-primary/15 text-primary ring-1 ring-inset ring-primary/25",
-  accent: "bg-accent/15 text-accent ring-1 ring-inset ring-accent/25",
-  warning: "bg-warning/15 text-warning ring-1 ring-inset ring-warning/25",
-  danger: "bg-danger/15 text-danger ring-1 ring-inset ring-danger/25",
-  success: "bg-success/15 text-success ring-1 ring-inset ring-success/25",
+/**
+ * Ícones customizados (public/icons/dashboard/*.png) — mesmos assets neon da
+ * sidebar, com o anel/glow recolorido por tom via scripts/generate-dashboard-icons.mjs
+ * (giro de matiz só nos pixels saturados; traço branco e interior escuro do
+ * card praticamente intocados). A sidebar continua 100% verde, não usa estes.
+ */
+const KPI_ICON: Record<string, string> = {
+  veiculos: "/icons/dashboard/veiculos-primary.png",
+  motoristas: "/icons/dashboard/motoristas-accent.png",
+  manutencao: "/icons/dashboard/manutencao-warning.png",
+  documentos: "/icons/dashboard/documentos-danger.png",
+  agenda: "/icons/dashboard/agenda-warning.png",
+  despesas: "/icons/dashboard/despesas-success.png",
+  alertas: "/icons/dashboard/alertas-danger.png",
+  checklists: "/icons/dashboard/checklists-success.png",
 };
 
 const B_BORDA: Record<Tom, string> = {
@@ -209,19 +211,19 @@ export function DashboardClient({
     const custo30Dias = despesasRecentes.length > 0 ? despesasRecentes.reduce((soma, d) => soma + d.amount, 0) : null;
 
     return [
-      { label: "Veículos ativos", value: veiculosAtivos, icon: Truck, tom: "primary" as Tom },
-      { label: "Motoristas ativos", value: motoristasAtivos, icon: Users, tom: "accent" as Tom },
+      { label: "Veículos ativos", value: veiculosAtivos, icon: KPI_ICON.veiculos, tom: "primary" as Tom },
+      { label: "Motoristas ativos", value: motoristasAtivos, icon: KPI_ICON.motoristas, tom: "accent" as Tom },
       {
         label: "Manutenções pendentes",
         value: manutencoesPendentes,
-        icon: Wrench,
+        icon: KPI_ICON.manutencao,
         tom: "warning" as Tom,
         status: manutencoesPendentes > 0 ? { label: "Atenção", tom: "warning" as Tom } : undefined,
       },
       {
         label: "Documentos vencidos",
         value: documentosVencidos,
-        icon: AlertTriangle,
+        icon: KPI_ICON.documentos,
         tom: "danger" as Tom,
         status: documentosVencidos > 0 ? { label: "Urgente", tom: "danger" as Tom } : undefined,
         destaque: documentosVencidos > 0,
@@ -229,11 +231,11 @@ export function DashboardClient({
       {
         label: "Vencendo em 30 dias",
         value: documentosVencendo,
-        icon: Clock,
+        icon: KPI_ICON.agenda,
         tom: "warning" as Tom,
         status: documentosVencendo > 0 ? { label: "Próximos", tom: "warning" as Tom } : undefined,
       },
-      { label: "Custo nos últimos 30 dias", value: custo30Dias === null ? "—" : formatBRL(custo30Dias), icon: WalletCards, tom: "success" as Tom },
+      { label: "Custo nos últimos 30 dias", value: custo30Dias === null ? "—" : formatBRL(custo30Dias), icon: KPI_ICON.despesas, tom: "success" as Tom },
     ];
   }, [veiculos, motoristas, manutencoes, documentos, despesasRecentes, hojeIso]);
 
@@ -283,7 +285,7 @@ export function DashboardClient({
       )}
 
       <div data-tour="kpis" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {kpis.map(({ label, value, icon: Icon, tom, status, destaque }) => (
+        {kpis.map(({ label, value, icon, tom, status, destaque }) => (
           <Card
             key={label}
             className={cn(
@@ -300,15 +302,7 @@ export function DashboardClient({
                 className={cn("absolute inset-y-0 left-0 rounded-l-xl", destaque ? "w-1" : "w-[3px]", A_BARRA[tom])}
               />
             )}
-            <div
-              className={cn(
-                "flex items-center justify-center",
-                variante === "a" ? "size-11 rounded-xl" : "size-12 rounded-2xl",
-                variante === "a" ? A_ICONE[tom] : B_ICONE[tom]
-              )}
-            >
-              <Icon className={variante === "a" ? "size-5" : "size-5.5"} aria-hidden />
-            </div>
+            <Image src={icon} alt="" width={48} height={48} className="size-11 shrink-0 object-contain" aria-hidden />
             <div className="min-w-0">
               <p
                 className={cn(
@@ -337,15 +331,7 @@ export function DashboardClient({
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div
-                className={cn(
-                  "flex items-center justify-center",
-                  variante === "a" ? "size-9 rounded-lg" : "size-10 rounded-xl",
-                  variante === "a" ? A_ICONE.danger : B_ICONE.danger
-                )}
-              >
-                <AlertTriangle className="size-4.5" aria-hidden />
-              </div>
+              <Image src={KPI_ICON.alertas} alt="" width={40} height={40} className="size-9 shrink-0 object-contain" aria-hidden />
               <h2 className="text-sm font-semibold text-foreground">Alertas urgentes</h2>
             </div>
             {alertas.length > 0 && <Pill label={`${alertas.length} pendente${alertas.length === 1 ? "" : "s"}`} tom="danger" variante={variante} />}
@@ -389,15 +375,7 @@ export function DashboardClient({
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div
-                className={cn(
-                  "flex items-center justify-center",
-                  variante === "a" ? "size-9 rounded-lg" : "size-10 rounded-xl",
-                  variante === "a" ? A_ICONE.success : B_ICONE.success
-                )}
-              >
-                <ClipboardList className="size-4.5" aria-hidden />
-              </div>
+              <Image src={KPI_ICON.checklists} alt="" width={40} height={40} className="size-9 shrink-0 object-contain" aria-hidden />
               <h2 className="text-sm font-semibold text-foreground">Checklists hoje</h2>
             </div>
             {checklistsHoje.length > 0 && (
