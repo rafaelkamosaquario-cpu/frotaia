@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { FROTA_NAV_ITEMS, FROTA_NAV_GROUPS } from "./frotaNavItems";
 
@@ -19,14 +20,13 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
         if (items.length === 0) return null;
 
         return (
-          <div key={group} className="mb-1 last:mb-0">
-            <p className="px-2.5 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 first:pt-1">
+          <div key={group} className="mb-2 last:mb-0">
+            <p className="px-2.5 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 first:pt-1">
               {group}
             </p>
-            <ul className="flex flex-col gap-0.5">
+            <ul className="flex flex-col gap-1">
               {items.map((item) => {
                 const isActive = pathname?.startsWith(item.href);
-                const Icon = item.icon;
                 return (
                   <li key={item.href}>
                     <Link
@@ -34,13 +34,20 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                       onClick={onNavigate}
                       data-tour-href={item.href}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-lg border-l-2 px-2.5 py-2 text-sm transition-colors",
+                        "flex items-center gap-3 rounded-xl border px-2 py-1.5 text-sm transition-colors",
                         isActive
-                          ? "border-primary bg-surface-muted font-medium text-foreground"
-                          : "border-transparent text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+                          ? "border-primary/30 bg-primary/[0.08] font-medium text-foreground shadow-[0_0_18px_-8px_color-mix(in_srgb,var(--primary)_55%,transparent)]"
+                          : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-muted hover:text-foreground"
                       )}
                     >
-                      <Icon className={cn("size-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} aria-hidden />
+                      <Image
+                        src={item.icon}
+                        alt=""
+                        width={34}
+                        height={34}
+                        className={cn("size-8 shrink-0 object-contain transition-opacity", isActive ? "opacity-100" : "opacity-80")}
+                        aria-hidden
+                      />
                       <span className="flex-1 truncate">{item.label}</span>
                       {!item.disponivel && (
                         <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
