@@ -177,8 +177,11 @@ function destacarTrechosInsight(texto: string): ReactNode[] {
   return partes;
 }
 
+/** `toLocaleString` devolve "R$" e o número separados por espaço não-quebrável (U+00A0) — troca por espaço normal pra o valor poder quebrar linha em vez de estourar/cortar o card em telas estreitas. */
 function formatBRL(valor: number) {
-  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  return valor
+    .toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+    .replace(/ /g, " ");
 }
 
 function diasAte(iso: string): number {
@@ -237,7 +240,14 @@ export function DashboardClient({
         tom: "warning" as Tom,
         status: documentosVencendo > 0 ? { label: "Próximos", tom: "warning" as Tom } : undefined,
       },
-      { label: "Custo nos últimos 30 dias", value: custo30Dias === null ? "—" : formatBRL(custo30Dias), icon: KPI_ICON.despesas, tom: "success" as Tom },
+      {
+        label: "Custo nos últimos 30 dias",
+        value: custo30Dias === null ? "—" : formatBRL(custo30Dias),
+        icon: KPI_ICON.despesas,
+        tom: "success" as Tom,
+        // Valor é string monetária (bem mais larga que os contadores numéricos dos outros cards) — fonte menor evita estourar o card.
+        monetario: true,
+      },
     ];
   }, [veiculos, motoristas, manutencoes, documentos, despesasRecentes, hojeIso]);
 
@@ -286,8 +296,8 @@ export function DashboardClient({
         </Card>
       )}
 
-      <div data-tour="kpis" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {kpis.map(({ label, value, icon, tom, status, destaque }) => (
+      <div data-tour="kpis" className="grid grid-cols-2 gap-4 sm:grid-cols-3 2xl:grid-cols-6">
+        {kpis.map(({ label, value, icon, tom, status, destaque, monetario }) => (
           <Card
             key={label}
             className={cn(
@@ -308,8 +318,10 @@ export function DashboardClient({
             <div className="min-w-0">
               <p
                 className={cn(
-                  "tracking-tight tabular-nums text-foreground",
-                  variante === "a" ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl",
+                  "break-words tracking-tight tabular-nums text-foreground",
+                  monetario
+                    ? "text-xl leading-tight sm:text-2xl xl:text-3xl"
+                    : cn("leading-tight", variante === "a" ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl"),
                   destaque ? "font-extrabold" : "font-bold"
                 )}
               >

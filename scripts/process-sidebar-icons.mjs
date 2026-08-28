@@ -6,8 +6,7 @@
 // multicoloridas mais elaboradas, já vêm 100% transparentes — confirmado
 // por alpha=0 nos 4 cantos, sem precisar de flood-fill de remoção de fundo).
 // Pra trocar de novo no futuro: atualizar SRC_DIR/MAP e rodar
-// `node scripts/process-sidebar-icons.mjs`. Dashboard não tem asset próprio
-// neste pacote (nem nos anteriores) — mantido manualmente, não gerado aqui.
+// `node scripts/process-sidebar-icons.mjs`.
 import sharp from "sharp";
 import path from "path";
 import fs from "fs";
@@ -16,6 +15,7 @@ const SRC_DIR = "C:/Users/Windows11/Desktop/prints-zapi/FROTAIALOGOS/cards/A2";
 const OUT_DIR = "public/icons/sidebar";
 
 const MAP = [
+  ["dashboard.png", "ChatGPT Image 27 de ago. de 2026, 16_13_13.png"],
   ["veiculos.png", "ChatGPT Image 27 de ago. de 2026, 12_59_27 (1).png"],
   ["motoristas.png", "ChatGPT Image 27 de ago. de 2026, 12_59_27 (2).png"],
   ["fretes.png", "ChatGPT Image 27 de ago. de 2026, 12_59_28 (3).png"],
