@@ -3,9 +3,11 @@
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useTheme } from "next-themes";
 import { CheckCircle2, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
+import { useHasMounted } from "@/hooks/useHasMounted";
 import type { ChecklistDispatchRow, DriverRow, ExpenseRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
 import { computeFleetAlerts, type FleetAlertItem } from "@/services/supabase/fleetAlertsService";
 import { dispatchesFromToday } from "@/services/supabase/checklistDispatchService";
@@ -38,12 +40,15 @@ const TOM_VAR: Record<Tom, string> = {
   success: "--success",
 };
 
-/** Glow só existe na Variante B — inspirado no box-shadow colorido do card de plano em destaque da landing page (`.plano-destaque`). Inline style (não classe Tailwind) pra evitar qualquer risco de parsing de vírgula/parênteses em valor arbitrário. */
+/** Glow colorido — só no tema escuro da Variante B, inspirado no box-shadow do card de plano em destaque da landing page (`.plano-destaque`). Inline style (não classe Tailwind) pra evitar qualquer risco de parsing de vírgula/parênteses em valor arbitrário. */
 function glowB(tom: Tom, forte = false): CSSProperties {
   return {
     boxShadow: `0 ${forte ? 14 : 9}px ${forte ? 34 : 24}px ${forte ? -12 : -14}px color-mix(in srgb, var(${TOM_VAR[tom]}) ${forte ? 60 : 38}%, transparent)`,
   };
 }
+
+/** Sombra neutra do tema claro (ajuste visual 08/2026) — mesma pra todos os tons, sem glow colorido, pra não voltar ao efeito de "card pastel". */
+const SOMBRA_CLARA: CSSProperties = { boxShadow: "0 4px 14px -2px rgba(16, 24, 40, 0.05)" };
 
 /**
  * Ícones customizados (public/icons/dashboard/*.png) — cards neon "com
@@ -204,6 +209,16 @@ export function DashboardClient({
   const hojeIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const variante = cardStyle;
 
+  // Ajuste visual 08/2026: no tema claro, a Variante B deixa de preencher o
+  // card com a cor semântica (lia "pastel"/"card lavado" em fundo branco) —
+  // vira card branco + linha superior fina + sombra neutra. Tema escuro
+  // continua idêntico (glow colorido), por isso o default antes de montar
+  // (`!hasMounted`) é sempre o comportamento escuro/atual, nunca o novo
+  // visual — evita qualquer flash incorreto na primeira pintura.
+  const hasMounted = useHasMounted();
+  const { resolvedTheme } = useTheme();
+  const useDarkGlow = !hasMounted || resolvedTheme !== "light";
+
   const kpis = useMemo(() => {
     const veiculosAtivos = veiculos.filter((v) => v.active).length;
     const motoristasAtivos = motoristas.filter((m) => m.active).length;
@@ -304,14 +319,20 @@ export function DashboardClient({
               "relative flex flex-col gap-3 overflow-hidden p-5",
               variante === "a" && "border-border",
               variante === "a" && destaque && "ring-1 ring-danger/20",
-              variante === "b" && [B_BORDA[tom], B_FUNDO[tom]]
+              variante === "b" && useDarkGlow && [B_BORDA[tom], B_FUNDO[tom]]
             )}
-            style={variante === "b" ? glowB(tom, destaque) : undefined}
+            style={variante === "b" ? (useDarkGlow ? glowB(tom, destaque) : SOMBRA_CLARA) : undefined}
           >
             {variante === "a" && (
               <span
                 aria-hidden
                 className={cn("absolute inset-y-0 left-0 rounded-l-xl", destaque ? "w-1" : "w-[3px]", A_BARRA[tom])}
+              />
+            )}
+            {variante === "b" && !useDarkGlow && (
+              <span
+                aria-hidden
+                className={cn("absolute inset-x-0 top-0 rounded-t-xl", destaque ? "h-1" : "h-[3px]", A_BARRA[tom])}
               />
             )}
             <Image src={icon} alt="" width={52} height={52} className="size-10 shrink-0 object-contain sm:size-12" aria-hidden />
@@ -338,10 +359,8 @@ export function DashboardClient({
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card
-          className={cn(
-            "p-5",
-            variante === "b" && ["border-danger/15", "bg-danger/[0.025]"]
-          )}
+          className={cn("p-5", variante === "b" && useDarkGlow && ["border-danger/15", "bg-danger/[0.025]"])}
+          style={variante === "b" && !useDarkGlow ? SOMBRA_CLARA : undefined}
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -382,10 +401,8 @@ export function DashboardClient({
         </Card>
 
         <Card
-          className={cn(
-            "p-5",
-            variante === "b" && ["border-success/15", "bg-success/[0.025]"]
-          )}
+          className={cn("p-5", variante === "b" && useDarkGlow && ["border-success/15", "bg-success/[0.025]"])}
+          style={variante === "b" && !useDarkGlow ? SOMBRA_CLARA : undefined}
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -404,7 +421,7 @@ export function DashboardClient({
               <div className="mb-4 h-2 overflow-hidden rounded-full bg-surface-muted">
                 <div
                   className="h-full rounded-full bg-success transition-all"
-                  style={{ width: `${checklistPercent}%`, ...(variante === "b" ? { boxShadow: "0 0 8px color-mix(in srgb, var(--success) 55%, transparent)" } : {}) }}
+                  style={{ width: `${checklistPercent}%`, ...(variante === "b" && useDarkGlow ? { boxShadow: "0 0 8px color-mix(in srgb, var(--success) 55%, transparent)" } : {}) }}
                 />
               </div>
               <ul className="flex flex-col gap-1">

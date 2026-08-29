@@ -119,6 +119,8 @@ body {
   --primary-foreground: #ffffff;
   --accent: #0f8fb0;
   --ring: #0bae2e;
+  /* Ajuste visual 08/2026 (tema claro): borda cinza-esverdeada mais suave que o --border genérico do V1 (#e4e6eb), pra combinar com os cards brancos + linha superior semântica do Dashboard. Escopado só ao claro — .dark .frota-panel já tem sua própria --border, intocada. */
+  --border: #dce5e0;
 }
 
 .dark .frota-panel {
