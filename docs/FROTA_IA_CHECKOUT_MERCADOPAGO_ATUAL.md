@@ -146,3 +146,15 @@ Duas rodadas sucessivas no mesmo tema, cada uma fechando o que a anterior deixou
 Arquivos: `src/services/mercadopago/cancelamentoAssinaturaAnterior.ts` (orquestração — usada tanto pelo webhook quanto pela reconciliação), `src/services/supabase/subscriptionService.ts` (wrappers das RPCs), `src/app/api/payments/mercadopago/reconcile-cancellations/route.ts` (job novo), `supabase/migrations/20260826140000_subscription_pending_preapproval_cancellations.sql`.
 
 **Estado final**: preapproval antigo nunca fica ativo indefinidamente sem o sistema saber — ou é cancelado, ou fica registrado como pendente/com falha, recuperável a qualquer momento (consultável em `subscriptions.pending_preapproval_cancellations`) e resolvido automaticamente assim que possível (retry) ou manualmente (`failed`).
+
+## 14. Pendência investigada: Pix nos planos recorrentes (Individual/Gestão Mensal) — 29/08/2026
+
+Rafael perguntou se dava pra aceitar Pix nos dois planos mensais (hoje só cartão, via `POST /preapproval`) — motivado por ter acabado de cadastrar uma chave Pix na própria conta Mercado Pago. Pesquisei a documentação técnica oficial (referência de API, não só páginas de marketing) antes de responder, seguindo o princípio já usado em todo o projeto de nunca implementar contra API não verificada.
+
+**Achado confirmado**: os endpoints `POST /preapproval` e `POST /preapproval_plan` (a família de API que o código usa) **não têm nenhum campo relacionado a Pix** na referência oficial — só `card_token_id` (cartão) e o objeto `auto_recurring` (frequência/valor). Cadastrar uma chave Pix na conta não muda isso — chave Pix habilita *receber* Pix em geral (é o que já sustenta o `ANUAL_PIX`, via `checkout/preferences`), mas não é a mesma coisa que o `/preapproval` aceitar Pix como forma de cobrança recorrente.
+
+**O que existe, mas não é a mesma coisa**: o Mercado Pago tem um produto separado, "Planos de assinatura" (`/developers/pt/docs/subscription-plans`), anunciado como "sem programação necessária", que aceita Pix/cartão/boleto/saldo — mas é gerenciado direto no painel/app do Mercado Pago, sem documentação de referência de API encontrada (schema de campos, como amarrar a um `external_reference` por empresa, como o webhook avisaria este sistema). Sem isso confirmado, não dá pra integrar com segurança ao fluxo automático atual (checkout dinâmico por empresa + webhook + entitlement).
+
+**Pix Automático** (padrão novo do Banco Central, adequação obrigatória das instituições em 01/01/2026) também foi pesquisado — nenhuma documentação de desenvolvedor do Mercado Pago encontrada expondo isso como campo/endpoint pra contas comuns integrarem hoje.
+
+**Conclusão**: mantém como está (cartão nos dois planos mensais, Pix só no `ANUAL_PIX`). Pra reabrir isso: (1) Rafael testar diretamente no painel do Mercado Pago se "Planos de assinatura" com Pix gera algo integrável, ou (2) aguardar/pesquisar de novo se a Mercado Pago documentar oficialmente uma API de Pix recorrente equivalente ao `/preapproval`. Não é bug, não é limitação do código — é limitação confirmada da API do provedor de pagamento.
