@@ -92,6 +92,20 @@ function tokensMatch(a: string, b: string): boolean {
 }
 
 /**
+ * Envio pela Z-API é best-effort (nunca deve travar o processamento da
+ * mensagem recebida por causa de uma falha de envio) — mas até 31/08/2026
+ * essas falhas eram descartadas em silêncio (`.catch(() => {})`), sem log
+ * nenhum. Foi assim que um `ZAPI_CLIENT_TOKEN` inválido em produção ficou
+ * invisível: o cadastro avançava no banco normalmente, só a mensagem de
+ * resposta nunca saía, e não havia nenhum jeito de ver isso nos logs.
+ * `contexto` identifica de qual ponto do fluxo veio a falha (o texto da
+ * mensagem em si nunca é logado, só o evento/telefone/erro).
+ */
+function logZapiSendFailure(error: unknown, phoneE164: string, contexto: string): void {
+  captureError({ event: "whatsapp_envio_falhou", route: ROTA, phoneE164, contexto, error });
+}
+
+/**
  * Resolve a entrada do onboarding a partir do que o WhatsApp mandou: toque
  * numa lista (`listResponseMessage.selectedRowId`), toque num botão
  * (`buttonsResponseMessage.buttonId`) ou texto livre — nessa ordem de
@@ -189,12 +203,12 @@ async function enviarSugestoesIniciais(
       "Ver sugestões",
       SUGESTOES_LISTA_NATIVA_WHATSAPP.map((s) => ({ id: s.id, title: s.title, description: s.description }))
     );
-    await sendWhatsappText(phoneE164, LEMBRETE_PERGUNTA_LIVRE).catch(() => {});
+    await sendWhatsappText(phoneE164, LEMBRETE_PERGUNTA_LIVRE).catch((err) => logZapiSendFailure(err, phoneE164, "sugestoes_lembrete_pergunta_livre"));
     await updateOnboardingSession(admin, userId, {
       collectedData: { ...collectedDataAtual, suggestionsMenuSentAt: new Date().toISOString(), awaitingNumberedMenuSelection: false },
     });
   } catch {
-    await sendWhatsappText(phoneE164, construirFallbackNumerado()).catch(() => {});
+    await sendWhatsappText(phoneE164, construirFallbackNumerado()).catch((err) => logZapiSendFailure(err, phoneE164, "sugestoes_fallback_numerado"));
     await updateOnboardingSession(admin, userId, {
       collectedData: { ...collectedDataAtual, suggestionsMenuSentAt: new Date().toISOString(), awaitingNumberedMenuSelection: true },
     }).catch(() => {});
@@ -267,7 +281,7 @@ export async function POST(request: Request) {
         atualizado.response_status === "ok"
           ? "✅ Checklist registrado, tudo certo. Boa viagem!"
           : "⚠️ Checklist registrado. Reportei o problema — a gestão vai avaliar. Se for algo grave, não saia com o veículo antes de confirmar com a empresa.";
-      await sendWhatsappText(phoneE164, resposta).catch(() => {});
+      await sendWhatsappText(phoneE164, resposta).catch((err) => logZapiSendFailure(err, phoneE164, "checklist_resposta_confirmacao"));
       return NextResponse.json({ ok: true });
     }
   }
@@ -282,11 +296,11 @@ export async function POST(request: Request) {
     // (ver bloco de finalize abaixo), nunca pula o cadastro em si.
     const intencaoComercial = resolverIntencaoComercialLanding(textoDireto);
     if (intencaoComercial === "EMPRESAS") {
-      await sendWhatsappText(phoneE164, MENSAGEM_INTERESSE_EMPRESAS).catch(() => {});
+      await sendWhatsappText(phoneE164, MENSAGEM_INTERESSE_EMPRESAS).catch((err) => logZapiSendFailure(err, phoneE164, "landing_empresas_mensagem_interesse_novo"));
     } else if (intencaoComercial) {
       await updateOnboardingSession(admin, userId, { collectedData: { ofertaPretendida: intencaoComercial } }).catch(() => {});
     }
-    await sendWhatsappText(phoneE164, firstOnboardingMessage()).catch(() => {});
+    await sendWhatsappText(phoneE164, firstOnboardingMessage()).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_primeira_mensagem_novo"));
     return NextResponse.json({ ok: true });
   }
 
@@ -301,7 +315,7 @@ export async function POST(request: Request) {
       session = await createOnboardingSession(admin, userId, "completed");
     } else {
       session = await createOnboardingSession(admin, userId, "awaiting_name");
-      await sendWhatsappText(phoneE164, firstOnboardingMessage()).catch(() => {});
+      await sendWhatsappText(phoneE164, firstOnboardingMessage()).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_primeira_mensagem_sessao_legada"));
       return NextResponse.json({ ok: true });
     }
   }
@@ -318,7 +332,7 @@ export async function POST(request: Request) {
     }
 
     if (!entradaOnboarding) {
-      await sendWhatsappText(phoneE164, "Por enquanto, durante o cadastro, preciso que você responda em texto ou toque numa das opções.").catch(() => {});
+      await sendWhatsappText(phoneE164, "Por enquanto, durante o cadastro, preciso que você responda em texto ou toque numa das opções.").catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_pede_texto_ou_toque"));
       return NextResponse.json({ ok: true });
     }
 
@@ -344,7 +358,7 @@ export async function POST(request: Request) {
         await sendWhatsappText(
           phoneE164,
           "Tive um problema ao salvar seu cadastro agora. Pode mandar novamente sua última resposta?"
-        ).catch(() => {});
+        ).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_finalizacao_falhou"));
         // Volta pra última pergunta antes da finalização (não pro início do
         // veículo) — reaproveita os dados já coletados e só pede a última
         // resposta de novo, retentando finalizeOnboarding a partir dali.
@@ -360,7 +374,7 @@ export async function POST(request: Request) {
       const collectedDataAtual = resultado.collectedData as Record<string, unknown>;
       if (!collectedDataAtual.suggestionsMenuSentAt) {
         const mensagem = construirMensagemPosCadastro(collectedDataAtual.intentId, collectedDataAtual.intentLabel);
-        await sendWhatsappText(phoneE164, mensagem).catch(() => {});
+        await sendWhatsappText(phoneE164, mensagem).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_mensagem_pos_cadastro"));
         await enviarSugestoesIniciais(admin, userId, phoneE164, collectedDataAtual);
 
         // Cliente veio de um CTA da landing (ver bloco isNew acima) — só
@@ -370,7 +384,7 @@ export async function POST(request: Request) {
         const ofertaPretendida = collectedDataAtual.ofertaPretendida;
         if (empresaFinalizada && typeof ofertaPretendida === "string" && isOfertaPlano(ofertaPretendida)) {
           const link = buildCheckoutLinkUrl(empresaFinalizada.id, ofertaPretendida);
-          await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(ofertaPretendida)}\n\n${link}`).catch(() => {});
+          await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(ofertaPretendida)}\n\n${link}`).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_link_checkout_landing"));
         }
 
         // Guia de Primeiros Passos V1 (08/2026, validação 08/2026) —
@@ -389,7 +403,7 @@ export async function POST(request: Request) {
             const assinaturaNova = await getSubscription(admin, empresaFinalizada.id);
             const guideState = await getGuideState(admin, empresaFinalizada.id, "v1");
             if (!guideState.offeredAt && isAccessAllowed(assinaturaNova)) {
-              await enviarRespostaOnboarding(phoneE164, buildGuideOfferV1()).catch(() => {});
+              await enviarRespostaOnboarding(phoneE164, buildGuideOfferV1()).catch((err) => logZapiSendFailure(err, phoneE164, "guia_v1_oferta_pos_cadastro"));
               await markGuideOffered(admin, empresaFinalizada.id, "v1");
               logEvent({ event: "guide_v1_offered", route: ROTA, company_id: empresaFinalizada.id });
             }
@@ -401,7 +415,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    await enviarRespostaOnboarding(phoneE164, resultado.reply).catch(() => {});
+    await enviarRespostaOnboarding(phoneE164, resultado.reply).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_proxima_pergunta"));
     return NextResponse.json({ ok: true });
   }
 
@@ -411,7 +425,7 @@ export async function POST(request: Request) {
     await sendWhatsappText(
       phoneE164,
       "Falta concluir seu cadastro antes de conversar por aqui. Pode me dizer seu nome para começarmos?"
-    ).catch(() => {});
+    ).catch((err) => logZapiSendFailure(err, phoneE164, "chat_sem_empresa_retoma_cadastro"));
     await updateOnboardingSession(admin, userId, { state: "awaiting_name" });
     return NextResponse.json({ ok: true });
   }
@@ -462,7 +476,7 @@ export async function POST(request: Request) {
         });
 
         await saveGuideState(admin, companyId, "v1", { status: resultado.nextStatus, step: resultado.nextStep });
-        await enviarRespostaOnboarding(phoneE164, resultado.reply).catch(() => {});
+        await enviarRespostaOnboarding(phoneE164, resultado.reply).catch((err) => logZapiSendFailure(err, phoneE164, "guia_v1_resposta_controle"));
         logEvent({ event: `guide_v1_${resultado.nextStatus}`, route: ROTA, company_id: companyId, step: resultado.nextStep ?? guideStepV1 ?? "none" });
         return NextResponse.json({ ok: true });
       }
@@ -484,7 +498,7 @@ export async function POST(request: Request) {
   if (ehPedidoDeGuia(textoDireto) && guideStateV1.status !== "in_progress") {
     const assinaturaParaGuia = await getSubscription(admin, companyId);
     if (isAccessAllowed(assinaturaParaGuia)) {
-      await enviarRespostaOnboarding(phoneE164, buildGuideReabrirV1(guideStateV1.status, guideStepV1)).catch(() => {});
+      await enviarRespostaOnboarding(phoneE164, buildGuideReabrirV1(guideStateV1.status, guideStepV1)).catch((err) => logZapiSendFailure(err, phoneE164, "guia_v1_reabertura_manual"));
       return NextResponse.json({ ok: true });
     }
     // Sem acesso válido: cai pro fluxo normal (gate de assinatura mostra a mensagem de trial/assinatura vencida).
@@ -527,7 +541,7 @@ export async function POST(request: Request) {
       content_type: "text",
       ...inboundBase,
     });
-    await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch(() => {});
+    await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch((err) => logZapiSendFailure(err, phoneE164, "funcionalidades_texto_completo"));
     return NextResponse.json({ ok: true });
   }
 
@@ -552,10 +566,10 @@ export async function POST(request: Request) {
       ...inboundBase,
     });
     if (intencaoComercial === "EMPRESAS") {
-      await sendWhatsappText(phoneE164, MENSAGEM_INTERESSE_EMPRESAS).catch(() => {});
+      await sendWhatsappText(phoneE164, MENSAGEM_INTERESSE_EMPRESAS).catch((err) => logZapiSendFailure(err, phoneE164, "landing_empresas_mensagem_interesse_existente"));
     } else {
       const link = buildCheckoutLinkUrl(companyId, intencaoComercial);
-      await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(intencaoComercial)}\n\n${link}`).catch(() => {});
+      await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(intencaoComercial)}\n\n${link}`).catch((err) => logZapiSendFailure(err, phoneE164, "landing_link_checkout_cliente_existente"));
     }
     return NextResponse.json({ ok: true });
   }
@@ -597,7 +611,7 @@ export async function POST(request: Request) {
       content_type: "text",
       ...inboundBase,
     });
-    await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch(() => {});
+    await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch((err) => logZapiSendFailure(err, phoneE164, "sugestao_ver_tudo_texto_completo"));
     return NextResponse.json({ ok: true });
   }
 
@@ -626,14 +640,14 @@ export async function POST(request: Request) {
         metadata: { mimeType },
         ...inboundBase,
       });
-      await sendWhatsappText(phoneE164, "Recebi a imagem, mas esse formato ainda não é suportado. Pode mandar em JPEG, PNG, GIF ou WebP?").catch(() => {});
+      await sendWhatsappText(phoneE164, "Recebi a imagem, mas esse formato ainda não é suportado. Pode mandar em JPEG, PNG, GIF ou WebP?").catch((err) => logZapiSendFailure(err, phoneE164, "imagem_formato_nao_suportado"));
       return NextResponse.json({ ok: true });
     }
 
     const midia = await baixarMidia(body.image.imageUrl);
     if (!midia) {
       captureError({ event: "whatsapp_midia_download_falhou", route: ROTA, media_type: "image", error: new Error("baixarMidia devolveu null pra imagem") });
-      await sendWhatsappText(phoneE164, "Não consegui baixar a imagem agora. Pode tentar enviar de novo?").catch(() => {});
+      await sendWhatsappText(phoneE164, "Não consegui baixar a imagem agora. Pode tentar enviar de novo?").catch((err) => logZapiSendFailure(err, phoneE164, "imagem_download_falhou"));
       return NextResponse.json({ ok: true });
     }
 
@@ -648,7 +662,7 @@ export async function POST(request: Request) {
       const midiaPlanilha = await baixarMidia(body.document.documentUrl);
       if (!midiaPlanilha) {
         captureError({ event: "whatsapp_midia_download_falhou", route: ROTA, media_type: "spreadsheet", error: new Error("baixarMidia devolveu null pra planilha") });
-        await sendWhatsappText(phoneE164, "Não consegui baixar a planilha agora. Pode tentar enviar de novo?").catch(() => {});
+        await sendWhatsappText(phoneE164, "Não consegui baixar a planilha agora. Pode tentar enviar de novo?").catch((err) => logZapiSendFailure(err, phoneE164, "planilha_download_falhou"));
         return NextResponse.json({ ok: true });
       }
 
@@ -671,7 +685,7 @@ export async function POST(request: Request) {
           metadata: { fileName, mimeType, planilhaInterpretada: false },
           ...inboundBase,
         });
-        await sendWhatsappText(phoneE164, motivo).catch(() => {});
+        await sendWhatsappText(phoneE164, motivo).catch((err) => logZapiSendFailure(err, phoneE164, "planilha_parse_falhou"));
         return NextResponse.json({ ok: true });
       }
     } else if (mimeType !== "application/pdf") {
@@ -689,13 +703,13 @@ export async function POST(request: Request) {
       await sendWhatsappText(
         phoneE164,
         "Recebi o arquivo, mas só consigo ler o conteúdo de PDF, planilha (.xlsx) ou CSV — outros formatos de documento ainda não são interpretados."
-      ).catch(() => {});
+      ).catch((err) => logZapiSendFailure(err, phoneE164, "documento_tipo_nao_suportado"));
       return NextResponse.json({ ok: true });
     } else {
       const midia = await baixarMidia(body.document.documentUrl);
       if (!midia) {
         captureError({ event: "whatsapp_midia_download_falhou", route: ROTA, media_type: "pdf", error: new Error("baixarMidia devolveu null pro documento") });
-        await sendWhatsappText(phoneE164, "Não consegui baixar o documento agora. Pode tentar enviar de novo?").catch(() => {});
+        await sendWhatsappText(phoneE164, "Não consegui baixar o documento agora. Pode tentar enviar de novo?").catch((err) => logZapiSendFailure(err, phoneE164, "documento_pdf_download_falhou"));
         return NextResponse.json({ ok: true });
       }
 
@@ -718,14 +732,14 @@ export async function POST(request: Request) {
         metadata: { mimeType: audioMimeType },
         ...inboundBase,
       });
-      await sendWhatsappText(phoneE164, "Recebi seu áudio, mas ainda não consigo entender mensagens de voz — pode escrever, por favor?").catch(() => {});
+      await sendWhatsappText(phoneE164, "Recebi seu áudio, mas ainda não consigo entender mensagens de voz — pode escrever, por favor?").catch((err) => logZapiSendFailure(err, phoneE164, "audio_transcricao_nao_configurada"));
       return NextResponse.json({ ok: true });
     }
 
     const midiaAudio = await baixarMidia(body.audio.audioUrl);
     if (!midiaAudio) {
       captureError({ event: "whatsapp_midia_download_falhou", route: ROTA, media_type: "audio", error: new Error("baixarMidia devolveu null pro áudio") });
-      await sendWhatsappText(phoneE164, "Não consegui baixar seu áudio agora. Pode tentar enviar de novo, ou escrever a mensagem?").catch(() => {});
+      await sendWhatsappText(phoneE164, "Não consegui baixar seu áudio agora. Pode tentar enviar de novo, ou escrever a mensagem?").catch((err) => logZapiSendFailure(err, phoneE164, "audio_download_falhou"));
       return NextResponse.json({ ok: true });
     }
 
@@ -746,7 +760,7 @@ export async function POST(request: Request) {
         metadata: { mimeType: audioMimeType, transcrito: false },
         ...inboundBase,
       });
-      await sendWhatsappText(phoneE164, "Recebi seu áudio, mas não consegui entender o que foi dito. Pode tentar de novo, mais claro, ou escrever a mensagem?").catch(() => {});
+      await sendWhatsappText(phoneE164, "Recebi seu áudio, mas não consegui entender o que foi dito. Pode tentar de novo, mais claro, ou escrever a mensagem?").catch((err) => logZapiSendFailure(err, phoneE164, "audio_transcricao_falhou"));
       return NextResponse.json({ ok: true });
     }
   } else if (body.location) {
@@ -777,7 +791,7 @@ export async function POST(request: Request) {
       await sendWhatsappText(
         phoneE164,
         "Seu período de teste gratuito do Frota IA terminou. Pra continuar usando, é só responder \"quero assinar\" que eu te mostro os planos disponíveis."
-      ).catch(() => {});
+      ).catch((err) => logZapiSendFailure(err, phoneE164, "assinatura_bloqueio_acesso"));
       return NextResponse.json({ ok: true });
     }
   }
@@ -803,7 +817,7 @@ export async function POST(request: Request) {
     // spec). Lembra que o guia continua pausado no mesmo passo, sem alterar
     // o estado salvo.
     if (guideV1PrecisaLembrete && guideStepV1) {
-      await enviarRespostaOnboarding(phoneE164, buildGuideRetomarNudgeV1(guideStepV1)).catch(() => {});
+      await enviarRespostaOnboarding(phoneE164, buildGuideRetomarNudgeV1(guideStepV1)).catch((err) => logZapiSendFailure(err, phoneE164, "guia_v1_lembrete_retomada"));
     }
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -815,7 +829,7 @@ export async function POST(request: Request) {
       await sendWhatsappText(
         phoneE164,
         "Ainda não consigo responder automaticamente — a integração com a IA está sendo configurada. Tente novamente mais tarde."
-      ).catch(() => {});
+      ).catch((err) => logZapiSendFailure(err, phoneE164, "anthropic_nao_configurado"));
       return NextResponse.json({ ok: true });
     }
 
@@ -823,7 +837,7 @@ export async function POST(request: Request) {
     // parte de gerarRespostaAssistente, chamada à Anthropic) — sem log aqui
     // não dá pra saber o que quebrou quando cai nesse fallback genérico.
     captureError({ event: "whatsapp_resposta_ia_falhou", route: ROTA, company_id: companyId, conversation_id: conversation.id, error: err });
-    await sendWhatsappText(phoneE164, "Não consegui processar sua mensagem agora. Tente novamente em instantes.").catch(() => {});
+    await sendWhatsappText(phoneE164, "Não consegui processar sua mensagem agora. Tente novamente em instantes.").catch((err) => logZapiSendFailure(err, phoneE164, "resposta_ia_erro_generico"));
     return NextResponse.json({ ok: true });
   }
 

@@ -12,10 +12,24 @@ import { buildGeneratedDocumentStoragePath, uploadGeneratedDocumentFile } from "
 /**
  * Ferramenta: gerar_documento
  *
- * Gera um PDF e envia pelo WhatsApp na hora — sem Storage/URL pública
- * (base64 direto pra Z-API, ver zapiClient.sendWhatsappPdf). Nunca inventa
- * dado ausente: se faltar analysisRunId ou conteúdo, pede antes de gerar
- * (seção 11 do prompt V1-WhatsApp).
+ * Gera um PDF e entrega pro cliente. Nunca inventa dado ausente: se faltar
+ * analysisRunId ou conteúdo, pede antes de gerar (seção 11 do prompt
+ * V1-WhatsApp).
+ *
+ * Entrega pelo canal disponível na CONTA, não por "de onde veio a
+ * mensagem" — o motor de IA é deliberadamente agnóstico de canal (ver
+ * comentário em gerarRespostaAssistente.ts: "esta função não sabe se está
+ * sendo chamada pela web ou pelo WhatsApp"), então esta ferramenta decide
+ * sozinha pelos dados já cadastrados:
+ * - tem WhatsApp vinculado (`user_channels`) → gera, salva no Storage
+ *   (best-effort) e envia o PDF direto na conversa, como sempre;
+ * - sem WhatsApp vinculado (conta só-painel, ex.: login Google que nunca
+ *   passou pelo onboarding do WhatsApp) → gera e salva no Storage
+ *   normalmente, e a resposta aponta pra tela "Documentos gerados" do
+ *   painel, em vez de falhar com "não encontrei WhatsApp vinculado" (achado
+ *   de auditoria, 09/2026: o widget de IA do painel usa esta MESMA
+ *   ferramenta, e pedir um relatório por ali sempre falhava pra quem não
+ *   tinha WhatsApp — cliente via a tela, mas o pedido nunca dava certo).
  *
  * Dois modos de entrada:
  * - `analysisRunId`: puxa uma análise já feita (de analysis_runs — ver o
@@ -64,10 +78,6 @@ async function executar(entrada: GerarDocumentoEntrada): Promise<GerarDocumentoR
   try {
     const canais = await listChannelsForUser(admin, userId);
     const canalWhatsapp = canais.find((c) => c.channel_type === "whatsapp" && c.phone_e164);
-
-    if (!canalWhatsapp?.phone_e164) {
-      return respostaFalha(["Não encontrei um número de WhatsApp vinculado para enviar o documento."]);
-    }
 
     const [profile, company] = await Promise.all([getProfile(admin, userId), getCompany(admin, companyId)]);
 
@@ -126,19 +136,33 @@ async function executar(entrada: GerarDocumentoEntrada): Promise<GerarDocumentoR
 
     const nomeArquivo = `${tipoDocumento}-${new Date().toISOString().slice(0, 10)}.pdf`;
 
-    await sendWhatsappPdf(canalWhatsapp.phone_e164, pdfBytes, nomeArquivo);
-
-    // Persiste o PDF no Storage pra aparecer no histórico do Painel depois
-    // (fechamento de coerência 08/2026 — antes só o WhatsApp tinha o
-    // arquivo, sem jeito de recuperar). Best-effort: falha no upload nunca
-    // desfaz o envio já feito, só fica sem "baixar de novo" no Painel.
     let storagePath: string | undefined;
-    try {
-      storagePath = buildGeneratedDocumentStoragePath(companyId, nomeArquivo);
-      await uploadGeneratedDocumentFile(admin, storagePath, pdfBytes);
-    } catch (erroUpload) {
-      storagePath = undefined;
-      console.error(`[gerar-documento] Falha ao persistir o PDF no Storage (documento já foi enviado por WhatsApp normalmente): ${erroUpload instanceof Error ? erroUpload.message : String(erroUpload)}`);
+    let enviadoPeloWhatsapp = false;
+
+    if (canalWhatsapp?.phone_e164) {
+      // Com WhatsApp vinculado: comportamento de sempre — entrega primeiro
+      // (nunca atrasa o cliente esperando o Storage), Storage é best-effort
+      // depois, só pra alimentar "Documentos gerados" no painel.
+      await sendWhatsappPdf(canalWhatsapp.phone_e164, pdfBytes, nomeArquivo);
+      enviadoPeloWhatsapp = true;
+      try {
+        storagePath = buildGeneratedDocumentStoragePath(companyId, nomeArquivo);
+        await uploadGeneratedDocumentFile(admin, storagePath, pdfBytes);
+      } catch (erroUpload) {
+        storagePath = undefined;
+        console.error(`[gerar-documento] Falha ao persistir o PDF no Storage (documento já foi enviado por WhatsApp normalmente): ${erroUpload instanceof Error ? erroUpload.message : String(erroUpload)}`);
+      }
+    } else {
+      // Sem WhatsApp vinculado (conta só-painel): aqui o Storage NÃO é
+      // best-effort — é a única forma de entrega, então precisa ter
+      // sucesso antes de dizer que deu certo.
+      try {
+        storagePath = buildGeneratedDocumentStoragePath(companyId, nomeArquivo);
+        await uploadGeneratedDocumentFile(admin, storagePath, pdfBytes);
+      } catch (erroUpload) {
+        console.error(`[gerar-documento] Falha ao persistir o PDF no Storage (sem WhatsApp vinculado, era a única via de entrega): ${erroUpload instanceof Error ? erroUpload.message : String(erroUpload)}`);
+        return respostaFalha(["Gerei o documento, mas não consegui salvá-lo agora (esta conta não tem WhatsApp vinculado). Pode tentar de novo em instantes?"]);
+      }
     }
 
     const registro = await recordGeneratedDocument(admin, {
@@ -149,7 +173,7 @@ async function executar(entrada: GerarDocumentoEntrada): Promise<GerarDocumentoR
       documentType: tipoDocumento,
       title: tituloFinal,
       fileName: nomeArquivo,
-      delivered: true,
+      delivered: enviadoPeloWhatsapp,
       storagePath,
     });
 
@@ -160,8 +184,10 @@ async function executar(entrada: GerarDocumentoEntrada): Promise<GerarDocumentoR
       dadosFaltantes: [],
       documentoId: registro.id,
       nomeArquivo,
-      enviado: true,
-      mensagemResumo: `Documento "${tituloFinal}" gerado e enviado pelo WhatsApp.`,
+      enviado: enviadoPeloWhatsapp,
+      mensagemResumo: enviadoPeloWhatsapp
+        ? `Documento "${tituloFinal}" gerado e enviado pelo WhatsApp.`
+        : `Documento "${tituloFinal}" gerado — como esta conta não tem WhatsApp vinculado, acesse "Documentos gerados" no painel pra visualizar e baixar.`,
     };
   } catch (err) {
     const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
@@ -183,8 +209,8 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
 
 export const ferramentaGerarDocumento: DefinicaoFerramenta<GerarDocumentoEntrada, GerarDocumentoResultado> = {
   nome: "gerar_documento",
-  descricao: "Gera um PDF (relatório de análise, custo, comparação, resumo etc.) e envia direto pelo WhatsApp.",
-  objetivo: "Entregar ao usuário um documento formal do que já foi calculado/analisado, sem inventar dado ausente e sem depender de o usuário acessar o painel.",
+  descricao: "Gera um PDF (relatório de análise, custo, comparação, resumo etc.) e entrega pelo WhatsApp (se vinculado) ou disponibiliza no painel, em Documentos gerados.",
+  objetivo: "Entregar ao usuário um documento formal do que já foi calculado/analisado, sem inventar dado ausente, pelo canal disponível na conta.",
   parametros: PARAMETROS,
   executar,
 };
