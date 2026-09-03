@@ -343,6 +343,19 @@ export const vehicleTireUpdateSchema = vehicleTireCreateSchema.partial().extend(
   removalReason: maxText(500, "Motivo").optional(),
 });
 
+// ── revenue (receita de frete — rodada de evolução funcional 09/2026) ─────
+
+const revenueFields = z.object({
+  vehicleId: uuidSchema.nullable().optional(),
+  driverId: uuidSchema.nullable().optional(),
+  amount: monetarySchema,
+  revenueDate: z.string().date(),
+  description: maxText(2000, "Descrição").optional(),
+});
+
+export const revenueCreateSchema = revenueFields;
+export const revenueUpdateSchema = revenueFields.partial();
+
 // ── scheduled alert (manual, painel — Rodada 2 evolução funcional) ────────
 
 export const alertCreateSchema = z.object({
@@ -477,6 +490,8 @@ export const frotaIaToolNameSchema = z.enum([
   "gerenciar_abastecimento",
   // Rodada de evolução funcional 09/2026 (item 3/5): gerenciar_pneu_veiculo.
   "gerenciar_pneu_veiculo",
+  // Rodada de evolução funcional 09/2026 (item 5/5): registrar_receita.
+  "registrar_receita",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

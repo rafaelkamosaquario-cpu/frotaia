@@ -5,6 +5,7 @@ import { listDriversForPanel } from "@/services/supabase/driverService";
 import { listMaintenanceSchedulesForPanel } from "@/services/supabase/maintenanceScheduleService";
 import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
 import { listExpenses } from "@/services/supabase/expenseService";
+import { listRevenues } from "@/services/supabase/revenueService";
 import { listSavedJourneysForPanel } from "@/services/supabase/savedJourneyService";
 import { listChecklistDispatchesForPanel } from "@/services/supabase/checklistDispatchService";
 import { listAnalysisRuns } from "@/services/supabase/analysisHistoryService";
@@ -34,19 +35,20 @@ export default async function RelatoriosPage({
   const vehicleId = asString(params.vehicleId) || undefined;
   const driverId = asString(params.driverId) || undefined;
 
-  const [veiculos, motoristas, manutencoes, documentos, despesas, jornadas, checklistDispatches, analisesFrete] = await Promise.all([
+  const [veiculos, motoristas, manutencoes, documentos, despesas, receitas, jornadas, checklistDispatches, analisesFrete] = await Promise.all([
     listVehiclesForPanel(supabase, access.company.id),
     listDriversForPanel(supabase, access.company.id),
     listMaintenanceSchedulesForPanel(supabase, access.company.id),
     listVehicleDocumentsForPanel(supabase, access.company.id),
     listExpenses(supabase, { companyId: access.company.id, vehicleId, dateFrom: periodo.from, dateTo: periodo.to, limit: 500 }),
+    listRevenues(supabase, { companyId: access.company.id, vehicleId, dateFrom: periodo.from, dateTo: periodo.to, limit: 500 }),
     listSavedJourneysForPanel(supabase, access.company.id),
     listChecklistDispatchesForPanel(supabase, access.company.id),
     listAnalysisRuns(supabase, { companyId: access.company.id, analysisTypes: ["analisar_frete"], dateFrom: periodo.from, limit: 500 }),
   ]);
 
   const filtrado = filterRelatoriosInput(
-    { veiculos, motoristas, manutencoes, documentos, despesas, jornadas, checklistDispatches, analisesFrete },
+    { veiculos, motoristas, manutencoes, documentos, despesas, receitas, jornadas, checklistDispatches, analisesFrete },
     { from: periodo.from, to: periodo.to, vehicleId, driverId }
   );
 

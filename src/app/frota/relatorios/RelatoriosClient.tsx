@@ -57,6 +57,7 @@ export function RelatoriosClient({ todosVeiculos, todosMotoristas, periodo, filt
   const blocos = useMemo(() => computeRelatoriosBlocos(dados, periodo.label), [dados, periodo.label]);
 
   const custoTotalDespesas = useMemo(() => dados.despesas.reduce((soma, d) => soma + d.amount, 0), [dados.despesas]);
+  const totalReceitas = useMemo(() => dados.receitas.reduce((soma, r) => soma + r.amount, 0), [dados.receitas]);
 
   function atualizarFiltro(patch: Record<string, string | undefined>) {
     const proximos = new URLSearchParams(searchParams.toString());
@@ -169,6 +170,10 @@ export function RelatoriosClient({ todosVeiculos, todosMotoristas, periodo, filt
             <p className="text-sm font-medium text-foreground">{motoristaSelecionado.name}</p>
           </div>
         )}
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Receitas no período</p>
+          <p className="text-sm font-medium text-foreground">{formatBRL(totalReceitas)}</p>
+        </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Despesas no período</p>
           <p className="text-sm font-medium text-foreground">{formatBRL(custoTotalDespesas)}</p>

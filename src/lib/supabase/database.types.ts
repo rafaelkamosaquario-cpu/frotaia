@@ -1518,6 +1518,84 @@ export type Database = {
         }
         Relationships: []
       }
+      revenues: {
+        Row: {
+          amount: number
+          analysis_run_id: string | null
+          company_id: string
+          conversation_id: string | null
+          created_at: string
+          description: string | null
+          driver_id: string | null
+          id: string
+          revenue_date: string
+          user_id: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          amount: number
+          analysis_run_id?: string | null
+          company_id: string
+          conversation_id?: string | null
+          created_at?: string
+          description?: string | null
+          driver_id?: string | null
+          id?: string
+          revenue_date: string
+          user_id: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          amount?: number
+          analysis_run_id?: string | null
+          company_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          description?: string | null
+          driver_id?: string | null
+          id?: string
+          revenue_date?: string
+          user_id?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenues_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_journeys: {
         Row: {
           actual_arrival: string | null
@@ -2654,6 +2732,7 @@ export type Database = {
         | "gerenciar_fornecedor"
         | "gerenciar_abastecimento"
         | "gerenciar_pneu_veiculo"
+        | "registrar_receita"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -2978,6 +3057,7 @@ export const Constants = {
         "gerenciar_fornecedor",
         "gerenciar_abastecimento",
         "gerenciar_pneu_veiculo",
+        "registrar_receita",
       ],
       fuel_type: [
         "diesel_s10",

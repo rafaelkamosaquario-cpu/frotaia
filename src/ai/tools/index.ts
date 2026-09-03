@@ -57,6 +57,7 @@ export * from "./gerenciar-checklist-config";
 export * from "./gerenciar-fornecedor";
 export * from "./gerenciar-abastecimento";
 export * from "./gerenciar-pneu-veiculo";
+export * from "./registrar-receita";
 
 import { ferramentaAnalisarFrete } from "./analisar-frete";
 import { ferramentaCalcularCombustivel } from "./calcular-combustivel";
@@ -96,6 +97,7 @@ import { ferramentaGerenciarChecklistConfig } from "./gerenciar-checklist-config
 import { ferramentaGerenciarFornecedor } from "./gerenciar-fornecedor";
 import { ferramentaGerenciarAbastecimento } from "./gerenciar-abastecimento";
 import { ferramentaGerenciarPneuVeiculo } from "./gerenciar-pneu-veiculo";
+import { ferramentaRegistrarReceita } from "./registrar-receita";
 import type { DefinicaoFerramenta, ResultadoFerramentaBase } from "./types";
 
 /**
@@ -147,4 +149,5 @@ export const FERRAMENTAS_FROTA_IA: ReadonlyArray<DefinicaoFerramenta<never, Resu
   ferramentaGerenciarFornecedor,
   ferramentaGerenciarAbastecimento,
   ferramentaGerenciarPneuVeiculo,
+  ferramentaRegistrarReceita,
 ];

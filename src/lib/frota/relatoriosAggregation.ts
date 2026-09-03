@@ -5,6 +5,7 @@ import type {
   ExpenseRow,
   ExpenseTypeEnum,
   MaintenanceScheduleRow,
+  RevenueRow,
   SavedJourneyRow,
   VehicleDocumentRow,
   VehicleRow,
@@ -93,6 +94,8 @@ export interface RelatoriosInput {
   documentos: VehicleDocumentRow[];
   /** Sem filtro — a filtragem por período/veículo/motorista acontece via filterRelatoriosInput. */
   despesas: ExpenseRow[];
+  /** Sem filtro — mesmo espírito de despesas. Junto com despesas, alimenta o bloco "Resultado (período)". */
+  receitas: RevenueRow[];
   jornadas: SavedJourneyRow[];
   checklistDispatches: ChecklistDispatchRow[];
   /** Já vem filtrado a analysis_type='analisar_frete' na query — ver RelatoriosPage. */
@@ -192,6 +195,8 @@ export function filterRelatoriosInput(input: RelatoriosInput, filtro: Relatorios
       (d) => (!vehicleId || d.vehicle_id === vehicleId) && (!driverId || d.driver_id === driverId) && dentroDoPeriodo(d.expiry_date, from, to)
     ),
     despesas: input.despesas.filter((d) => (!vehicleId || d.vehicle_id === vehicleId) && dentroDoPeriodo(d.expense_date, from, to)),
+    // Motorista não filtra receitas (revenues.driver_id existe, mas o registro não é feito por essa relação hoje — mesmo critério de despesas: só reduz por veículo/período).
+    receitas: input.receitas.filter((r) => (!vehicleId || r.vehicle_id === vehicleId) && dentroDoPeriodo(r.revenue_date, from, to)),
     jornadas: input.jornadas.filter(
       (j) => (!vehicleId || j.vehicle_id === vehicleId) && (!driverId || j.driver_id === driverId) && dentroDoPeriodo(j.scheduled_departure, from, to)
     ),
@@ -251,6 +256,19 @@ export function computeRelatoriosBlocos(input: RelatoriosInput, periodoLabel = "
   ];
 
   if (input.despesas.length > 0) blocos.push({ titulo: `Despesas por tipo (${periodoLabel})`, linhas: custoPorTipoDespesa, formatarValor: formatBRL });
+  if (input.despesas.length > 0 || input.receitas.length > 0) {
+    const totalReceitas = input.receitas.reduce((soma, r) => soma + r.amount, 0);
+    const totalDespesas = input.despesas.reduce((soma, d) => soma + d.amount, 0);
+    blocos.push({
+      titulo: `Resultado (${periodoLabel})`,
+      linhas: [
+        { label: "Receita", valor: totalReceitas },
+        { label: "Custo", valor: totalDespesas },
+        { label: "Resultado (receita − custo)", valor: totalReceitas - totalDespesas },
+      ],
+      formatarValor: formatBRL,
+    });
+  }
   if (input.jornadas.length > 0) blocos.push({ titulo: "Jornadas por status", linhas: jornadasPorStatus });
   if (input.checklistDispatches.length > 0) {
     blocos.push({ titulo: "Checklists por status", linhas: checklistsPorStatus });

@@ -52,6 +52,10 @@ export type VehicleTireRow = PublicTables["vehicle_tires"]["Row"];
 export type VehicleTireInsert = PublicTables["vehicle_tires"]["Insert"];
 export type VehicleTireUpdate = PublicTables["vehicle_tires"]["Update"];
 
+export type RevenueRow = PublicTables["revenues"]["Row"];
+export type RevenueInsert = PublicTables["revenues"]["Insert"];
+export type RevenueUpdate = PublicTables["revenues"]["Update"];
+
 export type CompanyPreferencesRow = PublicTables["company_preferences"]["Row"];
 export type CompanyPreferencesInsert = PublicTables["company_preferences"]["Insert"];
 export type CompanyPreferencesUpdate = PublicTables["company_preferences"]["Update"];
