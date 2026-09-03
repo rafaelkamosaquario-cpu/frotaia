@@ -54,6 +54,7 @@ export * from "./gerenciar-radar-frete";
 export * from "./consultar-oportunidades-frete";
 export * from "./gerenciar-empresa";
 export * from "./gerenciar-checklist-config";
+export * from "./gerenciar-fornecedor";
 
 import { ferramentaAnalisarFrete } from "./analisar-frete";
 import { ferramentaCalcularCombustivel } from "./calcular-combustivel";
@@ -90,6 +91,7 @@ import { ferramentaGerenciarRadarFrete } from "./gerenciar-radar-frete";
 import { ferramentaConsultarOportunidadesFrete } from "./consultar-oportunidades-frete";
 import { ferramentaGerenciarEmpresa } from "./gerenciar-empresa";
 import { ferramentaGerenciarChecklistConfig } from "./gerenciar-checklist-config";
+import { ferramentaGerenciarFornecedor } from "./gerenciar-fornecedor";
 import type { DefinicaoFerramenta, ResultadoFerramentaBase } from "./types";
 
 /**
@@ -138,4 +140,5 @@ export const FERRAMENTAS_FROTA_IA: ReadonlyArray<DefinicaoFerramenta<never, Resu
   ferramentaConsultarOportunidadesFrete,
   ferramentaGerenciarEmpresa,
   ferramentaGerenciarChecklistConfig,
+  ferramentaGerenciarFornecedor,
 ];

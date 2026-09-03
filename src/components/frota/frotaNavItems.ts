@@ -36,9 +36,11 @@ export const SIDEBAR_ICONS = {
   noticias: "/icons/sidebar/noticias.png",
   empresa: "/icons/sidebar/empresa.png",
   configuracoes: "/icons/sidebar/configuracoes.png",
+  /** Reaproveita o ícone de "empresa" (prédio) — pacote A2 não tem sobra pra um glifo novo; prédio genérico representa bem um fornecedor/posto externo. */
+  fornecedores: "/icons/sidebar/empresa.png",
 } as const satisfies Record<string, string>;
 
-/** Mesmas 18 rotas de sempre (nenhuma mudou) — refinamento visual 08/2026. */
+/** 19 rotas — Postos e fornecedores adicionada na rodada de evolução funcional 09/2026 (item 1/5). */
 export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/dashboard", label: "Dashboard", icon: SIDEBAR_ICONS.dashboard, group: "Visão geral", disponivel: true },
 
@@ -53,6 +55,7 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/jornadas", label: "Jornadas", icon: SIDEBAR_ICONS.jornadas, group: "Gestão", disponivel: true },
   { href: "/frota/rotas", label: "Rotas salvas", icon: SIDEBAR_ICONS.rotas, group: "Gestão", disponivel: true },
   { href: "/frota/checklists", label: "Checklists", icon: SIDEBAR_ICONS.checklists, group: "Gestão", disponivel: true },
+  { href: "/frota/fornecedores", label: "Postos e fornecedores", icon: SIDEBAR_ICONS.fornecedores, group: "Gestão", disponivel: true },
 
   { href: "/frota/agenda", label: "Agenda", icon: SIDEBAR_ICONS.agenda, group: "Acompanhamento", disponivel: true },
   { href: "/frota/alertas", label: "Alertas", icon: SIDEBAR_ICONS.alertas, group: "Acompanhamento", disponivel: true },

@@ -284,6 +284,21 @@ export const savedRouteCreateSchema = z.object({
 
 export const savedRouteUpdateSchema = savedRouteCreateSchema.partial();
 
+// ── vendor (posto/fornecedor — rodada de evolução funcional 09/2026) ──────
+
+export const vendorCategorySchema = z.enum(["posto_combustivel", "oficina_mecanica", "fornecedor_pecas", "outro"]);
+
+export const vendorCreateSchema = z.object({
+  name: maxText(120, "Nome").min(1, "Nome é obrigatório."),
+  category: vendorCategorySchema.optional(),
+  address: maxText(200, "Endereço").optional(),
+  phone: maxText(30, "Telefone").optional(),
+  notes: maxText(2000, "Observações").optional(),
+  active: z.boolean().optional(),
+});
+
+export const vendorUpdateSchema = vendorCreateSchema.partial();
+
 // ── scheduled alert (manual, painel — Rodada 2 evolução funcional) ────────
 
 export const alertCreateSchema = z.object({
@@ -411,6 +426,9 @@ export const frotaIaToolNameSchema = z.enum([
   "consultar_oportunidades_frete",
   "gerenciar_empresa",
   "gerenciar_checklist_config",
+  // Rodada de evolução funcional 09/2026 (comparação com sistema de
+  // planilha "Frota 7.15"): gerenciar_fornecedor.
+  "gerenciar_fornecedor",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

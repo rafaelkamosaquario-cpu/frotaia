@@ -40,6 +40,10 @@ export type SavedRouteRow = PublicTables["saved_routes"]["Row"];
 export type SavedRouteInsert = PublicTables["saved_routes"]["Insert"];
 export type SavedRouteUpdate = PublicTables["saved_routes"]["Update"];
 
+export type VendorRow = PublicTables["vendors"]["Row"];
+export type VendorInsert = PublicTables["vendors"]["Insert"];
+export type VendorUpdate = PublicTables["vendors"]["Update"];
+
 export type CompanyPreferencesRow = PublicTables["company_preferences"]["Row"];
 export type CompanyPreferencesInsert = PublicTables["company_preferences"]["Insert"];
 export type CompanyPreferencesUpdate = PublicTables["company_preferences"]["Update"];
@@ -140,6 +144,7 @@ export type ScheduledAlertStatus = PublicEnums["scheduled_alert_status"];
 export type VehicleTypeEnum = PublicEnums["vehicle_type"];
 export type FuelTypeEnum = PublicEnums["fuel_type"];
 export type TireCategoryEnum = PublicEnums["tire_category"];
+export type VendorCategoryEnum = PublicEnums["vendor_category"];
 export type AiMemoryTypeEnum = PublicEnums["ai_memory_type"];
 export type AiMemorySourceTypeEnum = PublicEnums["ai_memory_source_type"];
 export type FrotaIaToolName = PublicEnums["frota_ia_tool_name"];
