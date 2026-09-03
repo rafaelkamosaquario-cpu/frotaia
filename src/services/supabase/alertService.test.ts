@@ -8,8 +8,10 @@ import { resolveAlertOrigin, isEditableAlert } from "./alertService";
  * regra "não duplicar/confundir alerta automático com manual".
  */
 
-function alerta(overrides: Partial<{ maintenance_schedule_id: string | null; vehicle_document_id: string | null; category: string | null }>) {
-  return { maintenance_schedule_id: null, vehicle_document_id: null, category: null, ...overrides };
+function alerta(
+  overrides: Partial<{ maintenance_schedule_id: string | null; vehicle_document_id: string | null; vehicle_tire_id: string | null; category: string | null }>
+) {
+  return { maintenance_schedule_id: null, vehicle_document_id: null, vehicle_tire_id: null, category: null, ...overrides };
 }
 
 describe("resolveAlertOrigin", () => {
@@ -19,6 +21,10 @@ describe("resolveAlertOrigin", () => {
 
   it("documento vence sobre category quando não há manutenção", () => {
     expect(resolveAlertOrigin(alerta({ vehicle_document_id: "d1" }))).toBe("documento");
+  });
+
+  it("pneu vence sobre category quando não há manutenção/documento", () => {
+    expect(resolveAlertOrigin(alerta({ vehicle_tire_id: "t1", category: "outra-coisa" }))).toBe("pneu");
   });
 
   it("checklist só é identificado pela convenção de category, sem FK própria", () => {
@@ -38,8 +44,9 @@ describe("isEditableAlert", () => {
     expect(isEditableAlert(alerta({ category: "checklist" }))).toBe(true);
   });
 
-  it("manutenção e documento NUNCA são editáveis diretamente — mesma regra que a RLS de escrita aplica", () => {
+  it("manutenção, documento e pneu NUNCA são editáveis diretamente — mesma regra que a RLS de escrita aplica", () => {
     expect(isEditableAlert(alerta({ maintenance_schedule_id: "m1" }))).toBe(false);
     expect(isEditableAlert(alerta({ vehicle_document_id: "d1" }))).toBe(false);
+    expect(isEditableAlert(alerta({ vehicle_tire_id: "t1" }))).toBe(false);
   });
 });

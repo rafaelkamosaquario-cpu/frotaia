@@ -1734,6 +1734,7 @@ export type Database = {
           user_id: string
           vehicle_document_id: string | null
           vehicle_id: string | null
+          vehicle_tire_id: string | null
         }
         Insert: {
           category?: string | null
@@ -1752,6 +1753,7 @@ export type Database = {
           user_id: string
           vehicle_document_id?: string | null
           vehicle_id?: string | null
+          vehicle_tire_id?: string | null
         }
         Update: {
           category?: string | null
@@ -1770,6 +1772,7 @@ export type Database = {
           user_id?: string
           vehicle_document_id?: string | null
           vehicle_id?: string | null
+          vehicle_tire_id?: string | null
         }
         Relationships: [
           {
@@ -1805,6 +1808,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_alerts_vehicle_tire_id_fkey"
+            columns: ["vehicle_tire_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_tires"
             referencedColumns: ["id"]
           },
         ]
@@ -2274,6 +2284,94 @@ export type Database = {
           },
         ]
       }
+      vehicle_tires: {
+        Row: {
+          brand: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          expected_life_km: number | null
+          id: string
+          last_checked_km: number | null
+          model: string | null
+          mounted_at: string | null
+          mounted_km: number | null
+          notes: string | null
+          position: string | null
+          removal_reason: string | null
+          removed_at: string | null
+          status: Database["public"]["Enums"]["vehicle_tire_status"]
+          tire_profile_id: string | null
+          updated_at: string
+          updated_by: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          brand?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          expected_life_km?: number | null
+          id?: string
+          last_checked_km?: number | null
+          model?: string | null
+          mounted_at?: string | null
+          mounted_km?: number | null
+          notes?: string | null
+          position?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          status?: Database["public"]["Enums"]["vehicle_tire_status"]
+          tire_profile_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          brand?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          expected_life_km?: number | null
+          id?: string
+          last_checked_km?: number | null
+          model?: string | null
+          mounted_at?: string | null
+          mounted_km?: number | null
+          notes?: string | null
+          position?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          status?: Database["public"]["Enums"]["vehicle_tire_status"]
+          tire_profile_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_tires_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_tires_tire_profile_id_fkey"
+            columns: ["tire_profile_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_tire_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_tires_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicles: {
         Row: {
           active: boolean
@@ -2555,6 +2653,7 @@ export type Database = {
         | "gerenciar_checklist_config"
         | "gerenciar_fornecedor"
         | "gerenciar_abastecimento"
+        | "gerenciar_pneu_veiculo"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -2633,6 +2732,7 @@ export type Database = {
         | "toxicologico"
         | "seguro"
         | "licenciamento"
+      vehicle_tire_status: "montado" | "estoque" | "manutencao" | "sucateado"
       vehicle_type:
         | "utilitario"
         | "tres_quartos"
@@ -2877,6 +2977,7 @@ export const Constants = {
         "gerenciar_checklist_config",
         "gerenciar_fornecedor",
         "gerenciar_abastecimento",
+        "gerenciar_pneu_veiculo",
       ],
       fuel_type: [
         "diesel_s10",
@@ -2965,6 +3066,7 @@ export const Constants = {
         "seguro",
         "licenciamento",
       ],
+      vehicle_tire_status: ["montado", "estoque", "manutencao", "sucateado"],
       vehicle_type: [
         "utilitario",
         "tres_quartos",

@@ -1,7 +1,8 @@
-import type { MaintenanceScheduleRow, VehicleDocumentRow, VehicleDocumentTypeEnum, VehicleRow } from "@/lib/supabase/tables";
+import type { MaintenanceScheduleRow, VehicleDocumentRow, VehicleDocumentTypeEnum, VehicleRow, VehicleTireRow } from "@/lib/supabase/tables";
 import { listVehiclesForPanel } from "./vehicleService";
 import { listMaintenanceSchedulesForPanel } from "./maintenanceScheduleService";
 import { listVehicleDocumentsForPanel } from "./vehicleDocumentService";
+import { computeTireKm } from "./vehicleTireService";
 import type { SupabaseDbClient } from "./types";
 
 /**
@@ -221,6 +222,69 @@ export async function syncDocumentAlert(
     vehicle_id: documento.vehicle_id,
     title: titulo,
     category: "documento",
+    scheduled_for: agendadoPara,
+    status: "pending",
+  });
+  if (error) throw error;
+}
+
+/** Km restante abaixo disso dispara alerta automático de pneu (item 3/5 da rodada de evolução funcional 09/2026) — mesmo espírito do LIMITE_DIAS_PADRAO acima, só que por km em vez de data. */
+export const LIMIAR_KM_RESTANTE_PNEU_PADRAO = 1000;
+
+/**
+ * Mesmo princípio de `syncMaintenanceAlert`/`syncDocumentAlert`, mas
+ * disparado por KM em vez de data — chamado sempre que
+ * `gerenciar_pneu_veiculo` (modo ATUALIZAR_KM) ou `/api/frota/pneus`
+ * atualiza a leitura de km de um pneu. Sem data prevista pra "vencer": o
+ * alerta é agendado pra agora mesmo (`scheduled_for = now()`), já que a
+ * condição (km restante baixo) já é verdadeira no momento da leitura —
+ * o próximo ciclo do cron de disparo (`/api/alerts/dispatch`) já pega.
+ */
+export async function syncTireAlert(
+  client: SupabaseDbClient,
+  companyId: string,
+  userId: string,
+  tire: VehicleTireRow,
+  limiarKm: number = LIMIAR_KM_RESTANTE_PNEU_PADRAO
+): Promise<void> {
+  const { data: pendente, error: erroConsulta } = await client
+    .from("scheduled_alerts")
+    .select("id")
+    .eq("vehicle_tire_id", tire.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (erroConsulta) throw erroConsulta;
+
+  const { kmRestante } = computeTireKm(tire);
+  const precisaAlerta = tire.status === "montado" && kmRestante !== null && kmRestante <= limiarKm;
+
+  if (!precisaAlerta) {
+    if (pendente) {
+      const { error } = await client.from("scheduled_alerts").update({ status: "cancelled" }).eq("id", pendente.id);
+      if (error) throw error;
+    }
+    return;
+  }
+
+  const titulo = `Pneu${tire.position ? ` (${tire.position})` : ""}: só ~${Math.max(kmRestante, 0)} km restantes`;
+  const agendadoPara = new Date().toISOString();
+
+  if (pendente) {
+    const { error } = await client
+      .from("scheduled_alerts")
+      .update({ title: titulo, scheduled_for: agendadoPara, vehicle_id: tire.vehicle_id })
+      .eq("id", pendente.id);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await client.from("scheduled_alerts").insert({
+    company_id: companyId,
+    user_id: userId,
+    vehicle_tire_id: tire.id,
+    vehicle_id: tire.vehicle_id,
+    title: titulo,
+    category: "pneu",
     scheduled_for: agendadoPara,
     status: "pending",
   });

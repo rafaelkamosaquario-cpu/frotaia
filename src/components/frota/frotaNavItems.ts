@@ -40,9 +40,11 @@ export const SIDEBAR_ICONS = {
   fornecedores: "/icons/sidebar/empresa.png",
   /** Reaproveita o ícone de "despesas" (recibo) — pacote A2 não tem glifo de combustível/bomba; abastecimento sempre sincroniza uma despesa, então o recibo ainda faz sentido semântico. Não fica adjacente a Despesas na ordem do menu pra reduzir confusão visual. */
   abastecimentos: "/icons/sidebar/despesas.png",
+  /** Reaproveita o ícone de "manutencao" (chave/engrenagem) — pacote A2 não tem glifo de pneu; controle de vida útil/desgaste é semanticamente o mais próximo dos existentes. Não fica adjacente a Manutenção na ordem do menu. */
+  pneus: "/icons/sidebar/manutencao.png",
 } as const satisfies Record<string, string>;
 
-/** 20 rotas — Postos e fornecedores (item 1/5) e Abastecimentos (item 2/5) adicionadas na rodada de evolução funcional 09/2026. */
+/** 21 rotas — Postos e fornecedores (item 1/5), Abastecimentos (item 2/5) e Pneus (item 3/5) adicionadas na rodada de evolução funcional 09/2026. */
 export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/dashboard", label: "Dashboard", icon: SIDEBAR_ICONS.dashboard, group: "Visão geral", disponivel: true },
 
@@ -59,6 +61,7 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/checklists", label: "Checklists", icon: SIDEBAR_ICONS.checklists, group: "Gestão", disponivel: true },
   { href: "/frota/fornecedores", label: "Postos e fornecedores", icon: SIDEBAR_ICONS.fornecedores, group: "Gestão", disponivel: true },
   { href: "/frota/abastecimentos", label: "Abastecimentos", icon: SIDEBAR_ICONS.abastecimentos, group: "Gestão", disponivel: true },
+  { href: "/frota/pneus", label: "Pneus", icon: SIDEBAR_ICONS.pneus, group: "Gestão", disponivel: true },
 
   { href: "/frota/agenda", label: "Agenda", icon: SIDEBAR_ICONS.agenda, group: "Acompanhamento", disponivel: true },
   { href: "/frota/alertas", label: "Alertas", icon: SIDEBAR_ICONS.alertas, group: "Acompanhamento", disponivel: true },

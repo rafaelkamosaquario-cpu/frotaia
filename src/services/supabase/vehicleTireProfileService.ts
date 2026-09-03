@@ -15,6 +15,13 @@ export async function listTireProfiles(
   return data ?? [];
 }
 
+/** Usado por gerenciar_pneu_veiculo pra validar tireProfileId antes de linkar — mesmo princípio de getVendor/getDriver (nunca confiar só no id que o modelo mandou). */
+export async function getTireProfile(client: SupabaseDbClient, tireProfileId: string): Promise<VehicleTireProfileRow | null> {
+  const { data, error } = await client.from("vehicle_tire_profiles").select("*").eq("id", tireProfileId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function createTireProfile(
   client: SupabaseDbClient,
   companyId: string,

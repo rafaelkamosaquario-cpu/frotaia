@@ -61,24 +61,26 @@ export async function cancelAlert(client: SupabaseDbClient, alertId: string, com
   if (error) throw error;
 }
 
-export type AlertOrigin = "manutencao" | "documento" | "checklist" | "manual";
+export type AlertOrigin = "manutencao" | "documento" | "pneu" | "checklist" | "manual";
 
 /**
  * `category` é texto livre (sem enum/check no banco) — nunca confiável sozinho como discriminador.
- * A origem real vem dos FKs (`maintenance_schedule_id`/`vehicle_document_id`); checklist é a única
- * origem automática sem FK próprio, identificada pela convenção de `category: "checklist"` já usada
- * por `avisarGestorChecklistComAtencao`. Qualquer outra coisa é alerta manual (painel ou WhatsApp).
+ * A origem real vem dos FKs (`maintenance_schedule_id`/`vehicle_document_id`/`vehicle_tire_id`);
+ * checklist é a única origem automática sem FK próprio, identificada pela convenção de
+ * `category: "checklist"` já usada por `avisarGestorChecklistComAtencao`. Qualquer outra coisa é
+ * alerta manual (painel ou WhatsApp).
  */
-export function resolveAlertOrigin(alert: Pick<ScheduledAlertRow, "maintenance_schedule_id" | "vehicle_document_id" | "category">): AlertOrigin {
+export function resolveAlertOrigin(alert: Pick<ScheduledAlertRow, "maintenance_schedule_id" | "vehicle_document_id" | "vehicle_tire_id" | "category">): AlertOrigin {
   if (alert.maintenance_schedule_id) return "manutencao";
   if (alert.vehicle_document_id) return "documento";
+  if (alert.vehicle_tire_id) return "pneu";
   if (alert.category === "checklist") return "checklist";
   return "manual";
 }
 
 /** Só alertas manuais (sem origem automática) podem ser editados/cancelados diretamente — mesma regra que a RLS de escrita já aplica no banco (ver migration 20260824100000). */
-export function isEditableAlert(alert: Pick<ScheduledAlertRow, "maintenance_schedule_id" | "vehicle_document_id">): boolean {
-  return alert.maintenance_schedule_id === null && alert.vehicle_document_id === null;
+export function isEditableAlert(alert: Pick<ScheduledAlertRow, "maintenance_schedule_id" | "vehicle_document_id" | "vehicle_tire_id">): boolean {
+  return alert.maintenance_schedule_id === null && alert.vehicle_document_id === null && alert.vehicle_tire_id === null;
 }
 
 export async function getAlert(client: SupabaseDbClient, alertId: string, companyId: string): Promise<ScheduledAlertRow | null> {

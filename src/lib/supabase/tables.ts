@@ -48,6 +48,10 @@ export type FuelFillupRow = PublicTables["fuel_fillups"]["Row"];
 export type FuelFillupInsert = PublicTables["fuel_fillups"]["Insert"];
 export type FuelFillupUpdate = PublicTables["fuel_fillups"]["Update"];
 
+export type VehicleTireRow = PublicTables["vehicle_tires"]["Row"];
+export type VehicleTireInsert = PublicTables["vehicle_tires"]["Insert"];
+export type VehicleTireUpdate = PublicTables["vehicle_tires"]["Update"];
+
 export type CompanyPreferencesRow = PublicTables["company_preferences"]["Row"];
 export type CompanyPreferencesInsert = PublicTables["company_preferences"]["Insert"];
 export type CompanyPreferencesUpdate = PublicTables["company_preferences"]["Update"];
@@ -149,6 +153,7 @@ export type VehicleTypeEnum = PublicEnums["vehicle_type"];
 export type FuelTypeEnum = PublicEnums["fuel_type"];
 export type TireCategoryEnum = PublicEnums["tire_category"];
 export type VendorCategoryEnum = PublicEnums["vendor_category"];
+export type VehicleTireStatusEnum = PublicEnums["vehicle_tire_status"];
 export type AiMemoryTypeEnum = PublicEnums["ai_memory_type"];
 export type AiMemorySourceTypeEnum = PublicEnums["ai_memory_source_type"];
 export type FrotaIaToolName = PublicEnums["frota_ia_tool_name"];

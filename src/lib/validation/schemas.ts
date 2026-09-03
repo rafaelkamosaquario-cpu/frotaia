@@ -318,6 +318,31 @@ export const fuelFillupCreateSchema = z.object({
 
 export const fuelFillupUpdateSchema = fuelFillupCreateSchema.partial();
 
+// ── vehicle tire (pneu físico individual — rodada de evolução 09/2026) ────
+
+export const vehicleTireStatusSchema = z.enum(["montado", "estoque", "manutencao", "sucateado"]);
+
+const nonNegativeTireKmSchema = z.number().finite().nonnegative("Quilometragem não pode ser negativa.");
+
+export const vehicleTireCreateSchema = z.object({
+  vehicleId: uuidSchema.nullable().optional(),
+  tireProfileId: uuidSchema.nullable().optional(),
+  position: maxText(60, "Posição").optional(),
+  brand: maxText(80, "Marca").optional(),
+  model: maxText(80, "Modelo").optional(),
+  status: vehicleTireStatusSchema.optional(),
+  mountedAt: z.string().date().optional(),
+  mountedKm: nonNegativeTireKmSchema.optional(),
+  lastCheckedKm: nonNegativeTireKmSchema.optional(),
+  expectedLifeKm: nonNegativeTireKmSchema.optional(),
+  notes: maxText(2000, "Observações").optional(),
+});
+
+export const vehicleTireUpdateSchema = vehicleTireCreateSchema.partial().extend({
+  removedAt: z.string().date().optional(),
+  removalReason: maxText(500, "Motivo").optional(),
+});
+
 // ── scheduled alert (manual, painel — Rodada 2 evolução funcional) ────────
 
 export const alertCreateSchema = z.object({
@@ -450,6 +475,8 @@ export const frotaIaToolNameSchema = z.enum([
   "gerenciar_fornecedor",
   // Rodada de evolução funcional 09/2026 (item 2/5): gerenciar_abastecimento.
   "gerenciar_abastecimento",
+  // Rodada de evolução funcional 09/2026 (item 3/5): gerenciar_pneu_veiculo.
+  "gerenciar_pneu_veiculo",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

@@ -33,8 +33,8 @@ function chamarDelete(id: string) {
   };
 }
 
-const ALERTA_MANUAL = { id: "a1", maintenance_schedule_id: null, vehicle_document_id: null, category: null, status: "pending", title: "X" };
-const ALERTA_MANUTENCAO = { id: "a2", maintenance_schedule_id: "m1", vehicle_document_id: null, category: "manutencao", status: "pending", title: "Y" };
+const ALERTA_MANUAL = { id: "a1", maintenance_schedule_id: null, vehicle_document_id: null, vehicle_tire_id: null, category: null, status: "pending", title: "X" };
+const ALERTA_MANUTENCAO = { id: "a2", maintenance_schedule_id: "m1", vehicle_document_id: null, vehicle_tire_id: null, category: "manutencao", status: "pending", title: "Y" };
 
 describe("/api/frota/alertas/[id]", () => {
   beforeEach(() => {

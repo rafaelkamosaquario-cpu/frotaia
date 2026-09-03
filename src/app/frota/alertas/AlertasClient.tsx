@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Bell, Plus, SquarePen, Ban, Clock, Wrench, FileText, ClipboardCheck, User } from "lucide-react";
+import { AlertTriangle, Bell, Plus, SquarePen, Ban, Clock, Wrench, FileText, ClipboardCheck, User, Disc } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -17,8 +17,9 @@ interface AlertasClientProps {
   veiculos: VehicleRow[];
 }
 
-const ORIGEM_LABEL: Record<AlertOrigin, string> = { manual: "Manual", manutencao: "Manutenção", documento: "Documento", checklist: "Checklist" };
-const ORIGEM_ICON: Record<AlertOrigin, typeof Wrench> = { manual: Bell, manutencao: Wrench, documento: FileText, checklist: ClipboardCheck };
+const ORIGEM_LABEL: Record<AlertOrigin, string> = { manual: "Manual", manutencao: "Manutenção", documento: "Documento", pneu: "Pneu", checklist: "Checklist" };
+const ORIGEM_ICON: Record<AlertOrigin, typeof Wrench> = { manual: Bell, manutencao: Wrench, documento: FileText, pneu: Disc, checklist: ClipboardCheck };
+const ORIGEM_HREF: Record<Exclude<AlertOrigin, "manual" | "checklist">, string> = { manutencao: "/frota/manutencao", documento: "/frota/documentos", pneu: "/frota/pneus" };
 
 const STATUS_LABEL: Record<ScheduledAlertStatus, string> = {
   pending: "Pendente",
@@ -201,10 +202,10 @@ export function AlertasClient({ alertasIniciais, veiculos }: AlertasClientProps)
                             </span>
                           )}
                         </div>
-                        {!editavel && alerta.status === "pending" && (
+                        {!editavel && alerta.status === "pending" && origem !== "manual" && origem !== "checklist" && (
                           <p className="mt-1.5 text-xs text-muted-foreground">
-                            Controlado pela {origem === "manutencao" ? "manutenção" : "documento"} de origem —{" "}
-                            <a href={origem === "manutencao" ? "/frota/manutencao" : "/frota/documentos"} className="text-accent hover:underline">
+                            Controlado pela(o) {ORIGEM_LABEL[origem].toLowerCase()} de origem —{" "}
+                            <a href={ORIGEM_HREF[origem]} className="text-accent hover:underline">
                               editar lá
                             </a>
                             .
