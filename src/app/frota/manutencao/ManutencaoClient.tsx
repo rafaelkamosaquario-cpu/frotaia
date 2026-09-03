@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { MaintenanceScheduleRow, VehicleRow, ExpenseRow } from "@/lib/supabase/tables";
+import type { LatestOdometerReading } from "@/services/supabase/vehicleOdometerService";
 import { MaintenanceFormModal } from "./MaintenanceFormModal";
 import { ContextualHelp } from "@/components/frota/ContextualHelp";
 
@@ -13,6 +14,13 @@ interface ManutencaoClientProps {
   manutencoesIniciais: MaintenanceScheduleRow[];
   veiculos: VehicleRow[];
   despesasVinculadas: ExpenseRow[];
+  /** Última leitura de km conhecida por veículo (chave = vehicle_id) — usada só pra mostrar "faltam X km" quando next_due_km está preenchido. Nunca telemetria, sempre a última leitura manual informada em qualquer módulo (abastecimento/pneu/manutenção). */
+  odometros: Record<string, LatestOdometerReading>;
+}
+
+function formatarDataCurta(iso: string): string {
+  const partes = iso.slice(0, 10).split("-");
+  return `${partes[2]}/${partes[1]}`;
 }
 
 function formatDate(iso: string | null) {
@@ -43,7 +51,7 @@ const STATUS_CLASS: Record<string, string> = {
   cancelado: "bg-danger/10 text-danger",
 };
 
-export function ManutencaoClient({ manutencoesIniciais, veiculos, despesasVinculadas }: ManutencaoClientProps) {
+export function ManutencaoClient({ manutencoesIniciais, veiculos, despesasVinculadas, odometros }: ManutencaoClientProps) {
   const [manutencoes, setManutencoes] = useState(manutencoesIniciais);
   const [despesas, setDespesas] = useState(despesasVinculadas);
   const [formTarget, setFormTarget] = useState<MaintenanceScheduleRow | null | undefined>(undefined);
@@ -114,6 +122,8 @@ export function ManutencaoClient({ manutencoesIniciais, veiculos, despesasVincul
               {manutencoes.map((manutencao) => {
                 const veiculo = veiculosPorId.get(manutencao.vehicle_id);
                 const despesa = custoPorManutencaoId.get(manutencao.id);
+                const leitura = manutencao.next_due_km != null ? odometros[manutencao.vehicle_id] : undefined;
+                const kmRestante = leitura && manutencao.next_due_km != null ? manutencao.next_due_km - leitura.km : null;
                 return (
                   <tr key={manutencao.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
                     <td data-label="Veículo" className="px-4 py-3 font-medium text-foreground">
@@ -121,7 +131,14 @@ export function ManutencaoClient({ manutencoesIniciais, veiculos, despesasVincul
                     </td>
                     <td data-label="Tipo" className="px-4 py-3 text-foreground">{manutencao.type}</td>
                     <td data-label="Km execução" className="px-4 py-3 text-muted-foreground">{formatKm(manutencao.executed_km)}</td>
-                    <td data-label="Próxima km" className="px-4 py-3 text-muted-foreground">{formatKm(manutencao.next_due_km)}</td>
+                    <td data-label="Próxima km" className="px-4 py-3 text-muted-foreground">
+                      {formatKm(manutencao.next_due_km)}
+                      {kmRestante !== null && (
+                        <div className={`text-xs ${kmRestante <= 1000 ? "font-medium text-danger" : "text-muted-foreground"}`}>
+                          faltam ~{kmRestante}km (estimado, última leitura em {formatarDataCurta(leitura!.data)})
+                        </div>
+                      )}
+                    </td>
                     <td data-label="Vencimento" className="px-4 py-3 text-muted-foreground">{formatDate(manutencao.due_date)}</td>
                     <td data-label="Custo" className="px-4 py-3 text-muted-foreground">{despesa ? formatBRL(despesa.amount) : "—"}</td>
                     <td data-label="Status" className="px-4 py-3">

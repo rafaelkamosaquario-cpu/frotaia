@@ -3,6 +3,7 @@ import { listVehiclesForPanel } from "./vehicleService";
 import { listMaintenanceSchedulesForPanel } from "./maintenanceScheduleService";
 import { listVehicleDocumentsForPanel } from "./vehicleDocumentService";
 import { computeTireKm } from "./vehicleTireService";
+import { getLatestKnownOdometer, type LatestOdometerReading } from "./vehicleOdometerService";
 import type { SupabaseDbClient } from "./types";
 
 /**
@@ -53,14 +54,28 @@ export function descricaoUrgencia(dias: number): string {
   return `vence em ${dias} dia(s)`;
 }
 
+/** Km restante abaixo disso soma a manutenção na lista de alertas por km (item 4/5 da rodada de evolução funcional 09/2026) — mesmo espírito de LIMIAR_KM_RESTANTE_PNEU_PADRAO. */
+export const LIMIAR_KM_MANUTENCAO_PADRAO = 1000;
+
+function formatarDataCurta(iso: string): string {
+  const partes = iso.slice(0, 10).split("-");
+  return `${partes[2]}/${partes[1]}`;
+}
+
 export interface ComputeFleetAlertsInput {
   veiculos: VehicleRow[];
   manutencoes: MaintenanceScheduleRow[];
   documentos: VehicleDocumentRow[];
+  /** Última leitura de km conhecida por veículo (getLatestKnownOdometer) — só usada pra manutenção por km (next_due_km). Ausência é normal (nenhuma leitura registrada ainda); nunca telemetria. */
+  odometros?: Map<string, LatestOdometerReading>;
 }
 
 /** Função pura — sem I/O, reaproveitável em qualquer ambiente (client component, cron, ferramenta de IA). */
-export function computeFleetAlerts(input: ComputeFleetAlertsInput, limiteDias: number = LIMITE_DIAS_PADRAO): FleetAlertItem[] {
+export function computeFleetAlerts(
+  input: ComputeFleetAlertsInput,
+  limiteDias: number = LIMITE_DIAS_PADRAO,
+  limiarKm: number = LIMIAR_KM_MANUTENCAO_PADRAO
+): FleetAlertItem[] {
   const veiculosPorId = new Map(input.veiculos.map((v) => [v.id, v]));
 
   const deDocumentos: FleetAlertItem[] = input.documentos
@@ -79,21 +94,35 @@ export function computeFleetAlerts(input: ComputeFleetAlertsInput, limiteDias: n
       };
     });
 
+  // Data e km são avaliados em paralelo (nunca "ou exclusivo") — qualquer um dos dois que vencer primeiro já inclui a manutenção na lista.
   const deManutencoes: FleetAlertItem[] = input.manutencoes
-    .filter((m) => m.status !== "concluido" && m.status !== "cancelado" && diasAte(m.due_date) <= limiteDias)
-    .map((m) => {
+    .filter((m) => m.status !== "concluido" && m.status !== "cancelado")
+    .map((m): FleetAlertItem | null => {
       const dias = diasAte(m.due_date);
+      const leitura = m.next_due_km != null ? input.odometros?.get(m.vehicle_id) : undefined;
+      const kmRestante = leitura && m.next_due_km != null ? m.next_due_km - leitura.km : null;
+
+      const gatilhoPorData = dias <= limiteDias;
+      const gatilhoPorKm = kmRestante !== null && kmRestante <= limiarKm;
+      if (!gatilhoPorData && !gatilhoPorKm) return null;
+
       const veiculo = veiculosPorId.get(m.vehicle_id);
       const alvo = veiculo ? veiculo.name || veiculo.plate : "veículo";
+      const partes = [`${m.type} — ${alvo} — ${descricaoUrgencia(dias)}`];
+      if (kmRestante !== null) {
+        partes.push(`faltam ~${kmRestante}km (estimado, última leitura em ${formatarDataCurta(leitura!.data)})`);
+      }
+
       return {
         id: `man-${m.id}`,
-        descricao: `${m.type} — ${alvo} — ${descricaoUrgencia(dias)}`,
+        descricao: partes.join(" · "),
         data: m.due_date,
-        vencido: dias < 0,
+        vencido: dias < 0 || (kmRestante !== null && kmRestante <= 0),
         diasRestantes: dias,
         href: "/frota/manutencao",
       };
-    });
+    })
+    .filter((item): item is FleetAlertItem => item !== null);
 
   return [...deDocumentos, ...deManutencoes].sort((a, b) => a.diasRestantes - b.diasRestantes);
 }
@@ -110,7 +139,25 @@ export async function listFleetAlerts(
     listVehicleDocumentsForPanel(client, companyId),
   ]);
 
-  return computeFleetAlerts({ veiculos, manutencoes, documentos }, limiteDias);
+  const odometros = await getOdometrosParaManutencoes(client, manutencoes);
+
+  return computeFleetAlerts({ veiculos, manutencoes, documentos, odometros }, limiteDias);
+}
+
+/** Só busca leitura de km pros veículos que realmente têm uma manutenção ativa com next_due_km preenchido — evita 3 queries por veículo pra quem não usa manutenção por km. Exportada pra ser reaproveitada pela tela /frota/manutencao (mesmo dado, mesma fonte de verdade). */
+export async function getOdometrosParaManutencoes(client: SupabaseDbClient, manutencoes: MaintenanceScheduleRow[]): Promise<Map<string, LatestOdometerReading>> {
+  const veiculoIds = [
+    ...new Set(manutencoes.filter((m) => m.next_due_km != null && m.status !== "concluido" && m.status !== "cancelado").map((m) => m.vehicle_id)),
+  ];
+  if (veiculoIds.length === 0) return new Map();
+
+  const leituras = await Promise.all(veiculoIds.map((vehicleId) => getLatestKnownOdometer(client, vehicleId)));
+  const odometros = new Map<string, LatestOdometerReading>();
+  veiculoIds.forEach((vehicleId, i) => {
+    const leitura = leituras[i];
+    if (leitura) odometros.set(vehicleId, leitura);
+  });
+  return odometros;
 }
 
 /**

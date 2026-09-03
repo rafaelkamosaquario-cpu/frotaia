@@ -3,6 +3,7 @@ import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { listMaintenanceSchedulesForPanel } from "@/services/supabase/maintenanceScheduleService";
 import { listVehiclesForPanel } from "@/services/supabase/vehicleService";
 import { listMaintenanceLinkedExpenses } from "@/services/supabase/expenseService";
+import { getOdometrosParaManutencoes } from "@/services/supabase/fleetAlertsService";
 import { ManutencaoClient } from "./ManutencaoClient";
 
 /**
@@ -24,5 +25,8 @@ export default async function ManutencaoPage() {
     listMaintenanceLinkedExpenses(supabase, access.company.id),
   ]);
 
-  return <ManutencaoClient manutencoesIniciais={manutencoesIniciais} veiculos={veiculos} despesasVinculadas={despesasVinculadas} />;
+  // Map não é serializável de server pra client component — vira objeto simples (chave = vehicle_id) na borda.
+  const odometros = Object.fromEntries(await getOdometrosParaManutencoes(supabase, manutencoesIniciais));
+
+  return <ManutencaoClient manutencoesIniciais={manutencoesIniciais} veiculos={veiculos} despesasVinculadas={despesasVinculadas} odometros={odometros} />;
 }
