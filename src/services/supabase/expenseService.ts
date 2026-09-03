@@ -9,6 +9,8 @@ export interface RecordExpenseInput {
   sourceMessageId?: string;
   /** Manutenção que originou esta despesa (custo informado ao concluir) — nunca informado pelo cliente/modelo diretamente, só pelo fluxo de conclusão de manutenção (ver syncMaintenanceExpense). */
   maintenanceScheduleId?: string;
+  /** Abastecimento que originou esta despesa — nunca informado diretamente, só pelo fluxo de registro de abastecimento (ver syncFuelExpense). */
+  fuelFillupId?: string;
   expenseType: ExpenseTypeEnum;
   amount: number;
   /** Data da despesa (não a data de registro) — YYYY-MM-DD. */
@@ -27,6 +29,7 @@ export async function recordExpense(client: SupabaseDbClient, input: RecordExpen
       vehicle_id: input.vehicleId,
       source_message_id: input.sourceMessageId,
       maintenance_schedule_id: input.maintenanceScheduleId,
+      fuel_fillup_id: input.fuelFillupId,
       expense_type: input.expenseType,
       amount: input.amount,
       expense_date: input.expenseDate,
@@ -81,6 +84,54 @@ export async function syncMaintenanceExpense(client: SupabaseDbClient, input: Sy
     expenseType: "manutencao",
     amount: input.amount,
     expenseDate: input.expenseDate,
+    description: input.description,
+  });
+}
+
+export interface SyncFuelExpenseInput {
+  companyId: string;
+  userId: string;
+  fuelFillupId: string;
+  vehicleId: string;
+  amount: number;
+  expenseDate: string;
+  vendor?: string;
+  description: string;
+}
+
+/**
+ * Valor de um abastecimento vira/atualiza UMA despesa (categoria
+ * "combustivel") vinculada por `fuel_fillup_id` — mesmo mecanismo de
+ * `syncMaintenanceExpense`: nunca duplica (índice único parcial no banco
+ * garante no máximo 1), editar o abastecimento já vinculado sempre
+ * reaproveita a mesma despesa.
+ */
+export async function syncFuelExpense(client: SupabaseDbClient, input: SyncFuelExpenseInput): Promise<ExpenseRow> {
+  const { data: existente, error: erroConsulta } = await client
+    .from("expenses")
+    .select("*")
+    .eq("fuel_fillup_id", input.fuelFillupId)
+    .maybeSingle();
+  if (erroConsulta) throw erroConsulta;
+
+  if (existente) {
+    return updateExpense(client, existente.id, input.companyId, {
+      amount: input.amount,
+      expenseDate: input.expenseDate,
+      vehicleId: input.vehicleId,
+      vendor: input.vendor,
+    });
+  }
+
+  return recordExpense(client, {
+    companyId: input.companyId,
+    userId: input.userId,
+    vehicleId: input.vehicleId,
+    fuelFillupId: input.fuelFillupId,
+    expenseType: "combustivel",
+    amount: input.amount,
+    expenseDate: input.expenseDate,
+    vendor: input.vendor,
     description: input.description,
   });
 }

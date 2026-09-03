@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { syncMaintenanceExpense } from "./expenseService";
+import { syncMaintenanceExpense, syncFuelExpense } from "./expenseService";
 
 /**
  * Regressão do requisito "não duplicar despesa" (evolução funcional do
@@ -75,5 +75,55 @@ describe("syncMaintenanceExpense", () => {
 
     await expect(syncMaintenanceExpense(client, INPUT_BASE)).rejects.toEqual(erro);
     expect(from).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Mesma regra de "não duplicar despesa", agora pro abastecimento (rodada de
+ * evolução funcional 09/2026, item 2/5) — `syncFuelExpense` segue
+ * exatamente o mesmo mecanismo de `syncMaintenanceExpense`, vinculando por
+ * `fuel_fillup_id` em vez de `maintenance_schedule_id`.
+ */
+const FUEL_INPUT_BASE = {
+  companyId: "empresa-1",
+  userId: "usuario-1",
+  fuelFillupId: "abastecimento-1",
+  vehicleId: "veiculo-1",
+  amount: 1500,
+  expenseDate: "2026-09-01",
+  description: "Abastecimento (300L)",
+};
+
+describe("syncFuelExpense", () => {
+  it("cria uma despesa nova quando o abastecimento ainda não tem nenhuma vinculada", async () => {
+    const consultaSemResultado = makeChainable({ data: null, error: null });
+    const despesaCriada = { id: "despesa-1", fuel_fillup_id: "abastecimento-1", amount: 1500 };
+    const insercao = makeChainable({ data: despesaCriada, error: null });
+
+    const from = vi.fn().mockReturnValueOnce(consultaSemResultado).mockReturnValueOnce(insercao);
+    const client = { from } as never;
+
+    const resultado = await syncFuelExpense(client, FUEL_INPUT_BASE);
+
+    expect(consultaSemResultado.eq).toHaveBeenCalledWith("fuel_fillup_id", "abastecimento-1");
+    expect(insercao.insert).toHaveBeenCalledWith(expect.objectContaining({ fuel_fillup_id: "abastecimento-1", expense_type: "combustivel", amount: 1500 }));
+    expect(resultado).toEqual(despesaCriada);
+  });
+
+  it("atualiza a despesa já vinculada em vez de criar outra (idempotência — não duplica)", async () => {
+    const despesaExistente = { id: "despesa-1", fuel_fillup_id: "abastecimento-1", amount: 1400 };
+    const consultaComResultado = makeChainable({ data: despesaExistente, error: null });
+    const despesaAtualizada = { ...despesaExistente, amount: 1500 };
+    const atualizacao = makeChainable({ data: despesaAtualizada, error: null });
+
+    const from = vi.fn().mockReturnValueOnce(consultaComResultado).mockReturnValueOnce(atualizacao);
+    const client = { from } as never;
+
+    const resultado = await syncFuelExpense(client, FUEL_INPUT_BASE);
+
+    expect(from).toHaveBeenCalledTimes(2);
+    expect(atualizacao.update).toHaveBeenCalledWith(expect.objectContaining({ amount: 1500 }));
+    expect(atualizacao.insert).not.toHaveBeenCalled();
+    expect(resultado).toEqual(despesaAtualizada);
   });
 });

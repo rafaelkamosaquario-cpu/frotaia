@@ -299,6 +299,25 @@ export const vendorCreateSchema = z.object({
 
 export const vendorUpdateSchema = vendorCreateSchema.partial();
 
+// ── fuel fillup (abastecimento — rodada de evolução funcional 09/2026) ────
+
+const nonNegativeOdometerSchema = z.number().finite().nonnegative("Quilometragem não pode ser negativa.");
+
+export const fuelFillupCreateSchema = z.object({
+  vehicleId: uuidSchema,
+  driverId: uuidSchema.nullable().optional(),
+  vendorId: uuidSchema.nullable().optional(),
+  fillupDate: z.string().date(),
+  liters: z.number().finite().positive("Litros deve ser maior que zero."),
+  pricePerLiter: z.number().finite().positive("Preço por litro deve ser maior que zero.").optional(),
+  totalAmount: monetarySchema.positive("Valor total deve ser maior que zero."),
+  odometerKm: nonNegativeOdometerSchema.optional(),
+  fuelType: fuelTypeSchema.optional(),
+  notes: maxText(2000, "Observações").optional(),
+});
+
+export const fuelFillupUpdateSchema = fuelFillupCreateSchema.partial();
+
 // ── scheduled alert (manual, painel — Rodada 2 evolução funcional) ────────
 
 export const alertCreateSchema = z.object({
@@ -429,6 +448,8 @@ export const frotaIaToolNameSchema = z.enum([
   // Rodada de evolução funcional 09/2026 (comparação com sistema de
   // planilha "Frota 7.15"): gerenciar_fornecedor.
   "gerenciar_fornecedor",
+  // Rodada de evolução funcional 09/2026 (item 2/5): gerenciar_abastecimento.
+  "gerenciar_abastecimento",
 ]);
 
 export const toolExecutionCreateSchema = z.object({

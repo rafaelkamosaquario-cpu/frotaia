@@ -678,6 +678,7 @@ export type Database = {
           description: string | null
           expense_date: string
           expense_type: Database["public"]["Enums"]["expense_type"]
+          fuel_fillup_id: string | null
           id: string
           maintenance_schedule_id: string | null
           source_message_id: string | null
@@ -694,6 +695,7 @@ export type Database = {
           description?: string | null
           expense_date: string
           expense_type: Database["public"]["Enums"]["expense_type"]
+          fuel_fillup_id?: string | null
           id?: string
           maintenance_schedule_id?: string | null
           source_message_id?: string | null
@@ -710,6 +712,7 @@ export type Database = {
           description?: string | null
           expense_date?: string
           expense_type?: Database["public"]["Enums"]["expense_type"]
+          fuel_fillup_id?: string | null
           id?: string
           maintenance_schedule_id?: string | null
           source_message_id?: string | null
@@ -731,6 +734,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_fuel_fillup_id_fkey"
+            columns: ["fuel_fillup_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_fillups"
             referencedColumns: ["id"]
           },
           {
@@ -1037,6 +1047,92 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fuel_fillups: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          fillup_date: string
+          fuel_type: Database["public"]["Enums"]["fuel_type"] | null
+          id: string
+          liters: number
+          notes: string | null
+          odometer_km: number | null
+          price_per_liter: number | null
+          total_amount: number
+          updated_at: string
+          updated_by: string | null
+          vehicle_id: string
+          vendor_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          fillup_date: string
+          fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
+          id?: string
+          liters: number
+          notes?: string | null
+          odometer_km?: number | null
+          price_per_liter?: number | null
+          total_amount: number
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id: string
+          vendor_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          fillup_date?: string
+          fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
+          id?: string
+          liters?: number
+          notes?: string | null
+          odometer_km?: number | null
+          price_per_liter?: number | null
+          total_amount?: number
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_id?: string
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_fillups_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_fillups_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_fillups_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_fillups_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -2458,6 +2554,7 @@ export type Database = {
         | "gerenciar_empresa"
         | "gerenciar_checklist_config"
         | "gerenciar_fornecedor"
+        | "gerenciar_abastecimento"
       fuel_type:
         | "diesel_s10"
         | "diesel_s500"
@@ -2779,6 +2876,7 @@ export const Constants = {
         "gerenciar_empresa",
         "gerenciar_checklist_config",
         "gerenciar_fornecedor",
+        "gerenciar_abastecimento",
       ],
       fuel_type: [
         "diesel_s10",

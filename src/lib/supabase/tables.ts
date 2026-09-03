@@ -44,6 +44,10 @@ export type VendorRow = PublicTables["vendors"]["Row"];
 export type VendorInsert = PublicTables["vendors"]["Insert"];
 export type VendorUpdate = PublicTables["vendors"]["Update"];
 
+export type FuelFillupRow = PublicTables["fuel_fillups"]["Row"];
+export type FuelFillupInsert = PublicTables["fuel_fillups"]["Insert"];
+export type FuelFillupUpdate = PublicTables["fuel_fillups"]["Update"];
+
 export type CompanyPreferencesRow = PublicTables["company_preferences"]["Row"];
 export type CompanyPreferencesInsert = PublicTables["company_preferences"]["Insert"];
 export type CompanyPreferencesUpdate = PublicTables["company_preferences"]["Update"];
