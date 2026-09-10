@@ -16,7 +16,7 @@ export interface CriarCheckoutState {
  * viu o resumo/confirmou o plano na página `/assinar`. `companyId` vem
  * sempre de um token assinado já verificado em page.tsx (nunca de input
  * livre); `plano` é validado contra o catálogo aqui de novo (nunca confia
- * em nada vindo do form além de ser uma das 4 chaves válidas) — preço e
+ * em nada vindo do form além de ser uma das 9 chaves válidas) — preço e
  * entitlement são sempre resolvidos por dentro de `criarAssinaturaMensal`/
  * `criarPagamentoAnual` a partir de CATALOGO_OFERTAS, nunca do que o
  * cliente mandou.
@@ -44,17 +44,11 @@ export async function criarCheckoutAction(
       if (!email || !email.includes("@")) {
         return { error: "Informe um e-mail válido para continuar." };
       }
-      if (plano !== "MENSAL" && plano !== "GESTAO_MENSAL") {
-        return { error: "Plano inválido para assinatura recorrente." };
-      }
       const resultado = await criarAssinaturaMensal({ companyId, email, plano });
       return { initPoint: resultado.initPoint };
     }
 
-    if (plano !== "ANUAL_PARCELADO" && plano !== "ANUAL_PIX") {
-      return { error: "Plano inválido para pagamento único." };
-    }
-    const resultado = await criarPagamentoAnual({ companyId, modo: plano === "ANUAL_PARCELADO" ? "PARCELADO" : "PIX" });
+    const resultado = await criarPagamentoAnual({ companyId, plano });
     return { initPoint: resultado.initPoint };
   } catch (erro) {
     if (erro instanceof MercadoPagoConfigError) {

@@ -1,25 +1,24 @@
 # Frota IA — Checkout Mercado Pago (estado atual)
 
-Branch `claude/frota-ia-assistente-setup-qlrbac`, implementado em 2026-08-23. Nova estrutura comercial "Individual vs. Gestão" — reaproveita 100% a infraestrutura de pagamento que já existia (webhook, validação HMAC, `subscriptions`); o que mudou foi o catálogo de ofertas e a ligação entre pagamento e entitlement do Painel de Gestão.
+Branch `claude/frota-ia-assistente-setup-qlrbac`. Estrutura comercial atual (desde 2026-09-10): **Individual/Essencial/Pro**, substituindo a estrutura anterior "Individual vs. Gestão" (2026-08-23) — reaproveita 100% a infraestrutura de pagamento que já existia (webhook, validação HMAC, `subscriptions`); o que mudou foi o catálogo de ofertas.
 
 ## 1. Catálogo de ofertas
 
-Fonte única: `src/lib/mercadopago/catalog.ts` (`CATALOGO_OFERTAS`) — nunca preço/entitlement hardcoded em outro lugar.
+Fonte única: `src/lib/mercadopago/catalog.ts` (`CATALOGO_OFERTAS`) — nunca preço/entitlement hardcoded em outro lugar. 9 chaves de autoatendimento: 3 planos × 3 formas de cobrança cada.
 
-| Oferta | Preço | Cobrança | Painel | Veículos | Validade |
+| Plano | Veículos | Painel | Mensal | Anual à vista (Pix) | Anual 12x (cartão) |
 |---|---|---|---|---|---|
-| **Individual** (`MENSAL`) | R$ 79,90/mês | Recorrente | Não | 1 | Enquanto ativa |
-| **Gestão Mensal** (`GESTAO_MENSAL`) | R$ 99,90/mês | Recorrente | Sim | 10 | Enquanto ativa |
-| **Gestão Anual — cartão** (`ANUAL_PARCELADO`) | R$ 838,80 (até 12x R$ 69,90) | Única | Sim | 10 | 12 meses |
-| **Gestão Anual — Pix** (`ANUAL_PIX`) | R$ 799,00 à vista | Única | Sim | 10 | 12 meses |
+| **Individual** | 1 | Não | R$ 89,90/mês (`INDIVIDUAL_MENSAL`) | R$ 899,00 (`INDIVIDUAL_ANUAL_PIX`) | 12x R$ 74,92 = R$ 899,00 (`INDIVIDUAL_ANUAL_PARCELADO`) |
+| **Essencial** | Até 3 | Sim | R$ 149,90/mês (`ESSENCIAL_MENSAL`) | R$ 1.499,00 (`ESSENCIAL_ANUAL_PIX`) | 12x R$ 124,92 = R$ 1.499,00 (`ESSENCIAL_ANUAL_PARCELADO`) |
+| **Pro** | Até 10 | Sim | R$ 249,90/mês (`PRO_MENSAL`) | R$ 2.499,00 (`PRO_ANUAL_PIX`) | 12x R$ 208,25 = R$ 2.499,00 (`PRO_ANUAL_PARCELADO`) |
 
-**"12x sem juros" não é algo que o código controla nem confirma** — parcelamento é configurado via `installments: 12` no Checkout Pro, mas se as parcelas saem com ou sem juros depende da configuração de taxas da própria conta Mercado Pago, invisível pra este repositório. Conferir visualmente na página de checkout gerada antes de divulgar como "sem juros".
+**"12x sem juros" não é algo que o código controla nem confirma** — parcelamento é configurado via `installments` no Checkout Pro, mas se as parcelas saem com ou sem juros depende da configuração de taxas da própria conta Mercado Pago, invisível pra este repositório. Conferir visualmente na página de checkout gerada antes de divulgar como "sem juros".
 
 Plano Empresa (mais de 10 veículos) continua **fora do catálogo de autoatendimento** — só contratação comercial direta, sem automação (ver `systemPrompt.ts`).
 
-## 2. O upsell (Individual → Gestão Mensal)
+## 2. Seleção de plano (tier × frequência)
 
-Nunca gera duas assinaturas. O cliente escolhe entre dois botões na página `/assinar` — "Continuar com Individual" ou "Quero Frota IA Gestão" — e o que sai do outro lado é **uma única chamada** de `criarAssinaturaMensal` com `plano: "MENSAL"` ou `plano: "GESTAO_MENSAL"`. Não existe conceito de "R$79,90 + R$20" em nenhum lugar do código — é sempre um valor fechado (R$99,90) desde a criação do link no Mercado Pago.
+Não existe mais upsell inline (não há dois tiers só) — o gate (`/assinar`) mostra os 3 planos lado a lado, com um toggle Mensal/Anual e, quando Anual, a escolha entre cartão/Pix. O que sai do outro lado é sempre **uma única chamada** — `criarAssinaturaMensal` (mensal) ou `criarPagamentoAnual` (anual) — com a chave exata do catálogo (`plano: OfertaPlano`). O preço nunca é composto em runtime (ex.: "base + upsell") — cada uma das 9 combinações já tem seu `precoCentavos` fechado no catálogo.
 
 ## 3. O "gate de contratação" (`/assinar`)
 
@@ -30,21 +29,21 @@ WhatsApp (gerenciar_assinatura)
    ↓
 link assinado (HMAC, 30 min) → /assinar?token=...
    ↓
-resumo do plano + upsell (Individual) OU escolha Cartão/Pix (Gestão Anual)
+resumo: escolhe o tier (Individual/Essencial/Pro) + Mensal/Anual + (se Anual) cartão/Pix
    ↓
 confirmar → server action cria o checkout REAL no Mercado Pago
    ↓
 redireciona pro Mercado Pago
 ```
 
-**Segurança**: o token carrega só `companyId` + o plano que o cliente pediu na conversa (só um valor inicial de UI, não uma autorização). Preço e entitlement nunca vêm de parâmetro de URL — a action que cria o checkout (`src/app/assinar/actions.ts`) sempre resolve tudo de novo a partir de `CATALOGO_OFERTAS`, usando só a chave do plano (`MENSAL`/`GESTAO_MENSAL`/`ANUAL_PARCELADO`/`ANUAL_PIX`) escolhida na própria página. Não existe um jeito de o cliente alterar a URL e pagar R$79,90 recebendo Gestão — o valor cobrado e o entitlement liberado vêm sempre do mesmo lugar (o catálogo), nunca de dois lugares que possam divergir.
+**Segurança**: o token carrega só `companyId` + o plano que o cliente pediu na conversa (só um valor inicial de UI, não uma autorização). Preço e entitlement nunca vêm de parâmetro de URL — a action que cria o checkout (`src/app/assinar/actions.ts`) sempre resolve tudo de novo a partir de `CATALOGO_OFERTAS`, usando só a chave do plano (uma das 9 chaves) escolhida na própria página. Não existe um jeito de o cliente alterar a URL e pagar o preço do Individual recebendo o Pro — o valor cobrado e o entitlement liberado vêm sempre do mesmo lugar (o catálogo), nunca de dois lugares que possam divergir.
 
-E-mail só é pedido quando o plano é recorrente (Individual/Gestão Mensal) — Gestão Anual (cobrança única) não pede.
+E-mail só é pedido quando o plano é recorrente (qualquer um dos 3 `*_MENSAL`) — os planos anuais (cobrança única) não pedem.
 
 ## 4. Mercado Pago — como é chamado
 
-- **Recorrente** (Individual/Gestão Mensal): `POST /preapproval` — `external_reference` codifica `companyId|PLANO`.
-- **Única** (Gestão Anual cartão/Pix): `POST /checkout/preferences` — mesmo formato de `external_reference`. Pix restringe `excluded_payment_types` pra outras formas; cartão pede `installments: 12`.
+- **Recorrente** (`*_MENSAL`, qualquer tier): `POST /preapproval` — `external_reference` codifica `companyId|PLANO`.
+- **Única** (`*_ANUAL_PIX`/`*_ANUAL_PARCELADO`, qualquer tier): `POST /checkout/preferences` — mesmo formato de `external_reference`. O método (Pix ou cartão) vem de `oferta.metodoUnico`, nunca de um parâmetro solto: Pix restringe `excluded_payment_types` pra outras formas; cartão pede `installments` (12, vindo do catálogo).
 - **`back_urls`/`back_url`** agora apontam pra `/assinar/confirmacao?resultado=...&plano=...` (antes apontavam genericamente pra raiz do app) — página só de exibição, nunca decide nada (ver seção 7).
 
 ## 5. Webhook — 2 bugs corrigidos + idempotência
@@ -61,13 +60,13 @@ E-mail só é pedido quando o plano é recorrente (Individual/Gestão Mensal) �
 
 | Evento | `plan` gravado | `fleet_panel_included` | `status` |
 |---|---|---|---|
-| Individual pago | `MENSAL` | `false` | `ATIVA` |
-| Gestão Mensal pago | `GESTAO_MENSAL` | `true` | `ATIVA` |
-| Gestão Anual cartão pago | `ANUAL_PARCELADO` | `true` | `ATIVA`, `valido_ate` = +365 dias |
-| Gestão Anual Pix pago | `ANUAL_PIX` | `true` | `ATIVA`, `valido_ate` = +365 dias |
+| Individual pago (mensal) | `INDIVIDUAL_MENSAL` | `false` | `ATIVA` |
+| Essencial/Pro pago (mensal) | `ESSENCIAL_MENSAL`/`PRO_MENSAL` | `true` | `ATIVA` |
+| Qualquer tier, anual cartão pago | `*_ANUAL_PARCELADO` | conforme o tier | `ATIVA`, `valido_ate` = +365 dias |
+| Qualquer tier, anual Pix pago | `*_ANUAL_PIX` | conforme o tier | `ATIVA`, `valido_ate` = +365 dias |
 | Assinatura recorrente cancelada/pausada | (mantém) | `false` | `CANCELADA`/`INADIMPLENTE` |
 
-O **limite de veículos (1×10)** continua vindo, sem nenhuma mudança, de `getVehicleLimitForCompany` (`src/lib/frota/vehicleLimit.ts`, implementado antes desta tarefa) — que já lê `fleet_panel_included`. Como o webhook agora grava esse campo corretamente, o limite passa a ser automático depois do pagamento, sem eu precisar tocar nessa função.
+O **limite de veículos (1/3/10 conforme o tier)** vem de `getVehicleLimitForCompany` (`src/lib/frota/vehicleLimit.ts`) — desde 09/2026 deriva diretamente de `CATALOGO_OFERTAS[subscription.plan].limiteVeiculos` quando `plan` é uma das 9 chaves novas (cobre o caso Essencial=3, que o antigo booleano `fleet_panel_included` não distinguia de Pro=10), com fallback pro binário 1×10 pras chaves antigas/TRIAL/EMPRESA. O trigger de banco `enforce_vehicle_limit_by_entitlement` (última linha de defesa) foi generalizado do mesmo jeito na mesma sessão (migration `20260910100100`).
 
 `companies.fleet_panel_enabled` (flag legada, manual) continua existindo só como **override administrativo** — nunca é escrita pelo fluxo de pagamento, só por SQL direto quando necessário excepcionalmente.
 
@@ -97,11 +96,15 @@ Nenhuma rotina no código apaga veículo, motorista, despesa, documento, checkli
 
 ## 9. Compatibilidade com assinaturas antigas
 
-Nenhuma linha existente de `subscriptions` foi alterada — a migration só adicionou o valor `GESTAO_MENSAL` ao enum (aditivo). Quem já tem `plan=MENSAL` (R$79,90, preço antigo idêntico ao novo Individual) ou `plan=ANUAL_PARCELADO`/`ANUAL_PIX` com o preço/validade antigos gravados em `valor_centavos` continua exatamente como está — preço de assinatura já paga nunca é reescrito retroativamente. Só compras **novas** usam os valores do catálogo atualizado.
+Nenhuma linha existente de `subscriptions` foi alterada em nenhuma das reestruturações — todas as migrations desse enum são aditivas (`ADD VALUE`, nunca remove/renomeia). A reestruturação de 09/2026 (Individual/Essencial/Pro) foi feita com a tabela `subscriptions` **vazia** (zerada em 26/08 pra teste real, sem clientes pagantes) — as chaves antigas (`MENSAL`, `GESTAO_MENSAL`, `ANUAL_PARCELADO`, `ANUAL_PIX`) ficaram órfãs no enum do banco (Postgres não permite remover valor de enum), mas não são mais usadas por nenhuma chamada de código nem aparecem no catálogo TS (`OfertaPlano`).
 
 ## 10. Banco de dados
 
-1 migration aditiva: `20260823162740_add_gestao_mensal_plan.sql` — novo valor `GESTAO_MENSAL` no enum `subscription_plan`. Nenhuma coluna nova, nenhuma tabela nova.
+- `20260823162740_add_gestao_mensal_plan.sql` — valor `GESTAO_MENSAL` (histórico, chave hoje órfã).
+- `20260910100000_add_planos_individual_essencial_pro.sql` — 9 valores novos no enum `subscription_plan` (Individual/Essencial/Pro × Mensal/Anual Pix/Anual cartão).
+- `20260910100100_generalize_vehicle_limit_individual_essencial_pro.sql` — generaliza o trigger `enforce_vehicle_limit_by_entitlement` de binário (1×10) pra 3 níveis (1/3/10), derivado de `subscriptions.plan`.
+
+Nenhuma coluna nova, nenhuma tabela nova.
 
 ## 11. Correção pós-lançamento: `valido_ate` residual do trial (23/08/2026, commit `d836c93`)
 
@@ -120,12 +123,13 @@ Landing → wa.me com mensagem fixa → Frota IA reconhece a intenção
    → (cliente existente) recebe o link na hora
 ```
 
-**Mensagens oficiais dos CTAs** (ver seção "Relatório final" da resposta, mesmo texto):
-- Individual: `"Quero assinar o Frota IA Individual de R$79,90 por mês."`
-- Gestão: `"Quero contratar o Frota IA Gestão anual."`
+**Mensagens oficiais dos CTAs** (landing atual, 09/2026):
+- Individual: `"Quero assinar o Frota IA Individual por R$89,90/mês."`
+- Essencial: `"Quero contratar o Frota IA Essencial."`
+- Pro: `"Quero contratar o Frota IA Pro."`
 - Empresas: `"Quero conhecer o Frota IA Empresas para uma frota com mais de 10 veículos."`
 
-O reconhecimento é por palavra-chave (`"individual"`, `"gestão"`/`"gestao"`, `"empresas"`) — **nunca pelo valor em R$ mencionado no texto**. Preço e entitlement continuam vindo só de `CATALOGO_OFERTAS`, exatamente como antes.
+O reconhecimento é por palavra-chave (`"individual"`/`"essencial"`/`"pro"` + `"anual"` opcional + `"empresas"`) — **nunca pelo valor em R$ mencionado no texto**. Sem "anual" no texto, o padrão é sempre o plano mensal daquele tier. Preço e entitlement continuam vindo só de `CATALOGO_OFERTAS`, exatamente como antes.
 
 **Empresas nunca gera link** — recebe uma resposta fixa de interesse comercial (`MENSAGEM_INTERESSE_EMPRESAS`), sem automação, como já era esperado.
 
@@ -158,3 +162,16 @@ Rafael perguntou se dava pra aceitar Pix nos dois planos mensais (hoje só cart�
 **Pix Automático** (padrão novo do Banco Central, adequação obrigatória das instituições em 01/01/2026) também foi pesquisado — nenhuma documentação de desenvolvedor do Mercado Pago encontrada expondo isso como campo/endpoint pra contas comuns integrarem hoje.
 
 **Conclusão**: mantém como está (cartão nos dois planos mensais, Pix só no `ANUAL_PIX`). Pra reabrir isso: (1) Rafael testar diretamente no painel do Mercado Pago se "Planos de assinatura" com Pix gera algo integrável, ou (2) aguardar/pesquisar de novo se a Mercado Pago documentar oficialmente uma API de Pix recorrente equivalente ao `/preapproval`. Não é bug, não é limitação do código — é limitação confirmada da API do provedor de pagamento.
+
+## 15. Reestruturação Individual/Essencial/Pro (10/09/2026)
+
+Rafael definiu uma tabela de preços nova, saindo de 2 planos (Individual + Gestão) pra 3 (Individual/Essencial/Pro), cada um com as 3 formas de cobrança (antes só a "Gestão" tinha opção anual). Motivado por uma investigação prévia sobre Pix recorrente (Mercado Pago não confirmado via API pública; Efí Bank confirmado via API própria, `dev.efipay.com.br/docs/api-pix/pix-automatico`, mas exige conta empresarial — não mudou a decisão da seção 14, só ficou registrado como alternativa pesquisada).
+
+**O que mudou de arquitetura** (não foi só trocar números — ver catálogo na seção 1):
+- `CATALOGO_OFERTAS` foi de 4 pra 9 chaves; `limiteVeiculos` deixou de ser binário (`1 | 10`) e passou a `1 | 3 | 10`.
+- Novo campo `metodoUnico: "pix" | "cartao"` no catálogo — `criarPagamentoAnual` (`client.ts`) parou de receber um parâmetro `modo` solto e passou a derivar Pix-vs-cartão do próprio catálogo, pela chave do plano.
+- `CheckoutGate.tsx` foi redesenhado — de um wizard de 2 variantes (upsell inline / anual isolado) pra uma tela única com 3 cards de tier + toggle Mensal/Anual + (se Anual) Cartão/Pix.
+- `enforce_vehicle_limit_by_entitlement` (trigger de banco) generalizado de 1×10 pra 1/3/10 (migration `20260910100100`) — sem isso, o limite de 3 do Essencial não seria realmente aplicado se algum caminho de escrita pulasse a checagem da aplicação.
+- Migration `20260910100000` adiciona as 9 chaves ao enum `subscription_plan` (aditiva, tabela `subscriptions` vazia no momento — sem risco de assinante existente).
+
+Confirmado: 618 testes + lint + build passando depois da mudança.

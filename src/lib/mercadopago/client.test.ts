@@ -104,9 +104,9 @@ describe("validarAssinaturaWebhook", () => {
 
 describe("decodificarReferenciaExterna", () => {
   it("decodifica companyId e plano do formato 'companyId|PLANO'", () => {
-    expect(decodificarReferenciaExterna("empresa-1|MENSAL")).toEqual({ companyId: "empresa-1", plano: "MENSAL" });
-    expect(decodificarReferenciaExterna("empresa-2|ANUAL_PIX")).toEqual({ companyId: "empresa-2", plano: "ANUAL_PIX" });
-    expect(decodificarReferenciaExterna("empresa-3|GESTAO_MENSAL")).toEqual({ companyId: "empresa-3", plano: "GESTAO_MENSAL" });
+    expect(decodificarReferenciaExterna("empresa-1|INDIVIDUAL_MENSAL")).toEqual({ companyId: "empresa-1", plano: "INDIVIDUAL_MENSAL" });
+    expect(decodificarReferenciaExterna("empresa-2|PRO_ANUAL_PIX")).toEqual({ companyId: "empresa-2", plano: "PRO_ANUAL_PIX" });
+    expect(decodificarReferenciaExterna("empresa-3|ESSENCIAL_MENSAL")).toEqual({ companyId: "empresa-3", plano: "ESSENCIAL_MENSAL" });
   });
 
   it("devolve null pra formato inválido (sem separador, plano desconhecido)", () => {

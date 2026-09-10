@@ -10,14 +10,14 @@ import { CATALOGO_OFERTAS, isOfertaPlano, type OfertaPlano } from "./catalog";
  * api.mercadopago.com diretamente.
  *
  * Preços vêm sempre de CATALOGO_OFERTAS (src/lib/mercadopago/catalog.ts) —
- * nunca hardcoded aqui. Nova estrutura comercial "Individual vs. Gestão"
- * definida com o Rafael em 23/08/2026.
+ * nunca hardcoded aqui. Estrutura comercial "Individual/Essencial/Pro"
+ * definida com o Rafael em 10/09/2026.
  */
 
 const MP_API_BASE = "https://api.mercadopago.com";
 
 /**
- * `external_reference` sozinho não diz qual das 4 ofertas foi paga — só diz
+ * `external_reference` sozinho não diz qual das 9 ofertas foi paga — só diz
  * a empresa. Codificamos `companyId|PLANO` na criação do link e
  * decodificamos na volta do webhook (`buscarPagamento`/`buscarAssinatura`
  * devolvem o valor exatamente como veio da API do Mercado Pago, sem
@@ -58,8 +58,8 @@ function authHeaders(): HeadersInit {
 export interface CriarAssinaturaMensalInput {
   companyId: string;
   email: string;
-  /** MENSAL (Individual, R$79,90) ou GESTAO_MENSAL (upsell, R$99,90) — mesmo mecanismo de preapproval, preço/entitlement resolvidos via CATALOGO_OFERTAS. */
-  plano: "MENSAL" | "GESTAO_MENSAL";
+  /** Qualquer chave do catálogo com cobranca==="recorrente" (INDIVIDUAL_MENSAL/ESSENCIAL_MENSAL/PRO_MENSAL) — mesmo mecanismo de preapproval, preço/entitlement resolvidos via CATALOGO_OFERTAS. */
+  plano: OfertaPlano;
 }
 
 export interface LinkPagamentoResultado {
@@ -106,28 +106,29 @@ export async function criarAssinaturaMensal(input: CriarAssinaturaMensalInput): 
 
 export interface CriarPagamentoAnualInput {
   companyId: string;
-  modo: "PARCELADO" | "PIX";
+  /** Qualquer chave do catálogo com cobranca==="unica" (*_ANUAL_PIX/*_ANUAL_PARCELADO) — o método (Pix/cartão) já vem de oferta.metodoUnico, nunca de um parâmetro separado. */
+  plano: OfertaPlano;
 }
 
 /**
- * Cobrança única (Checkout Pro / preference) pro plano Gestão Anual — nunca
+ * Cobrança única (Checkout Pro / preference) pros planos anuais — nunca
  * recorrente, sem renovação automática (cliente decide se contrata de novo
- * ao fim dos 12 meses). `excluded_payment_types` no modo PIX restringe as
+ * ao fim dos 12 meses). `excluded_payment_types` no método Pix restringe as
  * outras formas — os IDs de tipo exatos (`credit_card`, `debit_card` etc.)
  * não têm confirmação 100% oficial na documentação pública consultada;
  * conferir visualmente na página de checkout gerada antes de divulgar.
- * `installments: 12` pede até 12 parcelas no Checkout Pro — se isso sai
+ * `installments` pede até N parcelas no Checkout Pro — se isso sai
  * "sem juros" ou não depende da configuração de taxas da própria conta
  * Mercado Pago, não é algo que esta chamada controle nem que dê pra
  * confirmar por código.
  */
 export async function criarPagamentoAnual(input: CriarPagamentoAnualInput): Promise<LinkPagamentoResultado> {
-  const plano: OfertaPlano = input.modo === "PARCELADO" ? "ANUAL_PARCELADO" : "ANUAL_PIX";
+  const { plano } = input;
   const oferta = CATALOGO_OFERTAS[plano];
   const valorReais = oferta.precoCentavos / 100;
 
   const paymentMethods =
-    input.modo === "PIX"
+    oferta.metodoUnico === "pix"
       ? {
           excluded_payment_types: [{ id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }, { id: "prepaid_card" }],
         }

@@ -1,6 +1,6 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
 import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
-import { CATALOGO_OFERTAS, PLANOS_AUTOATENDIMENTO, PRECO_UPSELL_GESTAO_CENTAVOS, formatarReais, type OfertaPlano } from "@/lib/mercadopago/catalog";
+import { CATALOGO_OFERTAS, PLANOS_AUTOATENDIMENTO, formatarReais, type OfertaPlano } from "@/lib/mercadopago/catalog";
 
 /**
  * Ferramenta: gerenciar_assinatura
@@ -57,6 +57,21 @@ async function executar(entrada: GerenciarAssinaturaEntrada): Promise<GerenciarA
   };
 }
 
+/** Gerado a partir do catálogo (em vez de escrito na mão por chave) — com 9 combinações (3 planos × 3 formas de cobrança), hardcode por chave ficaria verboso e frágil a esquecimento quando o catálogo mudar. */
+function descreverPlano(chave: OfertaPlano): string {
+  const oferta = CATALOGO_OFERTAS[chave];
+  const painel = oferta.painel ? "com Painel de Gestão" : "sem Painel de Gestão";
+  const veiculos = `até ${oferta.limiteVeiculos} veículo${oferta.limiteVeiculos > 1 ? "s" : ""}`;
+
+  if (oferta.cobranca === "recorrente") {
+    return `${chave}: ${oferta.label}, ${formatarReais(oferta.precoCentavos)}/mês recorrente, ${painel}, ${veiculos}.`;
+  }
+  if (oferta.metodoUnico === "cartao") {
+    return `${chave}: ${oferta.label}, até ${oferta.parcelas}x ${formatarReais(oferta.precoCentavos / (oferta.parcelas ?? 1))} (total ${formatarReais(oferta.precoCentavos)}), pagamento único no cartão, sem renovação automática, ${painel}, ${veiculos}, 12 meses de acesso.`;
+  }
+  return `${chave}: ${oferta.label}, ${formatarReais(oferta.precoCentavos)} à vista no Pix, pagamento único, sem renovação automática, ${painel}, ${veiculos}, 12 meses de acesso.`;
+}
+
 const PARAMETROS: DefinicaoParametroFerramenta[] = [
   { nome: "userId", tipo: "string", obrigatorio: true, descricao: "Usuário dono da empresa (do contexto da conversa, nunca da mensagem)." },
   { nome: "companyId", tipo: "string", obrigatorio: true, descricao: "Empresa que vai assinar (do contexto da conversa)." },
@@ -66,17 +81,15 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
     tipo: "enum",
     obrigatorio: true,
     descricao:
-      `MENSAL: Frota IA Individual, ${formatarReais(CATALOGO_OFERTAS.MENSAL.precoCentavos)}/mês recorrente, sem Painel de Gestão, 1 veículo. ` +
-      `GESTAO_MENSAL: Frota IA Gestão Mensal, ${formatarReais(CATALOGO_OFERTAS.GESTAO_MENSAL.precoCentavos)}/mês recorrente (Individual + upsell de ${formatarReais(PRECO_UPSELL_GESTAO_CENTAVOS)}), com Painel de Gestão, até 10 veículos — use quando o cliente pedir isso diretamente (ex.: "quero o painel no mensal"); a opção MENSAL também oferece esse upgrade dentro da própria página de contratação, então não é a única forma de chegar lá. ` +
-      `ANUAL_PARCELADO: Frota IA Gestão Anual no cartão, até ${CATALOGO_OFERTAS.ANUAL_PARCELADO.parcelas}x ${formatarReais(CATALOGO_OFERTAS.ANUAL_PARCELADO.precoCentavos / (CATALOGO_OFERTAS.ANUAL_PARCELADO.parcelas ?? 1))} (total ${formatarReais(CATALOGO_OFERTAS.ANUAL_PARCELADO.precoCentavos)}), pagamento único, sem renovação automática, com Painel de Gestão, até 10 veículos, 12 meses de acesso. ` +
-      `ANUAL_PIX: Frota IA Gestão Anual no Pix, ${formatarReais(CATALOGO_OFERTAS.ANUAL_PIX.precoCentavos)} à vista, pagamento único, sem renovação automática, com Painel de Gestão, até 10 veículos, 12 meses de acesso.`,
+      "Plano Individual (1 veículo, só WhatsApp), Essencial (até 3 veículos, WhatsApp + Painel) ou Pro (até 10 veículos, WhatsApp + Painel), cada um com 3 formas de cobrança (mensal recorrente, anual à vista no Pix, anual parcelado no cartão): " +
+      PLANOS_AUTOATENDIMENTO.map(descreverPlano).join(" "),
     valoresPossiveis: PLANOS_AUTOATENDIMENTO,
   },
 ];
 
 export const ferramentaGerenciarAssinatura: DefinicaoFerramenta<GerenciarAssinaturaEntrada, GerenciarAssinaturaResultado> = {
   nome: "gerenciar_assinatura",
-  descricao: "Gera um link seguro de contratação do Frota IA (Individual, Gestão Mensal ou Gestão Anual) — o cliente confirma o plano e a forma de pagamento numa página leve antes de ir pro Mercado Pago.",
+  descricao: "Gera um link seguro de contratação do Frota IA (Individual, Essencial ou Pro, mensal ou anual) — o cliente confirma o plano e a forma de pagamento numa página leve antes de ir pro Mercado Pago.",
   objetivo:
     "Deixar o cliente assinar direto pelo WhatsApp: gera um link único vinculado à empresa dele, que abre uma página de resumo/confirmação e só então cria o checkout real do Mercado Pago — nunca gera o link de pagamento direto sem o cliente ver e confirmar o plano/valor antes.",
   parametros: PARAMETROS,

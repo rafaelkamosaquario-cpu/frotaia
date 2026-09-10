@@ -101,7 +101,7 @@ describe("POST /api/payments/mercadopago/webhook", () => {
   });
 
   it("payment aprovado de plano anual ativa a assinatura e libera o Painel de Gestão", async () => {
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PIX", valorCentavos: 79900 });
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
 
     const resposta = await chamarWebhook({ dataId: "pay-1", type: "payment", body: { type: "payment", data: { id: "pay-1" } } })();
 
@@ -109,23 +109,23 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     expect(registrarEventoPagamento).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ companyId: "empresa-1", statusRecebido: "approved" }));
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ companyId: "empresa-1", plan: "ANUAL_PIX", status: "ATIVA", fleetPanelIncluded: true, valorCentavos: 79900 })
+      expect.objectContaining({ companyId: "empresa-1", plan: "PRO_ANUAL_PIX", status: "ATIVA", fleetPanelIncluded: true, valorCentavos: 249900 })
     );
   });
 
-  it("payment aprovado de ANUAL_PARCELADO também libera o Painel de Gestão", async () => {
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PARCELADO", valorCentavos: 83880 });
+  it("payment aprovado de PRO_ANUAL_PARCELADO também libera o Painel de Gestão", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PARCELADO", valorCentavos: 249900 });
 
     await chamarWebhook({ dataId: "pay-1b", type: "payment", body: { type: "payment", data: { id: "pay-1b" } } })();
 
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ plan: "ANUAL_PARCELADO", fleetPanelIncluded: true })
+      expect.objectContaining({ plan: "PRO_ANUAL_PARCELADO", fleetPanelIncluded: true })
     );
   });
 
   it("payment de mesmo id + status já processado não reaplica a assinatura (idempotência)", async () => {
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PIX", valorCentavos: 79900 });
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
     eventoPagamentoJaProcessado.mockResolvedValue(true);
 
     const resposta = await chamarWebhook({ dataId: "pay-1", type: "payment", body: { type: "payment", data: { id: "pay-1" } } })();
@@ -135,8 +135,8 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
   });
 
-  it("payment aprovado de plano MENSAL não atualiza a assinatura (isso vem só do evento de preapproval)", async () => {
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|MENSAL", valorCentavos: 7990 });
+  it("payment aprovado de plano INDIVIDUAL_MENSAL não atualiza a assinatura (isso vem só do evento de preapproval)", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|INDIVIDUAL_MENSAL", valorCentavos: 24990 });
 
     await chamarWebhook({ dataId: "pay-2", type: "payment", body: { type: "payment", data: { id: "pay-2" } } })();
 
@@ -145,7 +145,7 @@ describe("POST /api/payments/mercadopago/webhook", () => {
   });
 
   it("payment pendente registra o evento mas não ativa nada", async () => {
-    buscarPagamento.mockResolvedValue({ status: "pending", externalReference: "empresa-1|ANUAL_PARCELADO", valorCentavos: 71880 });
+    buscarPagamento.mockResolvedValue({ status: "pending", externalReference: "empresa-1|PRO_ANUAL_PARCELADO", valorCentavos: 249900 });
 
     await chamarWebhook({ dataId: "pay-3", type: "payment", body: { type: "payment", data: { id: "pay-3" } } })();
 
@@ -154,7 +154,7 @@ describe("POST /api/payments/mercadopago/webhook", () => {
   });
 
   it("preapproval authorized ativa o plano mensal (Individual), sem painel, e limpa valido_ate residual do trial", async () => {
-    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-2|MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-2|INDIVIDUAL_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-1", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-1" } } })();
 
@@ -162,7 +162,7 @@ describe("POST /api/payments/mercadopago/webhook", () => {
       expect.anything(),
       expect.objectContaining({
         companyId: "empresa-2",
-        plan: "MENSAL",
+        plan: "INDIVIDUAL_MENSAL",
         status: "ATIVA",
         fleetPanelIncluded: false,
         mercadopagoSubscriptionId: "sub-1",
@@ -171,19 +171,19 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     );
   });
 
-  it("preapproval authorized de GESTAO_MENSAL ativa o plano certo (não mais hardcoded como MENSAL), libera o painel e limpa valido_ate residual do trial", async () => {
-    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-3|GESTAO_MENSAL" });
+  it("preapproval authorized de PRO_MENSAL ativa o plano certo (não hardcoded como INDIVIDUAL_MENSAL), libera o painel e limpa valido_ate residual do trial", async () => {
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-3|PRO_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-3", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-3" } } })();
 
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ companyId: "empresa-3", plan: "GESTAO_MENSAL", status: "ATIVA", fleetPanelIncluded: true, validoAte: null })
+      expect.objectContaining({ companyId: "empresa-3", plan: "PRO_MENSAL", status: "ATIVA", fleetPanelIncluded: true, validoAte: null })
     );
   });
 
   it("preapproval de mesmo id + status já processado não reaplica a assinatura (idempotência)", async () => {
-    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-3|GESTAO_MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-3|PRO_MENSAL" });
     eventoPagamentoJaProcessado.mockResolvedValue(true);
 
     const resposta = await chamarWebhook({ dataId: "sub-3", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-3" } } })();
@@ -194,7 +194,7 @@ describe("POST /api/payments/mercadopago/webhook", () => {
   });
 
   it("preapproval cancelled cancela a assinatura, revoga o painel e não mexe em valido_ate", async () => {
-    buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-2|GESTAO_MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-2|PRO_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-2", type: "preapproval", body: { type: "preapproval", data: { id: "sub-2" } } })();
 
@@ -230,9 +230,9 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
     resolverCancelamentoPendente.mockResolvedValue(undefined);
   });
 
-  it("A) Individual (MENSAL) → Gestão Mensal: cancela o preapproval antigo DEPOIS de confirmar o novo ativo", async () => {
+  it("A) Individual Mensal → Pro Mensal: cancela o preapproval antigo DEPOIS de confirmar o novo ativo", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-antigo-mensal" });
-    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|GESTAO_MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|PRO_MENSAL" });
 
     const ordem: string[] = [];
     atualizarAssinaturaPorPagamento.mockImplementation(async () => {
@@ -251,27 +251,27 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
     expect(registrarTentativaCancelamentoPendente).not.toHaveBeenCalled();
   });
 
-  it("B) Individual → Gestão Anual cartão: cancela o preapproval antigo (o pagamento novo é único, vem por 'payment', não 'preapproval')", async () => {
+  it("B) Individual → Pro Anual cartão: cancela o preapproval antigo (o pagamento novo é único, vem por 'payment', não 'preapproval')", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-antigo-mensal" });
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PARCELADO", valorCentavos: 83880 });
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PARCELADO", valorCentavos: 249900 });
 
     await chamarWebhook({ dataId: "pay-anual", type: "payment", body: { type: "payment", data: { id: "pay-anual" } } })();
 
     expect(cancelarAssinatura).toHaveBeenCalledWith("sub-antigo-mensal");
   });
 
-  it("C) Individual → Gestão Anual Pix: mesmo comportamento do cartão", async () => {
+  it("C) Individual → Pro Anual Pix: mesmo comportamento do cartão", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-antigo-mensal" });
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PIX", valorCentavos: 79900 });
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
 
     await chamarWebhook({ dataId: "pay-pix", type: "payment", body: { type: "payment", data: { id: "pay-pix" } } })();
 
     expect(cancelarAssinatura).toHaveBeenCalledWith("sub-antigo-mensal");
   });
 
-  it("D) Gestão Mensal → Gestão Anual: mesmo mecanismo, preapproval do Gestão Mensal é cancelado", async () => {
+  it("D) Pro Mensal → Pro Anual: mesmo mecanismo, preapproval do Pro Mensal é cancelado", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-gestao-mensal" });
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PARCELADO", valorCentavos: 83880 });
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PARCELADO", valorCentavos: 249900 });
 
     await chamarWebhook({ dataId: "pay-upgrade-anual", type: "payment", body: { type: "payment", data: { id: "pay-upgrade-anual" } } })();
 
@@ -280,7 +280,7 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
   it("F) Renovação de anual expirado: sem preapproval anterior (anual nunca seta mercadopago_subscription_id) — nunca tenta cancelar nada", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: null });
-    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|ANUAL_PIX", valorCentavos: 79900 });
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
 
     await chamarWebhook({ dataId: "pay-renovacao", type: "payment", body: { type: "payment", data: { id: "pay-renovacao" } } })();
 
@@ -289,7 +289,7 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
   it("cliente novo (sem assinatura anterior nenhuma) nunca tenta cancelar nada", async () => {
     getSubscription.mockResolvedValue(null);
-    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-nova|MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-nova|INDIVIDUAL_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-primeira", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-primeira" } } })();
 
@@ -298,7 +298,7 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
   it("mesmo preapproval reportando mudança de status (ex.: pending→authorized) NUNCA cancela a si mesmo", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-mesma" });
-    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|INDIVIDUAL_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-mesma", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-mesma" } } })();
 
@@ -307,7 +307,7 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
   it("evento de preapproval CANCELADA (não ATIVA) nunca dispara cancelamento de uma OUTRA assinatura", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-outra-coisa" });
-    buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-1|GESTAO_MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-1|PRO_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-cancelada", type: "preapproval", body: { type: "preapproval", data: { id: "sub-cancelada" } } })();
 
@@ -317,7 +317,7 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
   it("idempotência: webhook duplicado (já processado) nunca reprocessa nem tenta cancelar de novo", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-antigo" });
     eventoPagamentoJaProcessado.mockResolvedValue(true);
-    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|GESTAO_MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|PRO_MENSAL" });
 
     await chamarWebhook({ dataId: "sub-novo", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-novo" } } })();
 
@@ -327,7 +327,7 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
   it("falha ao cancelar a assinatura anterior nunca derruba a resposta do webhook nem desfaz a ativação da nova (best-effort) — e a pendência fica persistida, nunca perdida (fechamento final)", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-antigo-mensal" });
-    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|GESTAO_MENSAL" });
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|PRO_MENSAL" });
     cancelarAssinatura.mockRejectedValue(new Error("Mercado Pago recusou o cancelamento"));
 
     const resposta = await chamarWebhook({ dataId: "sub-x", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-x" } } })();
@@ -340,7 +340,7 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
   it("falha antes do pagamento (evento com status não-aprovado) nunca ativa nem tenta cancelar nada", async () => {
     getSubscription.mockResolvedValue({ mercadopago_subscription_id: "sub-antigo-mensal" });
-    buscarPagamento.mockResolvedValue({ status: "rejected", externalReference: "empresa-1|ANUAL_PIX", valorCentavos: 79900 });
+    buscarPagamento.mockResolvedValue({ status: "rejected", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
 
     await chamarWebhook({ dataId: "pay-rejeitado", type: "payment", body: { type: "payment", data: { id: "pay-rejeitado" } } })();
 

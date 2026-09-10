@@ -1,8 +1,8 @@
 import type { SubscriptionPlanEnum } from "@/lib/supabase/tables";
 
 /**
- * Catálogo central de ofertas comerciais (08/2026, nova estrutura
- * "Individual vs. Gestão"). Fonte ÚNICA de preço/cobrança/entitlement por
+ * Catálogo central de ofertas comerciais (09/2026, estrutura
+ * "Individual/Essencial/Pro"). Fonte ÚNICA de preço/cobrança/entitlement por
  * plano — usada pela tool `gerenciar_assinatura`, por `mercadopago/client.ts`
  * (geração do checkout real), pelo webhook (resolução de entitlement) e
  * pela página `/assinar`. Nunca espalhar preço/entitlement hardcoded em
@@ -15,9 +15,19 @@ import type { SubscriptionPlanEnum } from "@/lib/supabase/tables";
  * antes desta mudança (`PRECOS_CENTAVOS`).
  */
 
-export type OfertaPlano = Exclude<SubscriptionPlanEnum, "TRIAL" | "EMPRESA">;
+export type OfertaPlano = Exclude<SubscriptionPlanEnum, "TRIAL" | "EMPRESA" | "MENSAL" | "ANUAL_PARCELADO" | "ANUAL_PIX" | "GESTAO_MENSAL">;
 
-export const PLANOS_AUTOATENDIMENTO: OfertaPlano[] = ["MENSAL", "GESTAO_MENSAL", "ANUAL_PARCELADO", "ANUAL_PIX"];
+export const PLANOS_AUTOATENDIMENTO: OfertaPlano[] = [
+  "INDIVIDUAL_MENSAL",
+  "INDIVIDUAL_ANUAL_PIX",
+  "INDIVIDUAL_ANUAL_PARCELADO",
+  "ESSENCIAL_MENSAL",
+  "ESSENCIAL_ANUAL_PIX",
+  "ESSENCIAL_ANUAL_PARCELADO",
+  "PRO_MENSAL",
+  "PRO_ANUAL_PIX",
+  "PRO_ANUAL_PARCELADO",
+];
 
 export interface OfertaCatalogo {
   /** Nome comercial, usado no `reason`/título do checkout do Mercado Pago e nas telas. */
@@ -27,52 +37,99 @@ export interface OfertaCatalogo {
   cobranca: "recorrente" | "unica";
   /** Só relevante pra cobrança única — quantos meses de acesso o pagamento garante. */
   validadeMeses: number | null;
+  /** Só relevante pra cobrança única — qual forma de pagamento essa oferta usa no Checkout Pro (nunca as duas juntas). */
+  metodoUnico?: "pix" | "cartao";
   /** Direito ao Painel de Gestão que esta oferta concede — grava direto em subscriptions.fleet_panel_included via o webhook. */
   painel: boolean;
   /** Só informativo pras telas — o limite de verdade continua vindo de getVehicleLimitForCompany (src/lib/frota/vehicleLimit.ts), nunca duplicado aqui. */
-  limiteVeiculos: 1 | 10;
+  limiteVeiculos: 1 | 3 | 10;
   /** Só para cobrança única no cartão — número de parcelas oferecidas no Checkout Pro. */
   parcelas?: number;
 }
 
 export const CATALOGO_OFERTAS: Record<OfertaPlano, OfertaCatalogo> = {
-  MENSAL: {
+  INDIVIDUAL_MENSAL: {
     label: "Frota IA Individual",
-    precoCentavos: 7990,
+    precoCentavos: 8990,
     cobranca: "recorrente",
     validadeMeses: null,
     painel: false,
     limiteVeiculos: 1,
   },
-  GESTAO_MENSAL: {
-    label: "Frota IA Gestão Mensal",
-    precoCentavos: 9990,
+  INDIVIDUAL_ANUAL_PIX: {
+    label: "Frota IA Individual Anual (Pix)",
+    precoCentavos: 89900,
+    cobranca: "unica",
+    validadeMeses: 12,
+    metodoUnico: "pix",
+    painel: false,
+    limiteVeiculos: 1,
+  },
+  INDIVIDUAL_ANUAL_PARCELADO: {
+    label: "Frota IA Individual Anual (cartão)",
+    precoCentavos: 89900,
+    cobranca: "unica",
+    validadeMeses: 12,
+    metodoUnico: "cartao",
+    painel: false,
+    limiteVeiculos: 1,
+    parcelas: 12,
+  },
+  ESSENCIAL_MENSAL: {
+    label: "Frota IA Essencial",
+    precoCentavos: 14990,
+    cobranca: "recorrente",
+    validadeMeses: null,
+    painel: true,
+    limiteVeiculos: 3,
+  },
+  ESSENCIAL_ANUAL_PIX: {
+    label: "Frota IA Essencial Anual (Pix)",
+    precoCentavos: 149900,
+    cobranca: "unica",
+    validadeMeses: 12,
+    metodoUnico: "pix",
+    painel: true,
+    limiteVeiculos: 3,
+  },
+  ESSENCIAL_ANUAL_PARCELADO: {
+    label: "Frota IA Essencial Anual (cartão)",
+    precoCentavos: 149900,
+    cobranca: "unica",
+    validadeMeses: 12,
+    metodoUnico: "cartao",
+    painel: true,
+    limiteVeiculos: 3,
+    parcelas: 12,
+  },
+  PRO_MENSAL: {
+    label: "Frota IA Pro",
+    precoCentavos: 24990,
     cobranca: "recorrente",
     validadeMeses: null,
     painel: true,
     limiteVeiculos: 10,
   },
-  ANUAL_PARCELADO: {
-    label: "Frota IA Gestão Anual (cartão)",
-    precoCentavos: 83880,
+  PRO_ANUAL_PIX: {
+    label: "Frota IA Pro Anual (Pix)",
+    precoCentavos: 249900,
     cobranca: "unica",
     validadeMeses: 12,
+    metodoUnico: "pix",
+    painel: true,
+    limiteVeiculos: 10,
+  },
+  PRO_ANUAL_PARCELADO: {
+    label: "Frota IA Pro Anual (cartão)",
+    precoCentavos: 249900,
+    cobranca: "unica",
+    validadeMeses: 12,
+    metodoUnico: "cartao",
     painel: true,
     limiteVeiculos: 10,
     parcelas: 12,
   },
-  ANUAL_PIX: {
-    label: "Frota IA Gestão Anual (Pix)",
-    precoCentavos: 79900,
-    cobranca: "unica",
-    validadeMeses: 12,
-    painel: true,
-    limiteVeiculos: 10,
-  },
 };
-
-/** Upsell do Individual — usado só pela tela /assinar e pela tool, nunca pra decidir preço real (isso é sempre CATALOGO_OFERTAS). */
-export const PRECO_UPSELL_GESTAO_CENTAVOS = CATALOGO_OFERTAS.GESTAO_MENSAL.precoCentavos - CATALOGO_OFERTAS.MENSAL.precoCentavos;
 
 export function isOfertaPlano(valor: string): valor is OfertaPlano {
   return (PLANOS_AUTOATENDIMENTO as string[]).includes(valor);

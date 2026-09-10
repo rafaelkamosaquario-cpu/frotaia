@@ -2782,6 +2782,15 @@ export type Database = {
         | "ANUAL_PIX"
         | "EMPRESA"
         | "GESTAO_MENSAL"
+        | "INDIVIDUAL_MENSAL"
+        | "INDIVIDUAL_ANUAL_PIX"
+        | "INDIVIDUAL_ANUAL_PARCELADO"
+        | "ESSENCIAL_MENSAL"
+        | "ESSENCIAL_ANUAL_PIX"
+        | "ESSENCIAL_ANUAL_PARCELADO"
+        | "PRO_MENSAL"
+        | "PRO_ANUAL_PIX"
+        | "PRO_ANUAL_PARCELADO"
       subscription_status:
         | "TRIAL"
         | "ATIVA"
@@ -3112,6 +3121,15 @@ export const Constants = {
         "ANUAL_PIX",
         "EMPRESA",
         "GESTAO_MENSAL",
+        "INDIVIDUAL_MENSAL",
+        "INDIVIDUAL_ANUAL_PIX",
+        "INDIVIDUAL_ANUAL_PARCELADO",
+        "ESSENCIAL_MENSAL",
+        "ESSENCIAL_ANUAL_PIX",
+        "ESSENCIAL_ANUAL_PARCELADO",
+        "PRO_MENSAL",
+        "PRO_ANUAL_PIX",
+        "PRO_ANUAL_PARCELADO",
       ],
       subscription_status: [
         "TRIAL",
