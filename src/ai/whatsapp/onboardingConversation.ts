@@ -36,6 +36,8 @@ import { CATEGORIAS_AJUDA, construirTextoAjudaCompleto } from "@/lib/helpMenu";
 export type OnboardingCompanyType = CompanyRow["company_type"];
 
 export interface OnboardingCollectedData {
+  /** Preenchido assim que a empresa mínima é criada no primeiro contato (inversão do funil, 09/2026) — presente aqui significa que `finalizeOnboarding` deve ATUALIZAR essa empresa em vez de criar uma nova. Ausente = caminho legado (ex.: lead "Empresas", que nunca passa pela demo). */
+  companyId?: string;
   name?: string;
   profileLabel?: string;
   companyType?: OnboardingCompanyType;

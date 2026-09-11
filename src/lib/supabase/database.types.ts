@@ -2752,6 +2752,8 @@ export type Database = {
       message_role: "user" | "assistant" | "system" | "tool"
       onboarding_state:
         | "not_started"
+        | "awaiting_demo_choice"
+        | "awaiting_demo_input"
         | "awaiting_name"
         | "awaiting_profile"
         | "awaiting_base_location"
@@ -3089,6 +3091,8 @@ export const Constants = {
       message_role: ["user", "assistant", "system", "tool"],
       onboarding_state: [
         "not_started",
+        "awaiting_demo_choice",
+        "awaiting_demo_input",
         "awaiting_name",
         "awaiting_profile",
         "awaiting_base_location",

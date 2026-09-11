@@ -10,10 +10,42 @@ import {
   getSubscription,
 } from "@/services/supabase/subscriptionService";
 import { cancelarComRecuperacao } from "@/services/mercadopago/cancelamentoAssinaturaAnterior";
+import { listChannelsForCompany } from "@/services/supabase/channelIdentityService";
+import { getOnboardingSession, updateOnboardingSession } from "@/services/supabase/onboardingSessionService";
+import { firstOnboardingMessage } from "@/ai/whatsapp/onboardingConversation";
+import { sendWhatsappText } from "@/lib/whatsapp/zapiClient";
 import { captureError, logEvent } from "@/lib/observability/logger";
 import type { SupabaseDbClient } from "@/services/supabase/types";
 
 const ROTA = "/api/payments/mercadopago/webhook";
+
+/**
+ * Inversão do funil (09/2026): a empresa nasce mínima no primeiro contato
+ * pelo WhatsApp (demo pré-cadastro) e o cadastro completo de 11+1
+ * perguntas só roda DEPOIS do pagamento confirmado — este é o gatilho.
+ * `listChannelsForCompany` já existia (usado pelo despacho de notícia
+ * diária) — 1:1 na V1 ("1 usuário + 1 veículo"), usa o primeiro canal.
+ * Idempotente: só dispara se a sessão ainda não estiver `completed` (uma
+ * reentrega do mesmo evento de pagamento não reabre o cadastro de quem já
+ * terminou). Best-effort de propósito — nunca deve derrubar a confirmação
+ * do pagamento em si, que já está garantida antes de chamar isto.
+ */
+async function dispararOnboardingPosPagamento(admin: SupabaseDbClient, companyId: string): Promise<void> {
+  try {
+    const canais = await listChannelsForCompany(admin, companyId);
+    const canal = canais[0];
+    if (!canal || !canal.phone_e164) return;
+
+    const session = await getOnboardingSession(admin, canal.user_id);
+    if (session?.state === "completed") return;
+
+    await updateOnboardingSession(admin, canal.user_id, { state: "awaiting_name" });
+    await sendWhatsappText(canal.phone_e164, "Pagamento confirmado! 🎉\n\nAgora vamos configurar sua operação — são só algumas perguntas rápidas.");
+    await sendWhatsappText(canal.phone_e164, firstOnboardingMessage());
+  } catch (erro) {
+    captureError({ event: "mercadopago_onboarding_pos_pagamento_falhou", route: ROTA, company_id: companyId, error: erro });
+  }
+}
 
 /**
  * Troca de plano (fechamento 08/2026, com correção final do risco residual
@@ -159,6 +191,7 @@ export async function POST(request: Request) {
 
         // Só depois da nova assinatura já confirmada ATIVA no banco.
         await cancelarAssinaturaAnteriorSeTrocouDePlano(admin, referencia.companyId, preapprovalAnterior, resourceId);
+        await dispararOnboardingPosPagamento(admin, referencia.companyId);
       }
     } else if (TIPOS_ASSINATURA.has(tipo)) {
       const assinatura = await buscarAssinatura(resourceId);
@@ -205,6 +238,7 @@ export async function POST(request: Request) {
         // causa de um evento "pending"/"paused" desta mesma troca.
         if (statusMapeado === "ATIVA") {
           await cancelarAssinaturaAnteriorSeTrocouDePlano(admin, referencia.companyId, preapprovalAnterior, resourceId);
+          await dispararOnboardingPosPagamento(admin, referencia.companyId);
         }
       }
     }

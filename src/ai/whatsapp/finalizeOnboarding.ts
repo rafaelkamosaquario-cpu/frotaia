@@ -1,5 +1,5 @@
 import "server-only";
-import { createCompanyWithOwner } from "@/services/supabase/companyService";
+import { createCompanyWithOwner, updateCompany } from "@/services/supabase/companyService";
 import { updateProfile } from "@/services/supabase/profileService";
 import { createVehicle, setDefaultVehicle } from "@/services/supabase/vehicleService";
 import { createRoute } from "@/services/supabase/savedRouteService";
@@ -37,6 +37,19 @@ import { parseVehicleDescription } from "./vehicleDescriptionParser";
  * o texto completo sempre vira uma memória (nunca perdido, mesmo com mais
  * de uma rota mencionada) e, se o parser conseguiu separar origem/destino,
  * também vira uma `saved_routes` estruturada vinculada ao veículo.
+ *
+ * Inversão do funil (09/2026, "mostrar valor antes de cadastrar"): a
+ * empresa deixou de nascer só aqui — `criarEmpresaMinima` (abaixo) já cria
+ * uma empresa mínima (só nome placeholder) no primeiro contato, antes de
+ * qualquer pergunta, pra destravar a demo pré-cadastro (toda ferramenta de
+ * IA exige `companyId`, mesmo em modo demo — ver `tool_executions`). Este
+ * `finalizeOnboarding` passou a rodar só DEPOIS do pagamento, completando o
+ * perfil dessa mesma empresa em vez de criar uma segunda — por isso checa
+ * `collectedData.companyId` (gravado no momento da empresa mínima, mesmo
+ * padrão já usado pra `ofertaPretendida`) pra decidir `updateCompany` em
+ * vez de `createCompanyWithOwner`. Sem esse campo (hoje só o caminho
+ * legado do lead "Empresas", que nunca passa pela demo), o comportamento é
+ * o de sempre: cria a empresa do zero aqui mesmo.
  */
 export async function finalizeOnboarding(
   admin: SupabaseDbClient,
@@ -44,12 +57,16 @@ export async function finalizeOnboarding(
   collectedData: OnboardingCollectedData,
   phoneE164: string
 ): Promise<CompanyRow> {
-  const company = await createCompanyWithOwner(admin, userId, {
+  const dadosPerfil = {
     name: collectedData.name ?? "Minha operação",
     companyType: collectedData.companyType ?? "autonomo",
     city: collectedData.baseCity,
     state: collectedData.baseState,
-  });
+  };
+
+  const company = collectedData.companyId
+    ? await updateCompany(admin, collectedData.companyId, userId, dadosPerfil)
+    : await createCompanyWithOwner(admin, userId, dadosPerfil);
 
   // Fechamento de coerência (08/2026): "Como posso chamar você?" grava em
   // companies.name (nome operacional/empresa), mas profiles.full_name
@@ -66,25 +83,32 @@ export async function finalizeOnboarding(
     }
   }
 
-  try {
-    await criarAssinaturaTeste(admin, company.id, phoneE164);
-  } catch {
-    // Onboarding já concluiu do ponto de vista do usuário — se a criação
-    // do teste falhar, não trava a conclusão (mesmo princípio do veículo
-    // abaixo). Sem assinatura nenhuma criada, o gating do webhook trata
-    // isAccessAllowed(null) como acesso negado — pior caso é o cliente
-    // precisar contatar o suporte, não um bug de segurança.
-  }
+  // Trial e vínculo do canal já foram feitos em criarEmpresaMinima, no
+  // primeiro contato (inversão do funil, 09/2026) — refazer aqui duplicaria
+  // a assinatura (criarAssinaturaTeste sempre insere uma linha nova) ou
+  // seria só redundante (setCompanyForUserChannels é idempotente, mas sem
+  // necessidade). Só roda pro caminho legado (empresa criada agora mesmo).
+  if (!collectedData.companyId) {
+    try {
+      await criarAssinaturaTeste(admin, company.id, phoneE164);
+    } catch {
+      // Onboarding já concluiu do ponto de vista do usuário — se a criação
+      // do teste falhar, não trava a conclusão (mesmo princípio do veículo
+      // abaixo). Sem assinatura nenhuma criada, o gating do webhook trata
+      // isAccessAllowed(null) como acesso negado — pior caso é o cliente
+      // precisar contatar o suporte, não um bug de segurança.
+    }
 
-  try {
-    // Corrige o "galinha e ovo": o canal de WhatsApp é criado no primeiro
-    // contato, antes de existir empresa (ver resolveOrCreateUserByPhone) —
-    // sem isso, user_channels.company_id fica nulo pra sempre, quebrando
-    // listChannelsForCompany (despacho de notícia diária e aviso de teste
-    // grátis). Achado em produção em 07/08/2026.
-    await setCompanyForUserChannels(admin, userId, company.id);
-  } catch {
-    // Mesmo princípio dos outros catches aqui: não trava o onboarding.
+    try {
+      // Corrige o "galinha e ovo": o canal de WhatsApp é criado no primeiro
+      // contato, antes de existir empresa (ver resolveOrCreateUserByPhone) —
+      // sem isso, user_channels.company_id fica nulo pra sempre, quebrando
+      // listChannelsForCompany (despacho de notícia diária e aviso de teste
+      // grátis). Achado em produção em 07/08/2026.
+      await setCompanyForUserChannels(admin, userId, company.id);
+    } catch {
+      // Mesmo princípio dos outros catches aqui: não trava o onboarding.
+    }
   }
 
   // Região de atuação — dado ESTRUTURAL (fechamento de coerência 08/2026),
@@ -188,5 +212,34 @@ export async function finalizeOnboarding(
     }
   }
 
+  return company;
+}
+
+/**
+ * Inversão do funil (09/2026, "mostrar valor antes de cadastrar"): cria uma
+ * empresa mínima (só o nome placeholder — `companies.name` é a única coluna
+ * `NOT NULL`, o resto tem default) no primeiro contato pelo WhatsApp, ANTES
+ * de qualquer pergunta de cadastro. Destrava a demo pré-cadastro: toda
+ * ferramenta de IA (mesmo em modo demo) precisa de `companyId` pra logar em
+ * `tool_executions`/`analysis_runs` (`company_id NOT NULL`) e pro gate de
+ * assinatura (`isAccessAllowed`) funcionar — sem isso a IA simplesmente não
+ * roda (ver webhook/route.ts). Reaproveita os mesmos 3 services que
+ * `finalizeOnboarding` já usava no fim do fluxo antigo, só chamados mais
+ * cedo — nenhuma lógica nova de negócio, só reordenação.
+ *
+ * O trial de 7 dias criado aqui é o de sempre (`criarAssinaturaTeste`,
+ * `DIAS_TESTE_GRATIS` em subscriptionService.ts) — nunca é citado ao
+ * cliente nesta fase (decisão do Rafael): é só o mecanismo técnico que
+ * libera `isAccessAllowed` pra demo funcionar, não uma promessa comercial
+ * explícita. Se falhar (`criarAssinaturaTeste`/`setCompanyForUserChannels`),
+ * propaga o erro — diferente do resto de `finalizeOnboarding`, aqui não faz
+ * sentido seguir sem trial: a empresa existiria mas a IA nunca responderia
+ * (isAccessAllowed(null) = false), um estado pior que simplesmente pedir
+ * pro cliente tentar de novo.
+ */
+export async function criarEmpresaMinima(admin: SupabaseDbClient, userId: string, phoneE164: string): Promise<CompanyRow> {
+  const company = await createCompanyWithOwner(admin, userId, { name: "Minha operação" });
+  await criarAssinaturaTeste(admin, company.id, phoneE164);
+  await setCompanyForUserChannels(admin, userId, company.id);
   return company;
 }

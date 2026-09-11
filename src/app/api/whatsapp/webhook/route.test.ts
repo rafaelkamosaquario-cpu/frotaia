@@ -13,7 +13,7 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/whatsapp/config", () => ({
   isWhatsappConfigured: () => true,
-  getWhatsappConfig: () => ({ WHATSAPP_WEBHOOK_SECRET: "segredo" }),
+  getWhatsappConfig: () => ({ WHATSAPP_WEBHOOK_SECRET: "segredo", APP_URL: "https://frotaia.up.railway.app" }),
 }));
 
 const sendWhatsappText = vi.fn();
@@ -42,7 +42,11 @@ vi.mock("@/services/supabase/onboardingSessionService", () => ({
 }));
 
 const finalizeOnboarding = vi.fn();
-vi.mock("@/ai/whatsapp/finalizeOnboarding", () => ({ finalizeOnboarding: (...a: unknown[]) => finalizeOnboarding(...a) }));
+const criarEmpresaMinima = vi.fn();
+vi.mock("@/ai/whatsapp/finalizeOnboarding", () => ({
+  finalizeOnboarding: (...a: unknown[]) => finalizeOnboarding(...a),
+  criarEmpresaMinima: (...a: unknown[]) => criarEmpresaMinima(...a),
+}));
 
 const processOnboardingMessage = vi.fn();
 vi.mock("@/ai/whatsapp/onboardingConversation", async () => {
@@ -119,6 +123,7 @@ describe("Guia de Primeiros Passos V1 — dispatch no webhook do WhatsApp (08/20
   beforeEach(() => {
     vi.clearAllMocks();
     resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
     getOnboardingSession.mockResolvedValue({ state: "completed", collected_data: {} });
     loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
     loadVehicleContext.mockResolvedValue({ vehicle: null, costProfile: null, tireProfiles: [], insuranceExpiryDate: null, licensingExpiryDate: null });
@@ -353,6 +358,7 @@ describe("Guia V1 — oferta automática exige isAccessAllowed (validação 08/2
   beforeEach(() => {
     vi.clearAllMocks();
     resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
     loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
     loadVehicleContext.mockResolvedValue({ vehicle: null, costProfile: null, tireProfiles: [], insuranceExpiryDate: null, licensingExpiryDate: null });
     getOrCreateOpenConversation.mockResolvedValue({ id: "conv-1" });
@@ -447,6 +453,7 @@ describe("Guia V1 — interação manual/em andamento também exige isAccessAllo
   beforeEach(() => {
     vi.clearAllMocks();
     resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
     getOnboardingSession.mockResolvedValue({ state: "completed", collected_data: {} });
     loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
     loadVehicleContext.mockResolvedValue({ vehicle: null, costProfile: null, tireProfiles: [], insuranceExpiryDate: null, licensingExpiryDate: null });
@@ -492,5 +499,207 @@ describe("Guia V1 — interação manual/em andamento também exige isAccessAllo
     await chamarWebhook(mensagemTexto("primeiros passos"))();
 
     expect(sendWhatsappOptionList).toHaveBeenCalled();
+  });
+});
+
+function mensagemBotao(buttonId: string) {
+  return { phone: "+5541999998888", messageId: `msg-${Math.random()}`, buttonsResponseMessage: { buttonId } };
+}
+
+describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 perguntas", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
+    loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
+    loadVehicleContext.mockResolvedValue({ vehicle: null, costProfile: null, tireProfiles: [], insuranceExpiryDate: null, licensingExpiryDate: null });
+    getOrCreateOpenConversation.mockResolvedValue({ id: "conv-1" });
+    appendMessage.mockResolvedValue(undefined);
+    sendWhatsappText.mockResolvedValue(undefined);
+    sendWhatsappOptionList.mockResolvedValue(undefined);
+    sendWhatsappButtons.mockResolvedValue(undefined);
+    getSubscription.mockResolvedValue({ status: "TRIAL", valido_ate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), fleet_panel_included: false });
+    gerarRespostaAssistente.mockResolvedValue({ message: { id: "m-1", content: "resposta da demo" }, ferramentasExecutadas: [] });
+  });
+
+  it("cliente novo (não Empresas): cria empresa mínima em silêncio e mostra o menu de demo, não as 11 perguntas", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: true });
+
+    await chamarWebhook(mensagemTexto("Quero testar o Frota IA grátis"))();
+
+    expect(criarEmpresaMinima).toHaveBeenCalledWith(expect.anything(), USER_ID, "+5541999998888");
+    expect(updateOnboardingSession).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      expect.objectContaining({ state: "awaiting_demo_choice", collectedData: expect.objectContaining({ companyId: EMPRESA }) })
+    );
+    expect(sendWhatsappOptionList).toHaveBeenCalled();
+    expect(sendWhatsappText).not.toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Como posso chamar você"));
+  });
+
+  it("cliente novo vindo de um CTA de plano (landing): guarda ofertaPretendida junto da empresa mínima", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: true });
+
+    await chamarWebhook(mensagemTexto("Quero assinar o Frota IA Individual por R$89,90/mês."))();
+
+    expect(updateOnboardingSession).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      expect.objectContaining({ collectedData: expect.objectContaining({ companyId: EMPRESA, ofertaPretendida: "INDIVIDUAL_MENSAL" }) })
+    );
+  });
+
+  it("lead 'Empresas': mantém o fluxo de sempre — sem demo, sem empresa mínima, direto pras 11 perguntas", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: true });
+
+    await chamarWebhook(mensagemTexto("Quero conhecer o Frota IA Empresas para uma frota com mais de 10 veículos."))();
+
+    expect(criarEmpresaMinima).not.toHaveBeenCalled();
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("atendimento comercial direto"));
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Como posso chamar você"));
+  });
+
+  it("awaiting_demo_choice: tocar 'Analisar um frete' transiciona pra awaiting_demo_input com o track salvo", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_choice", collected_data: { companyId: EMPRESA } });
+
+    await chamarWebhook(mensagemLista("frete"))();
+
+    expect(updateOnboardingSession).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      expect.objectContaining({ state: "awaiting_demo_input", collectedData: expect.objectContaining({ companyId: EMPRESA, demoTrack: "frete" }) })
+    );
+    expect(gerarRespostaAssistente).not.toHaveBeenCalled(); // ainda não é hora da IA rodar, só a transição determinística
+  });
+
+  it("awaiting_demo_choice: 'Conhecer funções' mostra o catálogo completo e repete o menu, sem sair do estado", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_choice", collected_data: { companyId: EMPRESA } });
+
+    await chamarWebhook(mensagemLista("funcionalidades"))();
+
+    expect(sendWhatsappText).toHaveBeenCalled();
+    expect(sendWhatsappOptionList).toHaveBeenCalled();
+    expect(updateOnboardingSession).not.toHaveBeenCalledWith(expect.anything(), USER_ID, expect.objectContaining({ state: "awaiting_demo_input" }));
+  });
+
+  it("awaiting_demo_input: mensagem de texto vai pra IA com ferramentasPermitidas do track e modoDemo:true", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });
+
+    await chamarWebhook(mensagemTexto("Curitiba pra São Paulo por R$4200, compensa?"))();
+
+    expect(gerarRespostaAssistente).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId: EMPRESA,
+        mensagemUsuario: "Curitiba pra São Paulo por R$4200, compensa?",
+        ferramentasPermitidas: expect.arrayContaining(["analisar_frete"]),
+        modoDemo: true,
+      })
+    );
+  });
+
+  it("awaiting_demo_input: quando a ferramenta-alvo do track roda com sucesso, dispara o CTA pós-demo (botões)", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });
+    gerarRespostaAssistente.mockResolvedValue({ message: { id: "m-2", content: "esse frete compensa" }, ferramentasExecutadas: ["analisar_frete"] });
+
+    await chamarWebhook(mensagemTexto("Curitiba pra São Paulo por R$4200, compensa?"))();
+
+    expect(sendWhatsappButtons).toHaveBeenCalledWith(
+      "+5541999998888",
+      expect.stringContaining("Gostou"),
+      expect.arrayContaining([expect.objectContaining({ id: "demo_ver_planos" })])
+    );
+  });
+
+  it("awaiting_demo_input: SEM a ferramenta-alvo executada (ex.: IA só pediu mais dado), não dispara o CTA ainda", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });
+    gerarRespostaAssistente.mockResolvedValue({ message: { id: "m-2", content: "me conta o valor ofertado" }, ferramentasExecutadas: [] });
+
+    await chamarWebhook(mensagemTexto("é um frete de Curitiba pra São Paulo"))();
+
+    expect(sendWhatsappButtons).not.toHaveBeenCalled();
+  });
+
+  it("awaiting_demo_input: assinatura vencida bloqueia a demo com o mesmo aviso do fluxo pós-cadastro", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });
+    getSubscription.mockResolvedValue({ status: "EXPIRADA", valido_ate: null, fleet_panel_included: false });
+
+    await chamarWebhook(mensagemTexto("Curitiba pra São Paulo por R$4200"))();
+
+    expect(gerarRespostaAssistente).not.toHaveBeenCalled();
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("teste gratuito"));
+  });
+
+  it("CTA 'Ver planos': mostra os 3 botões de plano e marca awaitingPlanChoice", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });
+
+    await chamarWebhook(mensagemBotao("demo_ver_planos"))();
+
+    expect(sendWhatsappButtons).toHaveBeenCalledWith(
+      "+5541999998888",
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "demo_plano_individual" }),
+        expect.objectContaining({ id: "demo_plano_essencial" }),
+        expect.objectContaining({ id: "demo_plano_pro" }),
+      ])
+    );
+    expect(updateOnboardingSession).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      expect.objectContaining({ collectedData: expect.objectContaining({ awaitingPlanChoice: true }) })
+    );
+  });
+
+  it("texto 'quero assinar' durante a demo também abre os botões de plano, sem precisar do CTA aparecer antes", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });
+
+    await chamarWebhook(mensagemTexto("quero assinar"))();
+
+    expect(sendWhatsappButtons).toHaveBeenCalled();
+    expect(gerarRespostaAssistente).not.toHaveBeenCalled();
+  });
+
+  it("escolher um plano depois de 'Ver planos' gera o link de checkout de verdade", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({
+      state: "awaiting_demo_input",
+      collected_data: { companyId: EMPRESA, demoTrack: "frete", awaitingPlanChoice: true },
+    });
+
+    await chamarWebhook(mensagemBotao("demo_plano_essencial"))();
+
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("/assinar?token="));
+    expect(updateOnboardingSession).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      expect.objectContaining({ collectedData: expect.objectContaining({ awaitingPlanChoice: false }) })
+    );
+  });
+
+  it("CTA 'Conhecer mais funções' volta pro menu de demo (awaiting_demo_choice)", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });
+
+    await chamarWebhook(mensagemBotao("demo_conhecer_funcoes"))();
+
+    expect(updateOnboardingSession).toHaveBeenCalledWith(expect.anything(), USER_ID, expect.objectContaining({ state: "awaiting_demo_choice" }));
+    expect(sendWhatsappOptionList).toHaveBeenCalled();
+  });
+
+  it("CTA 'Agora não' só confirma e deixa continuar testando, sem mudar de estado", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });
+
+    await chamarWebhook(mensagemBotao("demo_agora_nao"))();
+
+    expect(updateOnboardingSession).not.toHaveBeenCalled();
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("continuar testando"));
   });
 });

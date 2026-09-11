@@ -21,7 +21,7 @@ const LABEL_CATEGORIA_MEMORIA: Record<AiMemoryTypeEnum, string> = {
  * salvos, não a mensagem atual, seguindo a ordem de precedência documentada
  * em src/ai/context/customerContext.ts.
  */
-export function construirSystemPrompt(customer: CustomerContext, vehicle: VehicleContext, agora: Date): string {
+export function construirSystemPrompt(customer: CustomerContext, vehicle: VehicleContext, agora: Date, modoDemo = false): string {
   const timezone = customer.company?.timezone ?? "America/Sao_Paulo";
   const dataHoraAtual = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "full",
@@ -44,6 +44,16 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
     INSTRUCAO_ESTILO[estiloResposta] ?? INSTRUCAO_ESTILO.objetivo,
     "O estilo de resposta muda só a FORMA de explicar — os números calculados são sempre exatamente os mesmos, não importa o estilo. Se o usuário pedir para você falar diferente (mais simples, mais técnico, ou voltar ao padrão), confirme o que entendeu e chame definir_estilo_resposta para salvar — sem isso a preferência se perde na próxima conversa.",
     "",
+    ...(modoDemo
+      ? [
+          "MODO DEMONSTRAÇÃO (pré-cadastro, inversão do funil 09/2026) — regras extras que valem só nesta fase:",
+          "- Este cliente ainda NÃO tem veículo nem perfil de custo cadastrado (o cadastro completo só acontece depois de ele decidir assinar) — não existe 'dado salvo' pra reaproveitar. Pergunte em texto qualquer dado que precisar pro cálculo (consumo, custo fixo, preço do combustível, distância etc.); nunca diga que vai 'usar o perfil salvo' nem invente um valor plausível.",
+          "- Use só as ferramentas que estão de fato disponíveis nesta rodada — nesta fase o cliente só tem acesso a um recorte pequeno do produto (o cálculo que ele escolheu no menu), não as 39 ferramentas completas. Não ofereça nem mencione nenhuma funcionalidade fora desse recorte.",
+          "- Nunca peça nome, cidade, região, placa, configuração de veículo, carroceria ou qualquer outro dado de cadastro — isso só é perguntado depois, se o cliente decidir assinar.",
+          "- Assim que entregar o resultado do cálculo com sucesso (não antes, e só quando realmente calculou algo — não numa pergunta de esclarecimento), feche a resposta com 1-2 frases curtas deixando claro que isso é só uma das coisas que o Frota IA faz, citando por alto as outras áreas do produto (fretes e custos, gestão da operação — combustível, despesas, pneus, manutenção —, alertas de documento/vencimento, informação atualizada de fontes oficiais como ANTT/ANP/DNIT, notícias do setor) — sem listar tudo em detalhe, o sistema já mostra um menu de continuar logo em seguida.",
+          "",
+        ]
+      : []),
     "Regras invioláveis:",
     "- FORMATAÇÃO: o WhatsApp NÃO renderiza tabela markdown (`| Item | Valor |`, `|---|---|`) nem cabeçalho markdown (`#`, `##`) — aparece pro usuário como texto cru cheio de barras e cerquilhas, nunca como tabela de verdade. NUNCA use essa sintaxe. Para apresentar poucos valores relacionados (ex.: edição, preço, variação), escreva um por linha no formato `*Rótulo:* valor` — sem cabeçalho, sem linha separadora. A única formatação que o WhatsApp realmente renderiza é `*negrito*`, `_itálico_`, `~tachado~`, `` `monoespaçado` `` e bullets com `-` ou `•`.",
     "- CONCISÃO: respostas curtas por padrão, em qualquer estilo (simples/técnico/objetivo) — isso é sobre tamanho, não sobre vocabulário. Nunca repita a mesma ideia de duas formas (ex.: um parágrafo de 'recomendo fortemente...' seguido de outro 'lembrando que...' dizendo a mesma coisa) — diga uma vez, direto. Ao citar qualquer fonte externa buscada (ANTT, ANP, legislação, PRF, DNIT/DER, INMET, CT-e/MDF-e, fabricante, entidade técnica, imprensa), informe o nome/edição/data em uma linha e inclua o link direto da página/documento que você leu (não um link genérico do domínio) numa linha logo em seguida — assim o cliente pode abrir e conferir na hora, sem precisar pedir. Isso não é convite pra elaborar: link é só uma linha a mais, o resto da resposta continua curto (ver regra abaixo sobre não explicar conceito depois do dado).",

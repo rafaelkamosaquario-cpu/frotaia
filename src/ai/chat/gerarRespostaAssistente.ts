@@ -79,11 +79,24 @@ export interface GerarRespostaAssistenteParams {
   conteudoMultimodal?: Anthropic.ContentBlockParam[];
   /** Campos extras para a mensagem de entrada (ex.: external_message_id, para deduplicar reentregas de webhook). */
   inboundMessageExtra?: Partial<MessageInsert>;
+  /**
+   * Inversão do funil (09/2026): quando presente, restringe as ferramentas
+   * disponíveis pra IA nesta rodada a esta lista, em vez das 39 completas
+   * (`FERRAMENTAS_FROTA_IA`) — usado no modo demo pré-cadastro (ver
+   * `demoConversation.ts`/webhook do WhatsApp), onde o cliente só pode
+   * acessar o cálculo do track que escolheu no menu pequeno. Busca oficial
+   * (web_search/web_fetch) nunca é restringida por aqui.
+   */
+  ferramentasPermitidas?: FrotaIaToolName[];
+  /** Acrescenta o bloco de instrução de modo demo ao system prompt (ver systemPrompt.ts) — sempre usado junto de `ferramentasPermitidas`. */
+  modoDemo?: boolean;
 }
 
 export interface RespostaAssistente {
   conversationId: string;
   message: { id: string; content: string; createdAt: string };
+  /** Nomes das ferramentas executadas COM SUCESSO nesta rodada (qualquer rodada do loop) — usado pelo webhook do WhatsApp em modo demo pra saber se já pode disparar o CTA "quer continuar?" sem depender de heurística de texto. */
+  ferramentasExecutadas: string[];
 }
 
 export async function gerarRespostaAssistente(params: GerarRespostaAssistenteParams): Promise<RespostaAssistente> {
@@ -118,12 +131,16 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
   });
 
   const anthropic = createAnthropicClient();
-  const system = construirSystemPrompt(customerContext, vehicleContext, new Date());
-  const ferramentasProprias = construirFerramentasAnthropic();
+  const system = construirSystemPrompt(customerContext, vehicleContext, new Date(), params.modoDemo);
+  const todasFerramentas = construirFerramentasAnthropic();
+  const ferramentasProprias = params.ferramentasPermitidas
+    ? todasFerramentas.filter((f) => params.ferramentasPermitidas!.includes(f.name as FrotaIaToolName))
+    : todasFerramentas;
   let tools = [...ferramentasProprias, construirFerramentaBuscaOficial(), construirFerramentaLeituraOficial()];
 
   let textoFinal = "";
   let buscaAmplaOferecida = false;
+  const ferramentasExecutadas: string[] = [];
 
   for (let rodada = 0; rodada <= MAX_TOOL_ROUNDS; rodada++) {
     const resposta = await anthropic.messages.create({
@@ -237,6 +254,10 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
           }
         }
 
+        if (resultado.sucesso) {
+          ferramentasExecutadas.push(bloco.name);
+        }
+
         resultadosFerramentas.push({
           type: "tool_result",
           tool_use_id: bloco.id,
@@ -275,5 +296,6 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
   return {
     conversationId: conversation.id,
     message: { id: mensagemSalva.id, content: textoFinal, createdAt: mensagemSalva.created_at },
+    ferramentasExecutadas,
   };
 }

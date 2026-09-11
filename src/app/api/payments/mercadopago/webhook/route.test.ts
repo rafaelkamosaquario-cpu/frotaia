@@ -21,8 +21,18 @@ const eventoPagamentoJaProcessado = vi.fn();
 const getSubscription = vi.fn();
 const registrarTentativaCancelamentoPendente = vi.fn();
 const resolverCancelamentoPendente = vi.fn();
+const listChannelsForCompany = vi.fn();
+const getOnboardingSession = vi.fn();
+const updateOnboardingSession = vi.fn();
+const sendWhatsappText = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
+vi.mock("@/services/supabase/channelIdentityService", () => ({ listChannelsForCompany: (...a: unknown[]) => listChannelsForCompany(...a) }));
+vi.mock("@/services/supabase/onboardingSessionService", () => ({
+  getOnboardingSession: (...a: unknown[]) => getOnboardingSession(...a),
+  updateOnboardingSession: (...a: unknown[]) => updateOnboardingSession(...a),
+}));
+vi.mock("@/lib/whatsapp/zapiClient", () => ({ sendWhatsappText: (...a: unknown[]) => sendWhatsappText(...a) }));
 vi.mock("@/lib/mercadopago/config", () => ({
   isMercadoPagoConfigured: () => isMercadoPagoConfigured(),
   getMercadoPagoWebhookSecret: () => getMercadoPagoWebhookSecret(),
@@ -73,6 +83,10 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     cancelarAssinatura.mockResolvedValue(undefined);
     registrarTentativaCancelamentoPendente.mockResolvedValue(undefined);
     resolverCancelamentoPendente.mockResolvedValue(undefined);
+    listChannelsForCompany.mockResolvedValue([{ user_id: "user-1", phone_e164: "+5541999998888" }]);
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: {} });
+    updateOnboardingSession.mockResolvedValue(undefined);
+    sendWhatsappText.mockResolvedValue(undefined);
   });
 
   it("503 quando o Mercado Pago não está configurado", async () => {
@@ -228,6 +242,10 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
     cancelarAssinatura.mockResolvedValue(undefined);
     registrarTentativaCancelamentoPendente.mockResolvedValue(undefined);
     resolverCancelamentoPendente.mockResolvedValue(undefined);
+    listChannelsForCompany.mockResolvedValue([{ user_id: "user-1", phone_e164: "+5541999998888" }]);
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: {} });
+    updateOnboardingSession.mockResolvedValue(undefined);
+    sendWhatsappText.mockResolvedValue(undefined);
   });
 
   it("A) Individual Mensal → Pro Mensal: cancela o preapproval antigo DEPOIS de confirmar o novo ativo", async () => {
@@ -346,5 +364,79 @@ describe("Troca de plano — cancelamento da assinatura anterior no Mercado Pago
 
     expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
     expect(cancelarAssinatura).not.toHaveBeenCalled();
+  });
+});
+
+describe("Inversão do funil (09/2026) — pagamento confirmado dispara o cadastro completo de 11 perguntas", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isMercadoPagoConfigured.mockReturnValue(true);
+    getMercadoPagoWebhookSecret.mockReturnValue("segredo");
+    validarAssinaturaWebhook.mockReturnValue(true);
+    eventoPagamentoJaProcessado.mockResolvedValue(false);
+    getSubscription.mockResolvedValue(null);
+    cancelarAssinatura.mockResolvedValue(undefined);
+    registrarTentativaCancelamentoPendente.mockResolvedValue(undefined);
+    resolverCancelamentoPendente.mockResolvedValue(undefined);
+    listChannelsForCompany.mockResolvedValue([{ user_id: "user-1", phone_e164: "+5541999998888" }]);
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: "empresa-1", demoTrack: "frete" } });
+    updateOnboardingSession.mockResolvedValue(undefined);
+    sendWhatsappText.mockResolvedValue(undefined);
+  });
+
+  it("payment anual aprovado: reabre o onboarding (awaiting_name) e manda a confirmação + primeira pergunta", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
+
+    await chamarWebhook({ dataId: "pay-1", type: "payment", body: { type: "payment", data: { id: "pay-1" } } })();
+
+    expect(listChannelsForCompany).toHaveBeenCalledWith(expect.anything(), "empresa-1");
+    expect(updateOnboardingSession).toHaveBeenCalledWith(expect.anything(), "user-1", { state: "awaiting_name" });
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Pagamento confirmado"));
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Como posso chamar você"));
+  });
+
+  it("preapproval mensal autorizado (Individual/Essencial/Pro) também dispara o cadastro completo", async () => {
+    buscarAssinatura.mockResolvedValue({ status: "authorized", externalReference: "empresa-1|ESSENCIAL_MENSAL" });
+
+    await chamarWebhook({ dataId: "sub-1", type: "subscription_preapproval", body: { type: "subscription_preapproval", data: { id: "sub-1" } } })();
+
+    expect(updateOnboardingSession).toHaveBeenCalledWith(expect.anything(), "user-1", { state: "awaiting_name" });
+  });
+
+  it("sessão já 'completed' (cliente que já tinha feito o cadastro antes desta mudança) NUNCA é reaberta", async () => {
+    getOnboardingSession.mockResolvedValue({ state: "completed", collected_data: {} });
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
+
+    await chamarWebhook({ dataId: "pay-2", type: "payment", body: { type: "payment", data: { id: "pay-2" } } })();
+
+    expect(updateOnboardingSession).not.toHaveBeenCalled();
+  });
+
+  it("preapproval CANCELADA/pending nunca dispara o cadastro completo (só ATIVA de verdade)", async () => {
+    buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-1|PRO_MENSAL" });
+
+    await chamarWebhook({ dataId: "sub-cancel", type: "preapproval", body: { type: "preapproval", data: { id: "sub-cancel" } } })();
+
+    expect(updateOnboardingSession).not.toHaveBeenCalled();
+  });
+
+  it("empresa sem nenhum canal vinculado: não quebra, só não dispara nada", async () => {
+    listChannelsForCompany.mockResolvedValue([]);
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
+
+    const resposta = await chamarWebhook({ dataId: "pay-3", type: "payment", body: { type: "payment", data: { id: "pay-3" } } })();
+
+    expect(resposta.status).toBe(200);
+    expect(updateOnboardingSession).not.toHaveBeenCalled();
+  });
+
+  it("falha ao disparar o onboarding pós-pagamento (ex.: Supabase fora do ar) nunca derruba a confirmação do pagamento em si", async () => {
+    listChannelsForCompany.mockRejectedValue(new Error("Supabase fora do ar"));
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
+
+    const resposta = await chamarWebhook({ dataId: "pay-4", type: "payment", body: { type: "payment", data: { id: "pay-4" } } })();
+
+    expect(resposta.status).toBe(200);
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalled(); // a assinatura já foi confirmada antes do gatilho de onboarding rodar
   });
 });

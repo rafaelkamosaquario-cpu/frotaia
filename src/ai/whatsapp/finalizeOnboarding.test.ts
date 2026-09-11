@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const createCompanyWithOwner = vi.fn();
+const updateCompany = vi.fn();
 const updateProfile = vi.fn();
 const createVehicle = vi.fn();
 const setDefaultVehicle = vi.fn();
@@ -12,7 +13,10 @@ const criarAssinaturaTeste = vi.fn();
 const setCompanyForUserChannels = vi.fn();
 const setOperatingRegion = vi.fn();
 
-vi.mock("@/services/supabase/companyService", () => ({ createCompanyWithOwner: (...a: unknown[]) => createCompanyWithOwner(...a) }));
+vi.mock("@/services/supabase/companyService", () => ({
+  createCompanyWithOwner: (...a: unknown[]) => createCompanyWithOwner(...a),
+  updateCompany: (...a: unknown[]) => updateCompany(...a),
+}));
 vi.mock("@/services/supabase/profileService", () => ({ updateProfile: (...a: unknown[]) => updateProfile(...a) }));
 vi.mock("@/services/supabase/vehicleService", () => ({
   createVehicle: (...a: unknown[]) => createVehicle(...a),
@@ -32,6 +36,7 @@ const COMPANY = { id: "empresa-1", name: "João Silva" };
 beforeEach(() => {
   vi.clearAllMocks();
   createCompanyWithOwner.mockResolvedValue(COMPANY);
+  updateCompany.mockResolvedValue(COMPANY);
   updateProfile.mockResolvedValue({});
   criarAssinaturaTeste.mockResolvedValue({});
   setCompanyForUserChannels.mockResolvedValue(undefined);
@@ -158,5 +163,56 @@ describe("finalizeOnboarding — intenção inicial persistida (08/2026)", () =>
     const { finalizeOnboarding } = await import("./finalizeOnboarding");
     await finalizeOnboarding({} as never, "user-1", {}, "+5541999998888");
     expect(saveMemory).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.objectContaining({ key: "initial_intent" }));
+  });
+});
+
+describe("finalizeOnboarding — inversão do funil (09/2026): completa perfil de empresa já existente", () => {
+  it("com collectedData.companyId presente, atualiza a empresa (updateCompany) em vez de criar outra", async () => {
+    const { finalizeOnboarding } = await import("./finalizeOnboarding");
+    await finalizeOnboarding({} as never, "user-1", { companyId: "empresa-1", name: "Rafael Transportes", companyType: "autonomo" }, "+5541999998888");
+
+    expect(updateCompany).toHaveBeenCalledWith(
+      expect.anything(),
+      "empresa-1",
+      "user-1",
+      expect.objectContaining({ name: "Rafael Transportes", companyType: "autonomo" })
+    );
+    expect(createCompanyWithOwner).not.toHaveBeenCalled();
+  });
+
+  it("com companyId presente, não recria o trial nem revincula o canal (já feitos em criarEmpresaMinima)", async () => {
+    const { finalizeOnboarding } = await import("./finalizeOnboarding");
+    await finalizeOnboarding({} as never, "user-1", { companyId: "empresa-1", name: "Rafael Transportes" }, "+5541999998888");
+
+    expect(criarAssinaturaTeste).not.toHaveBeenCalled();
+    expect(setCompanyForUserChannels).not.toHaveBeenCalled();
+  });
+
+  it("sem companyId (caminho legado, ex.: lead Empresas), continua criando a empresa do zero — comportamento de sempre", async () => {
+    const { finalizeOnboarding } = await import("./finalizeOnboarding");
+    await finalizeOnboarding({} as never, "user-1", { name: "Rafael Transportes" }, "+5541999998888");
+
+    expect(createCompanyWithOwner).toHaveBeenCalled();
+    expect(updateCompany).not.toHaveBeenCalled();
+    expect(criarAssinaturaTeste).toHaveBeenCalled();
+    expect(setCompanyForUserChannels).toHaveBeenCalled();
+  });
+});
+
+describe("criarEmpresaMinima — inversão do funil (09/2026)", () => {
+  it("cria empresa com nome placeholder, trial e vínculo do canal", async () => {
+    const { criarEmpresaMinima } = await import("./finalizeOnboarding");
+    const resultado = await criarEmpresaMinima({} as never, "user-1", "+5541999998888");
+
+    expect(createCompanyWithOwner).toHaveBeenCalledWith(expect.anything(), "user-1", { name: "Minha operação" });
+    expect(criarAssinaturaTeste).toHaveBeenCalledWith(expect.anything(), "empresa-1", "+5541999998888");
+    expect(setCompanyForUserChannels).toHaveBeenCalledWith(expect.anything(), "user-1", "empresa-1");
+    expect(resultado).toEqual(COMPANY);
+  });
+
+  it("diferente do resto de finalizeOnboarding, falha ao criar o trial PROPAGA o erro (sem trial, a IA nunca responderia)", async () => {
+    criarAssinaturaTeste.mockRejectedValue(new Error("falha ao criar trial"));
+    const { criarEmpresaMinima } = await import("./finalizeOnboarding");
+    await expect(criarEmpresaMinima({} as never, "user-1", "+5541999998888")).rejects.toThrow("falha ao criar trial");
   });
 });

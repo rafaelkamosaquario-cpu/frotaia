@@ -14,10 +14,11 @@ import { toPhoneE164 } from "@/lib/identity/phoneNormalizer";
 import { resolveOrCreateUserByPhone } from "@/services/supabase/userIdentityService";
 import { getOnboardingSession, createOnboardingSession, updateOnboardingSession } from "@/services/supabase/onboardingSessionService";
 import { firstOnboardingMessage, processOnboardingMessage, type OnboardingCollectedData, type OnboardingReply } from "@/ai/whatsapp/onboardingConversation";
-import { finalizeOnboarding } from "@/ai/whatsapp/finalizeOnboarding";
+import { finalizeOnboarding, criarEmpresaMinima } from "@/ai/whatsapp/finalizeOnboarding";
+import { askDemoChoice, resolverEscolhaDemo, TRANSICAO_POR_TRACK, FERRAMENTAS_POR_TRACK, FERRAMENTA_ALVO_POR_TRACK, type DemoTrack } from "@/ai/whatsapp/demoConversation";
 import { loadCustomerContext, loadVehicleContext } from "@/ai/context/customerContext";
 import { getOrCreateOpenConversation, appendMessage } from "@/services/supabase/conversationService";
-import { gerarRespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
+import { gerarRespostaAssistente, type GerarRespostaAssistenteParams, type RespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
 import { getSubscription, isAccessAllowed } from "@/services/supabase/subscriptionService";
 import { AnthropicConfigError } from "@/lib/anthropic/client";
 import { isUniqueViolation } from "@/lib/supabase/errors";
@@ -25,7 +26,7 @@ import { findPendingChecklistDispatchByPhone, recordChecklistResponse } from "@/
 import { processarMensagemDeGrupo } from "@/services/freight/groupMessageIntake";
 import { resolverIntencaoComercialLanding, mensagemConfirmacaoOferta, MENSAGEM_INTERESSE_EMPRESAS } from "@/lib/mercadopago/landingIntent";
 import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
-import { isOfertaPlano } from "@/lib/mercadopago/catalog";
+import { isOfertaPlano, type OfertaPlano } from "@/lib/mercadopago/catalog";
 import { captureError, logEvent } from "@/lib/observability/logger";
 import { getGuideState, saveGuideState, markGuideOffered } from "@/services/supabase/companyPreferencesService";
 import {
@@ -126,6 +127,82 @@ async function enviarRespostaOnboarding(phoneE164: string, reply: OnboardingRepl
     return;
   }
   await sendWhatsappText(phoneE164, reply.text);
+}
+
+/**
+ * Inversão do funil (09/2026): reconhece intenção de assinar tanto em
+ * texto livre digitado durante a demo (`awaiting_demo_input`) quanto no
+ * gate de assinatura pós-cadastro (mais abaixo) — mesmo regex nos dois
+ * lugares, extraído aqui pra não divergir.
+ */
+const PARECE_QUERER_ASSINAR = /assin|contrat|pagar|pagamento|plano|mensalidade|renovar/i;
+
+const CTA_DEMO_VER_PLANOS = "demo_ver_planos";
+const CTA_DEMO_CONHECER_FUNCOES = "demo_conhecer_funcoes";
+const CTA_DEMO_AGORA_NAO = "demo_agora_nao";
+
+/** Enviado depois que a demo entrega o cálculo-alvo do track escolhido (ver FERRAMENTA_ALVO_POR_TRACK) — nunca antes disso. */
+function buildCtaPosDemo(): OnboardingReply {
+  return {
+    kind: "buttons",
+    text:
+      "Gostou do resultado?\n\nCom o Frota IA, você pode continuar usando essas funções no seu dia a dia direto pelo WhatsApp, com seu veículo e seu histórico salvos.",
+    options: [
+      { id: CTA_DEMO_VER_PLANOS, label: "Ver planos" },
+      { id: CTA_DEMO_CONHECER_FUNCOES, label: "Conhecer mais funções" },
+      { id: CTA_DEMO_AGORA_NAO, label: "Agora não" },
+    ],
+  };
+}
+
+const BOTOES_PLANO: Array<{ id: string; label: string; oferta: OfertaPlano }> = [
+  { id: "demo_plano_individual", label: "Individual", oferta: "INDIVIDUAL_MENSAL" },
+  { id: "demo_plano_essencial", label: "Essencial", oferta: "ESSENCIAL_MENSAL" },
+  { id: "demo_plano_pro", label: "Pro", oferta: "PRO_MENSAL" },
+];
+
+function buildBotoesPlano(): OnboardingReply {
+  return {
+    kind: "buttons",
+    text: "Qual plano combina mais com sua operação?",
+    options: BOTOES_PLANO.map((b) => ({ id: b.id, label: b.label })),
+  };
+}
+
+/**
+ * Chama a IA e envia a resposta, com o mesmo tratamento de erro do fluxo
+ * pós-cadastro (reentrega deduplicada, Anthropic não configurado, fallback
+ * genérico) — extraído pra ser reaproveitado também pelo modo demo
+ * (`awaiting_demo_input`), que precisa exatamente da mesma robustez sem
+ * duplicar o bloco inteiro. Devolve `null` quando o erro já foi tratado e
+ * comunicado ao cliente (quem chama não deve mandar mais nada).
+ */
+async function gerarRespostaEEnviar(
+  phoneE164: string,
+  companyId: string,
+  conversationId: string,
+  paramsIA: GerarRespostaAssistenteParams
+): Promise<RespostaAssistente | null> {
+  try {
+    const resposta = await gerarRespostaAssistente(paramsIA);
+    await sendWhatsappText(phoneE164, resposta.message.content);
+    return resposta;
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      // Reentrega do mesmo webhook (mesmo external_message_id) — já respondemos antes, não faz de novo.
+      return null;
+    }
+    if (err instanceof AnthropicConfigError) {
+      await sendWhatsappText(
+        phoneE164,
+        "Ainda não consigo responder automaticamente — a integração com a IA está sendo configurada. Tente novamente mais tarde."
+      ).catch((e) => logZapiSendFailure(e, phoneE164, "anthropic_nao_configurado"));
+      return null;
+    }
+    captureError({ event: "whatsapp_resposta_ia_falhou", route: ROTA, company_id: companyId, conversation_id: conversationId, error: err });
+    await sendWhatsappText(phoneE164, "Não consegui processar sua mensagem agora. Tente novamente em instantes.").catch((e) => logZapiSendFailure(e, phoneE164, "resposta_ia_erro_generico"));
+    return null;
+  }
 }
 
 const MENSAGEM_POS_CADASTRO =
@@ -290,17 +367,39 @@ export async function POST(request: Request) {
 
   if (isNew) {
     // resolveOrCreateUserByPhone já criou a sessão de onboarding em awaiting_name.
-    // Mensagem vinda de um CTA da landing (08/2026): guarda a oferta pretendida
-    // no rascunho do onboarding (sobrevive a todas as etapas via spread, sem
-    // precisar alterar a máquina de estados) — só é usada depois de concluído
-    // (ver bloco de finalize abaixo), nunca pula o cadastro em si.
     const intencaoComercial = resolverIntencaoComercialLanding(textoDireto);
+
+    // Lead "Empresas" mantém o fluxo de sempre — sem demo, direto pro
+    // cadastro completo de 11 perguntas (decisão confirmada com o Rafael:
+    // frota grande já é negociação humana, a demo de 1 frete não muda
+    // isso). Nenhuma empresa mínima é criada aqui — finalizeOnboarding cria
+    // do zero no fim das 11 perguntas, caminho legado inalterado.
     if (intencaoComercial === "EMPRESAS") {
       await sendWhatsappText(phoneE164, MENSAGEM_INTERESSE_EMPRESAS).catch((err) => logZapiSendFailure(err, phoneE164, "landing_empresas_mensagem_interesse_novo"));
-    } else if (intencaoComercial) {
-      await updateOnboardingSession(admin, userId, { collectedData: { ofertaPretendida: intencaoComercial } }).catch(() => {});
+      await sendWhatsappText(phoneE164, firstOnboardingMessage()).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_primeira_mensagem_novo"));
+      return NextResponse.json({ ok: true });
     }
-    await sendWhatsappText(phoneE164, firstOnboardingMessage()).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_primeira_mensagem_novo"));
+
+    // Inversão do funil (09/2026, "mostrar valor antes de cadastrar"):
+    // empresa mínima criada em silêncio ANTES de qualquer pergunta — é o
+    // que destrava a demo (toda ferramenta de IA exige companyId, mesmo em
+    // modo restrito). ofertaPretendida (se veio de um CTA de plano da
+    // landing) é gravada agora pra ser lida só quando o cliente chegar em
+    // "Ver planos", não mais no fim de um onboarding de 11 perguntas.
+    let empresaMinima;
+    try {
+      empresaMinima = await criarEmpresaMinima(admin, userId, phoneE164);
+    } catch (err) {
+      captureError({ event: "whatsapp_empresa_minima_falhou", route: ROTA, error: err });
+      await sendWhatsappText(phoneE164, "Tive um problema ao preparar sua conta agora. Pode mandar sua mensagem de novo?").catch((e) => logZapiSendFailure(e, phoneE164, "empresa_minima_falhou"));
+      return NextResponse.json({ ok: true });
+    }
+
+    await updateOnboardingSession(admin, userId, {
+      state: "awaiting_demo_choice",
+      collectedData: { companyId: empresaMinima.id, ...(intencaoComercial ? { ofertaPretendida: intencaoComercial } : {}) },
+    });
+    await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_inicial"));
     return NextResponse.json({ ok: true });
   }
 
@@ -318,6 +417,122 @@ export async function POST(request: Request) {
       await sendWhatsappText(phoneE164, firstOnboardingMessage()).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_primeira_mensagem_sessao_legada"));
       return NextResponse.json({ ok: true });
     }
+  }
+
+  // ── Menu de demo pré-cadastro (inversão do funil, 09/2026) ──────────────
+
+  if (session.state === "awaiting_demo_choice") {
+    if (!entradaOnboarding) {
+      await sendWhatsappText(phoneE164, "Por enquanto, toque numa das opções acima ou digite o que você quer testar.").catch((err) => logZapiSendFailure(err, phoneE164, "demo_pede_toque"));
+      return NextResponse.json({ ok: true });
+    }
+
+    const collectedDataAtual = (session.collected_data ?? {}) as Record<string, unknown>;
+    const escolha = resolverEscolhaDemo(entradaOnboarding);
+
+    if (!escolha) {
+      await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_repete"));
+      return NextResponse.json({ ok: true });
+    }
+
+    if (escolha === "funcionalidades") {
+      await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_funcionalidades_texto"));
+      await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_apos_funcionalidades"));
+      return NextResponse.json({ ok: true });
+    }
+
+    await updateOnboardingSession(admin, userId, {
+      state: "awaiting_demo_input",
+      collectedData: { ...collectedDataAtual, demoTrack: escolha },
+    });
+    await sendWhatsappText(phoneE164, TRANSICAO_POR_TRACK[escolha]).catch((err) => logZapiSendFailure(err, phoneE164, "demo_transicao_track"));
+    return NextResponse.json({ ok: true });
+  }
+
+  if (session.state === "awaiting_demo_input") {
+    const collectedDataAtual = (session.collected_data ?? {}) as Record<string, unknown>;
+    const companyIdDemo = collectedDataAtual.companyId as string | undefined;
+    const demoTrack = collectedDataAtual.demoTrack as DemoTrack | undefined;
+
+    // Estado inconsistente (não deveria acontecer — companyId sempre é
+    // gravado junto com a transição pra este estado) — recomeça o menu em
+    // vez de travar a conversa.
+    if (!companyIdDemo || !demoTrack) {
+      await updateOnboardingSession(admin, userId, { state: "awaiting_demo_choice", collectedData: collectedDataAtual });
+      await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_estado_inconsistente"));
+      return NextResponse.json({ ok: true });
+    }
+
+    const botaoTocado = body.buttonsResponseMessage?.buttonId;
+
+    if (botaoTocado === CTA_DEMO_VER_PLANOS || (textoDireto && PARECE_QUERER_ASSINAR.test(textoDireto))) {
+      await enviarRespostaOnboarding(phoneE164, buildBotoesPlano()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_botoes_plano"));
+      await updateOnboardingSession(admin, userId, { collectedData: { ...collectedDataAtual, awaitingPlanChoice: true } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (botaoTocado === CTA_DEMO_CONHECER_FUNCOES) {
+      await updateOnboardingSession(admin, userId, { state: "awaiting_demo_choice", collectedData: collectedDataAtual });
+      await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_apos_cta_conhecer"));
+      return NextResponse.json({ ok: true });
+    }
+
+    if (botaoTocado === CTA_DEMO_AGORA_NAO) {
+      await sendWhatsappText(
+        phoneE164,
+        "Sem problema — pode continuar testando à vontade, ou digitar \"quero assinar\" quando quiser ver os planos."
+      ).catch((err) => logZapiSendFailure(err, phoneE164, "demo_cta_agora_nao"));
+      return NextResponse.json({ ok: true });
+    }
+
+    if (collectedDataAtual.awaitingPlanChoice && botaoTocado) {
+      const botaoPlano = BOTOES_PLANO.find((b) => b.id === botaoTocado);
+      if (botaoPlano) {
+        const link = buildCheckoutLinkUrl(companyIdDemo, botaoPlano.oferta);
+        await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(botaoPlano.oferta)}\n\n${link}`).catch((err) => logZapiSendFailure(err, phoneE164, "demo_checkout_link"));
+        await updateOnboardingSession(admin, userId, { collectedData: { ...collectedDataAtual, awaitingPlanChoice: false } });
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    if (!textoDireto) {
+      await sendWhatsappText(phoneE164, "Por enquanto, durante o teste, me responda por texto.").catch((err) => logZapiSendFailure(err, phoneE164, "demo_pede_texto"));
+      return NextResponse.json({ ok: true });
+    }
+
+    // Mesmo gate de assinatura do fluxo normal (mais abaixo) — o trial
+    // criado em criarEmpresaMinima já vale a partir daqui.
+    const assinaturaDemo = await getSubscription(admin, companyIdDemo);
+    if (!isAccessAllowed(assinaturaDemo)) {
+      await sendWhatsappText(
+        phoneE164,
+        "Seu período de teste gratuito do Frota IA terminou. Pra continuar, é só responder \"quero assinar\" que eu te mostro os planos disponíveis."
+      ).catch((err) => logZapiSendFailure(err, phoneE164, "demo_assinatura_bloqueio"));
+      return NextResponse.json({ ok: true });
+    }
+
+    const customerContextDemo = await loadCustomerContext(admin, userId);
+    const vehicleContextDemo = await loadVehicleContext(admin, companyIdDemo);
+    const conversationDemo = await getOrCreateOpenConversation(admin, companyIdDemo, userId, channelId);
+
+    const resposta = await gerarRespostaEEnviar(phoneE164, companyIdDemo, conversationDemo.id, {
+      client: admin,
+      userId,
+      companyId: companyIdDemo,
+      conversation: conversationDemo,
+      customerContext: customerContextDemo,
+      vehicleContext: vehicleContextDemo,
+      mensagemUsuario: textoDireto,
+      inboundMessageExtra: body.messageId ? { external_message_id: body.messageId } : {},
+      ferramentasPermitidas: FERRAMENTAS_POR_TRACK[demoTrack],
+      modoDemo: true,
+    });
+
+    if (resposta?.ferramentasExecutadas.includes(FERRAMENTA_ALVO_POR_TRACK[demoTrack])) {
+      await enviarRespostaOnboarding(phoneE164, buildCtaPosDemo()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_cta_pos_resultado"));
+    }
+
+    return NextResponse.json({ ok: true });
   }
 
   if (session.state !== "completed") {
@@ -786,7 +1001,7 @@ export async function POST(request: Request) {
   // gerenciar_assinatura real acontece no fluxo normal logo abaixo.
   const assinatura = await getSubscription(admin, companyId);
   if (!isAccessAllowed(assinatura)) {
-    const pareceQuererAssinar = /assin|contrat|pagar|pagamento|plano|mensalidade|renovar/i.test(mensagemUsuario);
+    const pareceQuererAssinar = PARECE_QUERER_ASSINAR.test(mensagemUsuario);
     if (!pareceQuererAssinar) {
       await sendWhatsappText(
         phoneE164,
