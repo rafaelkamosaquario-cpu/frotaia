@@ -51,9 +51,17 @@ export function resolverEscolhaDemo(texto: string): DemoTrack | "funcionalidades
   return porTitulo?.id ?? null;
 }
 
-/** Pergunta de transição fixa ao entrar em `awaiting_demo_input` — pede só o dado necessário pro cálculo daquele track, nunca nome/perfil/cidade/veículo. */
+/**
+ * Pergunta de transição fixa ao entrar em `awaiting_demo_input` — pede só
+ * o dado necessário pro cálculo daquele track, nunca nome/perfil/cidade/
+ * veículo. Só promete TEXTO (achado real, 11/09/2026): o handler de
+ * `awaiting_demo_input` no webhook só resolve `textoDireto` nesta fase —
+ * foto/PDF/áudio ainda não têm o mesmo tratamento multimodal do fluxo
+ * pós-cadastro, então prometer isso aqui geraria expectativa que o
+ * produto não cumpre ainda.
+ */
 export const TRANSICAO_POR_TRACK: Record<DemoTrack, string> = {
-  frete: "Perfeito. Me mande a proposta do frete — pode escrever os dados, mandar uma foto, PDF ou áudio.",
+  frete: "Perfeito. Me mande os dados do frete — origem, destino, valor ofertado e o que mais você tiver.",
   rota: "Perfeito. Me diga a origem e o destino que eu calculo a distância e a duração real da rota.",
   custo: "Perfeito. Me conta o trajeto (ou a rota) e o consumo do seu veículo — ou os dados que você já tiver — que eu calculo o custo da viagem.",
 };

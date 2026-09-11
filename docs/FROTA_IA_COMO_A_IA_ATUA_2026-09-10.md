@@ -1,6 +1,6 @@
 # Frota IA — Como a IA (Claude) atua e onde cada uma das 39 ferramentas se aplica
 
-Documento novo (10/09/2026), montado a partir do código real (`src/ai/chat/gerarRespostaAssistente.ts`, `src/ai/tools/*`, `src/lib/anthropic/systemPrompt.ts`) e do `FROTA_IA_FERRAMENTAS_ATUAL_2026-09-06.md` já existente — aqui o foco é **como a IA decide o que fazer** e **onde o resultado de cada ferramenta aparece pro cliente**, não só o que cada uma calcula.
+Documento criado em 10/09/2026, **atualizado em 11/09/2026** (inversão do funil — ver seção nova abaixo), montado a partir do código real (`src/ai/chat/gerarRespostaAssistente.ts`, `src/ai/tools/*`, `src/lib/anthropic/systemPrompt.ts`) e do `FROTA_IA_FERRAMENTAS_ATUAL_2026-09-06.md` já existente — aqui o foco é **como a IA decide o que fazer** e **onde o resultado de cada ferramenta aparece pro cliente**, não só o que cada uma calcula.
 
 ---
 
@@ -34,6 +34,20 @@ A IA pode encadear **até 4 rodadas** de uso de ferramenta numa única resposta 
 ### A trava de segurança mais importante
 
 Todo `userId`/`companyId` que a ferramenta recebe vem **sempre do contexto autenticado da conversa** — nunca do que o modelo "decidiu" mandar. Na prática (`gerarRespostaAssistente.ts`): antes de executar qualquer ferramenta, o código **apaga** qualquer `userId`/`companyId` que porventura viesse no `input` gerado pelo modelo e **reinjeta** os valores reais, vindos da sessão/telefone autenticado. Mesmo que alguém tente manipular a conversa pra fazer a IA "escrever" numa empresa diferente, essa troca nunca chega a acontecer — é uma barreira de código, não uma instrução que a IA poderia ser convencida a ignorar.
+
+### Um terceiro modo: demo pré-cadastro, ferramentas restritas (11/09/2026)
+
+Desde a inversão do funil, existe um terceiro jeito de chamar `gerarRespostaAssistente()` — não é WhatsApp nem Painel, é **modo demo** (estado `awaiting_demo_input`, antes de o cliente ter feito o cadastro completo). A diferença não é de canal, é de **escopo**: o parâmetro novo `ferramentasPermitidas` filtra as 39 ferramentas pra só as do track que o cliente escolheu no menu (`FERRAMENTAS_POR_TRACK` em `src/ai/whatsapp/demoConversation.ts`):
+
+| Track escolhido no menu | Ferramentas liberadas |
+|---|---|
+| Analisar um frete | `analisar_frete`, `calcular_margem`, `calcular_valor_minimo_frete`, `verificar_piso_minimo_antt` |
+| Calcular uma rota | `consultar_rota` |
+| Calcular custo de viagem | `calcular_custo_viagem`, `calcular_combustivel` |
+
+O parâmetro `modoDemo: true` também acrescenta um bloco de instrução ao system prompt: nunca tentar puxar "perfil salvo do veículo" (ainda não existe nesta fase — a empresa é mínima, sem veículo), sempre perguntar o dado em texto, e fechar a resposta citando por alto as outras áreas do produto depois de entregar o cálculo. Busca oficial (web_search/web_fetch) nunca é restringida, mesmo em modo demo.
+
+Tecnicamente, a IA continua sendo a mesma engine (`gerarRespostaAssistente()`) — a trava de `userId`/`companyId` do contexto autenticado (seção acima) vale igual, e a empresa (mínima, criada no primeiro contato) já existe antes de qualquer chamada, então `tool_executions`/`analysis_runs` gravam normalmente. As 39 ferramentas completas só voltam a ficar disponíveis depois que o cadastro completo termina (`session.state === "completed"`).
 
 ### Princípios que valem para as 39 ferramentas, sem exceção
 
@@ -128,3 +142,4 @@ Legenda da coluna "Onde aparece pro cliente": nome da tela do Painel Web onde o 
 - **2 ferramentas não têm tela própria no painel**: `gerenciar_assinatura` (contratação) e `vincular_painel`/`gerenciar_memoria` (bastidor) — não é uma lacuna de produto, é porque a natureza delas (link de pagamento, ponte de acesso, memória write-only) não pede uma tela dedicada.
 - **`comparar_pneus`, `consultar_rota` e `consultar_conhecimento_operacional`** não persistem resultado estruturado numa tela — ficam só na resposta da conversa (ainda que fiquem no log de `tool_executions` pra auditoria).
 - Essa correspondência ferramenta↔tela é **a mesma pros 3 planos de autoatendimento** — o que muda por plano é só o limite de veículos (1/3/10) e o acesso ao Painel em si (Individual não tem Painel, só WhatsApp).
+- A tabela da Parte 2 descreve o estado **pós-cadastro completo** (só aí as 39 ferramentas ficam todas liberadas). Durante a demo pré-cadastro (ver seção nova na Parte 1), só 1-4 ferramentas por vez ficam disponíveis, e nenhuma tela de Painel existe ainda (a empresa é mínima, sem Painel liberado).

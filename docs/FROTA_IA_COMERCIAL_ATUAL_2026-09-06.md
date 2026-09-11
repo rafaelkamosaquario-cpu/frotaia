@@ -12,15 +12,18 @@ Documento comercial calibrado pelo que o produto **realmente entrega hoje**, sem
 - **Pequena/média transportadora (até 10 veículos)** — quer o controle de uma frota inteira sem contratar um sistema de gestão caro nem treinar a equipe pra usar um ERP.
 - **Embarcador** — quer o mesmo controle de custo/rota pros veículos próprios.
 
-## O que dizer que o produto FAZ (tudo real, verificado no código em 06/09/2026)
+## O que dizer que o produto FAZ (tudo real, verificado no código; item 1 atualizado em 11/09/2026)
 
-### 1. Fala com ele pelo WhatsApp normal, sem app novo
+### 1. Ele testa de verdade antes de decidir qualquer coisa
+Desde 11/09/2026, ninguém precisa preencher cadastro nenhum pra ver o produto funcionando. Ao mandar a primeira mensagem, o Frota IA já pergunta o que ele quer testar — analisar um frete, calcular uma rota ou calcular o custo de uma viagem — e entrega o resultado real na hora, com o dado que ele mesmo informar. Só depois de ver funcionando é que aparece a opção de continuar usando (ver planos). Isso é forte pra vencer objeção de "não confio sem ver antes" — é literalmente a primeira coisa que ele vive, não uma promessa.
+
+### 2. Fala com ele pelo WhatsApp normal, sem app novo
 Não precisa baixar nada, não precisa aprender tela nenhuma. É só mandar mensagem de texto, áudio ou foto — o mesmo WhatsApp que ele já usa o dia inteiro.
 
-### 2. Calcula se o frete compensa, na hora
+### 3. Calcula se o frete compensa, na hora
 Manda o frete que apareceu (ou até 2-3 propostas pra comparar) e recebe: lucro, margem, retorno vazio, prazo de pagamento, capital de giro necessário e risco — tudo em segundos, sem precisar saber fórmula nenhuma.
 
-### 3. Controla a operação inteira, não só o cálculo
+### 4. Controla a operação inteira, não só o cálculo
 Desde setembro de 2026, o Frota IA também **registra e guarda o histórico** de:
 - **Abastecimento** — litros, valor, km — e calcula o consumo **real medido**, não só o "no papel".
 - **Pneu físico** — qual pneu está montado em qual veículo, km rodado, km restante, alerta automático quando a vida útil tá acabando.
@@ -28,22 +31,22 @@ Desde setembro de 2026, o Frota IA também **registra e guarda o histórico** de
 - **Postos e fornecedores** — cadastro reaproveitável em despesas e abastecimentos.
 - **Receita de frete fechado** — pra saber o resultado real (receita menos custo) do período, não só o gasto.
 
-### 4. Documento oficial sem precisar decorar lei
+### 5. Documento oficial sem precisar decorar lei
 Piso mínimo de frete (Lei ANTT), jornada de motorista, peso e dimensões, prazo de pagamento — tudo buscado ao vivo na fonte oficial na hora da pergunta, nunca um número "de cabeça" que pode estar desatualizado.
 
-### 5. Avisa antes de vencer
+### 6. Avisa antes de vencer
 Documento de veículo, CNH, seguro, manutenção — cria lembrete automático que chega pelo WhatsApp no horário certo, sem precisar lembrar de nada.
 
-### 6. Radar de frete de retorno
+### 7. Radar de frete de retorno
 Ativa um "radar" pra ser avisado automaticamente quando aparecer carga compatível com o trajeto de volta — inclusive lendo grupos de frete do WhatsApp (quando autorizado).
 
-### 7. Painel Web opcional, pra quem tem mais de 1 veículo
+### 8. Painel Web opcional, pra quem tem mais de 1 veículo
 Tudo que é feito pelo WhatsApp aparece automaticamente numa tela de computador também — dashboard, relatórios em PDF, cadastro visual — sem duplicar nada, é a mesma conta.
 
-### 8. Busca sempre em fontes oficiais verificadas, nunca inventa
+### 9. Busca sempre em fontes oficiais verificadas, nunca inventa
 Antes de responder qualquer coisa sobre lei, preço oficial, pedágio ou especificação técnica, o Frota IA busca ao vivo numa lista real de sites confiáveis — nunca de memória do modelo. Ordem de confiança: primeiro o que você mesmo informou, depois órgão público oficial (ANTT, ANP, DNIT, SENATRAN, INMET, Planalto), depois site de fabricante (Michelin, Scania, Volvo, Cummins e outros), depois entidade técnica do setor (CNT, NTC&Logística, SEST SENAT) e imprensa especializada — e só como último recurso, internet geral, sempre avisando quando a fonte não é oficial.
 
-### 9. Notícias do setor direto no WhatsApp (opcional)
+### 10. Notícias do setor direto no WhatsApp (opcional)
 Quem quiser pode ativar um resumo diário das principais notícias do transporte rodoviário — vindo direto de fontes de imprensa/entidades do setor, sem precisar acompanhar site nenhum. É opt-in (desligado por padrão), pra não virar spam de quem não pediu. Fontes: CNT, NTC&Logística (índice INCT), SEST SENAT, Diário do Transporte, Transporte Moderno, Automotive Business, Carga Pesada, Blog do Caminhoneiro, Frota&Cia e outros 8 veículos de imprensa especializada no motorista/transportador — 18 fontes reais no total, nunca notícia genérica ou inventada.
 
 ## Planos e preços (catálogo oficial atual, desde 10/09/2026 — nunca cite de cabeça, sempre confirme antes de fechar)

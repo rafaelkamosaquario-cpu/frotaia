@@ -6,6 +6,8 @@ Documento técnico/funcional gerado direto do código real do repositório (`src
 
 O Frota IA é um assistente de IA (Claude, Anthropic) que conversa por **WhatsApp** e por um **Painel Web**, usando exatamente o mesmo motor de resposta e as mesmas 39 ferramentas nos dois canais — o que é feito por WhatsApp aparece no painel, e vice-versa. A IA nunca calcula "de cabeça": todo número (custo, margem, CPK, jornada etc.) sai de uma ferramenta determinística escrita em código, nunca de uma estimativa do modelo de linguagem. Dado factual externo (lei, preço oficial, pedágio, clima) vem sempre de busca ao vivo restrita a domínios oficiais, nunca de memória do modelo.
 
+**Atualização 11/09/2026 (inversão do funil)**: as 39 ferramentas completas listadas abaixo só ficam disponíveis depois que o cliente conclui o cadastro (pós-pagamento). Antes disso, numa demonstração pré-cadastro pelo WhatsApp, a IA roda com um recorte pequeno (1-4 ferramentas, conforme o track escolhido no menu: frete, rota ou custo) — detalhe completo em `FROTA_IA_COMO_A_IA_ATUA_2026-09-10.md` e `FROTA_IA_JORNADA_POR_PLANO_2026-09-10.md`.
+
 ## Princípios que valem para todas as ferramentas
 
 - **Nunca inventa número.** Se falta um dado pra calcular, a IA pergunta — nunca estima "valor plausível".
