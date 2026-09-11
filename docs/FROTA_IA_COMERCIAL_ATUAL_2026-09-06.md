@@ -44,7 +44,7 @@ Tudo que é feito pelo WhatsApp aparece automaticamente numa tela de computador 
 Antes de responder qualquer coisa sobre lei, preço oficial, pedágio ou especificação técnica, o Frota IA busca ao vivo numa lista real de sites confiáveis — nunca de memória do modelo. Ordem de confiança: primeiro o que você mesmo informou, depois órgão público oficial (ANTT, ANP, DNIT, SENATRAN, INMET, Planalto), depois site de fabricante (Michelin, Scania, Volvo, Cummins e outros), depois entidade técnica do setor (CNT, NTC&Logística, SEST SENAT) e imprensa especializada — e só como último recurso, internet geral, sempre avisando quando a fonte não é oficial.
 
 ### 9. Notícias do setor direto no WhatsApp (opcional)
-Quem quiser pode ativar um resumo diário das principais notícias do transporte rodoviário — vindo direto de fontes de imprensa/entidades do setor, sem precisar acompanhar site nenhum. É opt-in (desligado por padrão), pra não virar spam de quem não pediu.
+Quem quiser pode ativar um resumo diário das principais notícias do transporte rodoviário — vindo direto de fontes de imprensa/entidades do setor, sem precisar acompanhar site nenhum. É opt-in (desligado por padrão), pra não virar spam de quem não pediu. Fontes: CNT, NTC&Logística (índice INCT), SEST SENAT, Diário do Transporte, Transporte Moderno, Automotive Business, Carga Pesada, Blog do Caminhoneiro, Frota&Cia e outros 8 veículos de imprensa especializada no motorista/transportador — 18 fontes reais no total, nunca notícia genérica ou inventada.
 
 ## Planos e preços (catálogo oficial atual, desde 10/09/2026 — nunca cite de cabeça, sempre confirme antes de fechar)
 
