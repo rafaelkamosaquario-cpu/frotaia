@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Frota IA Assistente",
+  title: "Frota IA",
   description:
     "Especialista virtual em transporte e gestão de frotas: fretes, CPK, consumo, pneus e custos.",
   // apple-touch-icon controla o ícone quando o cliente usa "Adicionar à Tela de Início" no iOS/Safari — Android/Chrome usa manifest.ts.
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
   },
   icons: {
-    apple: "/apple-touch-icon.png",
+    apple: "/brand-icons/180?v=20260911",
   },
 };
 
@@ -59,3 +59,4 @@ export default function RootLayout({
     </html>
   );
 }
+
