@@ -55,7 +55,7 @@ Quem quiser pode ativar um resumo diário das principais notícias do transporte
 | **Pro** | Até 10 | WhatsApp + Painel | R$ 249,90 | R$ 2.499,00 | 12x R$ 208,25 |
 | **Empresa** (mais de 10 veículos) | +10 | WhatsApp + Painel | Sob consulta | Sob consulta | Sob consulta |
 
-- **7 dias de teste grátis**, 1 teste por número de WhatsApp.
+- **Teste grátis**, 1 teste por número de WhatsApp.
 - Trocar de plano (ex.: Individual pro Pro) nunca gera duas cobranças — a assinatura recorrente anterior é cancelada automaticamente assim que a nova já está confirmada ativa.
 - Pagamento 100% pelo Mercado Pago (link seguro) — nunca pede cartão dentro da conversa.
 - **Mensal é sempre cartão** (assinatura recorrente) — Pix só está disponível nos planos anuais. Investigado em 10/09/2026: a API pública do Mercado Pago não confirma suporte a Pix recorrente hoje; existe uma alternativa via Efí Bank (`dev.efipay.com.br`), mas exige conta empresarial (CNPJ/MEI) — não é algo pra prometer ao cliente sem decisão explícita sua.
