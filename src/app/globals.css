@@ -231,3 +231,118 @@ body {
 .animate-bounce-dot {
   animation: bounce-dot 1.2s ease-in-out infinite;
 }
+
+/* Visual-only refinement. The extra shell scope leaves chat, login and
+   activation untouched. Existing routes, event handlers and data stay intact. */
+.frota-panel.frota-refined {
+  --background: #f3f6fb;
+  --foreground: #182537;
+  --surface: #ffffff;
+  --surface-muted: #eaf0f8;
+  --border: #d6e0ee;
+  --muted-foreground: #52647b;
+  --primary: #2167d1;
+  --primary-hover: #1854b0;
+  --primary-foreground: #ffffff;
+  --accent: #087d99;
+  --ring: #2167d1;
+  --success: #18794e;
+  --warning: #996006;
+  --danger: #c83243;
+  --radius: 1rem;
+  --panel-shadow: 0 4px 18px rgb(24 37 55 / 5%);
+  color: var(--foreground);
+}
+
+.dark .frota-panel.frota-refined {
+  --background: #060911;
+  --foreground: #f1f4fa;
+  --surface: #0d1420;
+  --surface-muted: #151f2f;
+  --border: #28354a;
+  --muted-foreground: #aab4c6;
+  --primary: #62aaff;
+  --primary-hover: #8bbfff;
+  --primary-foreground: #061326;
+  --accent: #66c6df;
+  --ring: #62aaff;
+  --success: #59d79b;
+  --warning: #f6b84a;
+  --danger: #ff8585;
+  --panel-shadow: 0 8px 24px rgb(0 0 0 / 14%);
+}
+
+.frota-refined main { min-width: 0; }
+.frota-refined main > div { min-width: 0; }
+.frota-refined main h1 {
+  font-size: clamp(1.55rem, 2.5vw, 2.25rem);
+  line-height: 1.2;
+  letter-spacing: -.035em;
+  font-weight: 750;
+}
+.frota-refined main h2 { letter-spacing: -.015em; }
+.frota-refined .ui-card {
+  border-radius: 1rem;
+  background-color: var(--surface);
+}
+.frota-refined .frota-dashboard {
+  width: 100%;
+  max-width: 1600px;
+  margin-inline: auto;
+  padding: clamp(1rem, 2.6vw, 2.5rem);
+}
+.frota-refined .frota-dashboard > div:first-child { margin-bottom: 1.5rem; }
+.frota-refined [data-tour="ia-sugere"] { margin-bottom: 1.25rem; padding: 1.25rem; }
+.frota-refined [data-tour="kpis"] { gap: 1rem; }
+.frota-refined [data-tour="kpis"] > .ui-card {
+  min-width: 0;
+  padding: 1.25rem;
+  gap: 1rem;
+  border-color: var(--border);
+  /* Override only the legacy inline decorative glow, not semantic badges. */
+  box-shadow: var(--panel-shadow) !important;
+}
+.frota-refined [data-tour="kpis"] > .ui-card > img {
+  width: 2.5rem;
+  height: 2.5rem;
+  filter: saturate(.65);
+}
+.frota-refined [data-tour="kpis"] p { overflow-wrap: anywhere; }
+.frota-refined .frota-menu a {
+  min-height: 46px;
+  padding: .55rem .7rem;
+  border-radius: .65rem;
+  box-shadow: none;
+}
+.frota-refined .frota-menu ul { gap: .25rem; }
+.frota-refined .frota-menu a img { width: 24px; height: 24px; filter: saturate(.6); }
+.frota-refined :is(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.frota-refined :is(button, a) { -webkit-tap-highlight-color: transparent; }
+.frota-refined .frota-safe-bottom a,
+.frota-refined .frota-safe-bottom button { gap: .3rem; }
+.frota-refined .frota-table tr { background-color: var(--surface); }
+
+@media (max-width: 767px) {
+  .frota-refined [data-tour="kpis"] { gap: .75rem; }
+  .frota-refined [data-tour="kpis"] > .ui-card { padding: 1rem; gap: .75rem; }
+  .frota-refined [data-tour="kpis"] p.text-sm { font-size: .8125rem; line-height: 1.45; }
+  .frota-refined .frota-table td[data-label] { align-items: flex-start; overflow-wrap: anywhere; }
+  .frota-refined .frota-table td[data-label]::before { max-width: 45%; white-space: normal; }
+  .frota-refined main :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 1rem; }
+  .frota-refined main :is(input:not([type="checkbox"]):not([type="radio"]), select) { min-height: 44px; }
+}
+
+@media (max-width: 359px) {
+  .frota-refined [data-tour="kpis"] { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frota-refined *, .frota-refined *::before, .frota-refined *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

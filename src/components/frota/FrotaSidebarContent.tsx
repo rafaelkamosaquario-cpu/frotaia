@@ -14,7 +14,7 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex-1 overflow-y-auto scrollbar-thin p-3">
+    <nav className="frota-menu flex-1 overflow-y-auto scrollbar-thin p-3">
       {FROTA_NAV_GROUPS.map((group) => {
         const items = FROTA_NAV_ITEMS.filter((item) => item.group === group);
         if (items.length === 0) return null;

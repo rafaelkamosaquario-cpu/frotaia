@@ -27,7 +27,7 @@ export function FrotaMobileSidebar({ open, onClose }: FrotaMobileSidebarProps) {
   if (!hasMounted) return null;
 
   return createPortal(
-    <div className={cn("fixed inset-0 z-50 lg:hidden", open ? "pointer-events-auto" : "pointer-events-none")} aria-hidden={!open}>
+    <div className={cn("frota-panel frota-refined fixed inset-0 z-50 lg:hidden", open ? "pointer-events-auto" : "pointer-events-none")} aria-hidden={!open}>
       <div
         className={cn("absolute inset-0 bg-black/50 transition-opacity duration-200", open ? "opacity-100" : "opacity-0")}
         onClick={onClose}
@@ -46,7 +46,7 @@ export function FrotaMobileSidebar({ open, onClose }: FrotaMobileSidebarProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+            className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground"
             aria-label="Fechar menu"
           >
             <X className="size-5" aria-hidden />

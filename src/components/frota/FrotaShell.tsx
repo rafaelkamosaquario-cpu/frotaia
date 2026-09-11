@@ -19,7 +19,7 @@ export function FrotaShell({ companyName, role, children }: FrotaShellProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   return (
-    <div className="frota-panel flex h-dvh flex-col bg-background">
+    <div className="frota-panel frota-refined flex h-dvh flex-col bg-background">
       <FrotaHeader companyName={companyName} role={role} />
       <div className="flex min-h-0 flex-1">
         <FrotaSidebar />

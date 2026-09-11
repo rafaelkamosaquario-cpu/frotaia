@@ -281,7 +281,7 @@ export function DashboardClient({
   const checklistPercent = checklistsHoje.length > 0 ? Math.round((checklistsRespondidos / checklistsHoje.length) * 100) : 0;
 
   return (
-    <div className="flex flex-1 flex-col p-4 sm:p-6">
+    <div className="frota-dashboard flex flex-1 flex-col p-4 sm:p-6">
       <div className="mb-4 flex items-start justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
