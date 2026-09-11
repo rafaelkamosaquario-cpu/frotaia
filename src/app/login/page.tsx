@@ -38,7 +38,7 @@ export default function LoginPage() {
         <div className="mx-auto mb-5 flex justify-center">
           <LogoMark className="size-12" />
         </div>
-        <h1 className="text-lg font-semibold text-foreground">Frota IA Assistente</h1>
+        <h1 className="text-lg font-semibold text-foreground">Frota IA</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Entre para acessar sua frota, seus veículos e o histórico de conversas.
         </p>
@@ -90,3 +90,4 @@ function GoogleIcon() {
     </svg>
   );
 }
+
