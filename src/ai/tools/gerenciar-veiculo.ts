@@ -37,10 +37,11 @@ import type {
  * conversa.
  *
  * Regra de produto (redesenhada em 08/2026, Onboarding 2 — Frota IA
- * Gestão/Painel): limite de veículos ATIVOS por conta/empresa vem do
- * ENTITLEMENT real, não mais de `company_type` — `getVehicleLimitForCompany`
- * (src/lib/frota/vehicleLimit.ts) é a fonte central única: 1 veículo sem
- * Painel de Gestão, até 10 com Painel de Gestão. CRIAR verifica isso antes
+ * Gestão/Painel; generalizada em 09/2026 pra 3 níveis): limite de veículos
+ * ATIVOS por conta/empresa vem do ENTITLEMENT real, não mais de
+ * `company_type` — `getVehicleLimitForCompany` (src/lib/frota/vehicleLimit.ts)
+ * é a fonte central única: 1 veículo (Individual), até 3 (Essencial) ou até
+ * 10 (Pro/override manual do Painel de Gestão). CRIAR verifica isso antes
  * de escrever, espelhando exatamente a mesma condição do trigger de banco
  * `enforce_vehicle_limit_by_entitlement` (migration
  * 20260823062200_generalize_vehicle_limit_by_entitlement). Quando o limite
@@ -295,7 +296,7 @@ async function executar(entrada: GerenciarVeiculoEntrada): Promise<GerenciarVeic
       if (veiculosExistentes.length >= limiteVeiculos) {
         const mensagem =
           limiteVeiculos === 1
-            ? "Esta conta já tem um veículo cadastrado — nesta versão só é permitido 1 veículo por conta. Use ATUALIZAR para corrigir/completar os dados dele, em vez de cadastrar outro. O Painel de Gestão permite até 10 veículos por conta."
+            ? "Esta conta já tem um veículo cadastrado — o plano atual permite só 1 veículo ativo. Use ATUALIZAR para corrigir/completar os dados dele, em vez de cadastrar outro. Planos com Painel de Gestão permitem mais veículos (Essencial: até 3, Pro: até 10)."
             : `Esta empresa já atingiu o limite de ${limiteVeiculos} veículos ativos do plano atual.`;
         return respostaFalha(modo, [mensagem]);
       }
@@ -498,7 +499,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
   { nome: "vencimentoSeguro", tipo: "string", obrigatorio: false, descricao: "Data de vencimento do seguro do veículo, formato YYYY-MM-DD — lida de foto do comprovante ou informada pelo cliente." },
   { nome: "vencimentoLicenciamento", tipo: "string", obrigatorio: false, descricao: "Data de vencimento do licenciamento/CRLV, formato YYYY-MM-DD — lida de foto do documento ou informada pelo cliente." },
   { nome: "observacoes", tipo: "string", obrigatorio: false, descricao: "Observações livres sobre o veículo." },
-  { nome: "ativo", tipo: "boolean", obrigatorio: false, descricao: "ATUALIZAR: true reativa, false desativa o veículo (ex.: cliente vendeu o caminhão ou voltou a usá-lo). O limite de veículos ativos depende do plano (1 sem Painel de Gestão, até 10 com Painel de Gestão) — se der erro de limite, avise o cliente." },
+  { nome: "ativo", tipo: "boolean", obrigatorio: false, descricao: "ATUALIZAR: true reativa, false desativa o veículo (ex.: cliente vendeu o caminhão ou voltou a usá-lo). O limite de veículos ativos depende do plano (Individual: 1 · Essencial: até 3 · Pro: até 10) — se der erro de limite, avise o cliente." },
   { nome: "precoCombustivelLitro", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: preço do combustível por litro." },
   { nome: "custoFixoDia", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: custo fixo diário." },
   { nome: "custoFixoMes", tipo: "number", obrigatorio: false, descricao: "DEFINIR_CUSTO: custo fixo mensal." },

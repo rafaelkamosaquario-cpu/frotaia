@@ -200,7 +200,7 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
         description={
           toggleTarget?.active
             ? `Tem certeza que deseja desativar "${toggleTarget?.name ?? toggleTarget?.plate}"?`
-            : `Tem certeza que deseja ativar "${toggleTarget?.name ?? toggleTarget?.plate}"? O limite de veículos ativos depende do plano (1 sem Painel de Gestão, até 10 com Painel de Gestão).`
+            : `Tem certeza que deseja ativar "${toggleTarget?.name ?? toggleTarget?.plate}"? O limite de veículos ativos depende do plano (Individual: 1 · Essencial: até 3 · Pro: até 10).`
         }
         confirmLabel={toggleTarget?.active ? "Desativar" : "Ativar"}
         variant={toggleTarget?.active ? "danger" : "default"}
