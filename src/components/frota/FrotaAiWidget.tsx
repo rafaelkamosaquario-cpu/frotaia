@@ -146,13 +146,16 @@ export function FrotaAiWidget() {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Fechar o Frota IA" : "Pergunte ao Frota IA"}
         data-tour="ia-widget"
-        className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex size-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-105 sm:right-5 lg:bottom-5"
+        aria-expanded={open}
+        aria-controls="frota-ai-conversation"
+        className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-4 text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover sm:right-5 lg:bottom-5"
       >
         {open ? <X className="size-5" aria-hidden /> : <Sparkles className="size-5" aria-hidden />}
+        <span className="text-sm font-semibold">{open ? "Fechar conversa" : "Pergunte ao Frota IA"}</span>
       </button>
 
       {open && (
-        <div className="fixed bottom-[calc(8.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-[min(560px,70dvh)] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl sm:right-5 lg:bottom-22">
+        <div id="frota-ai-conversation" role="region" aria-label="Conversa com Frota IA" className="fixed bottom-[calc(8.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-[min(560px,calc(100dvh-13rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl sm:right-5 lg:bottom-22">
           <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <Sparkles className="size-4 text-primary" aria-hidden />
             <span className="text-sm font-semibold text-foreground">Pergunte ao Frota IA</span>
@@ -220,7 +223,8 @@ export function FrotaAiWidget() {
               onChange={(e) => setTexto(e.target.value)}
               placeholder="Pergunte algo sobre sua frota…"
               disabled={isLoading}
-              className="h-10 flex-1 rounded-lg border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Mensagem para o Frota IA"
+              className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Button type="submit" size="icon" disabled={isLoading || (!texto.trim() && !imagemAnexada)} aria-label="Enviar">
               <Send className="size-4" aria-hidden />

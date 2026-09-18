@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/hooks/useToast";
 import type { VehicleRow, VehicleDocumentRow } from "@/lib/supabase/tables";
 import { VehicleFormModal } from "./VehicleFormModal";
+import { VehiclePlate } from "@/components/frota/VehiclePlate";
 
 interface VeiculosClientProps {
   veiculosIniciais: VehicleRow[];
@@ -91,7 +92,7 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Veículos</h1>
-          <p className="text-sm text-muted-foreground">{veiculos.length} veículo(s) cadastrado(s)</p>
+          <p className="text-sm text-muted-foreground">{veiculos.length} {veiculos.length === 1 ? "veículo cadastrado" : "veículos cadastrados"}</p>
         </div>
         <Button onClick={() => setFormTarget(null)} className="gap-1.5">
           <SquarePen className="size-4" aria-hidden />
@@ -128,7 +129,7 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
             <tbody>
               {veiculos.map((veiculo) => (
                 <tr key={veiculo.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
-                  <td data-label="Placa" className="px-4 py-3 font-medium text-foreground">{veiculo.plate ?? "—"}</td>
+                  <td data-label="Placa" className="px-4 py-3 font-medium text-foreground"><VehiclePlate plate={veiculo.plate} /></td>
                   <td data-label="Apelido" className="px-4 py-3 text-foreground">{veiculo.name ?? "—"}</td>
                   <td data-label="Tipo" className="px-4 py-3 text-muted-foreground">
                     {veiculo.vehicle_type ? VEHICLE_TYPE_LABEL[veiculo.vehicle_type] : "—"}

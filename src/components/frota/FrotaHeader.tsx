@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, ChevronDown } from "lucide-react";
 import { FrotaBrand } from "./FrotaBrand";
 import { Button } from "@/components/ui/Button";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { FrotaThemeSelector } from "./FrotaThemeSelector";
 import { signOut } from "@/services/supabase/authService";
 import { cn } from "@/lib/utils";
 import type { CompanyMemberRole } from "@/lib/supabase/tables";
@@ -43,14 +43,15 @@ export function FrotaHeader({ companyName, role }: FrotaHeaderProps) {
           <p className="text-sm font-medium text-foreground">{companyName}</p>
           <p className="text-xs text-muted-foreground">{ROLE_LABEL[role]}</p>
         </div>
-        <ThemeToggle />
+        <FrotaThemeSelector />
         <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Sair">
           <LogOut className="size-4.5" aria-hidden />
         </Button>
       </div>
 
       {/* Mobile/tablet: um único botão de conta, resto vira menu (evita disputar espaço com o wordmark). */}
-      <div className="lg:hidden">
+      <div className="flex items-center gap-2 lg:hidden">
+        <FrotaThemeSelector />
         <button
           type="button"
           onClick={() => setAccountOpen((v) => !v)}
@@ -77,11 +78,6 @@ export function FrotaHeader({ companyName, role }: FrotaHeaderProps) {
               <div className="px-2 py-1.5">
                 <p className="truncate text-sm font-medium text-foreground">{companyName}</p>
                 <p className="text-xs text-muted-foreground">{ROLE_LABEL[role]}</p>
-              </div>
-              <div className="my-1 border-t border-border" />
-              <div className="flex items-center justify-between px-2 py-1.5">
-                <span className="text-sm text-foreground">Tema</span>
-                <ThemeToggle />
               </div>
               <div className="my-1 border-t border-border" />
               <button

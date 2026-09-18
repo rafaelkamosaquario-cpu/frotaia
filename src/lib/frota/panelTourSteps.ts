@@ -41,7 +41,7 @@ export const PANEL_TOUR_STEP_DEFS: Record<PanelTourStep, PanelTourStepDef> = {
   ia_sugere: {
     step: "ia_sugere",
     numero: 3,
-    titulo: "Frota IA sugere",
+    titulo: "Frota IA informa",
     texto: "O Frota IA analisa os dados da operação e chama sua atenção pra o que merece prioridade.",
     target: { kind: "data", key: "ia-sugere" },
   },

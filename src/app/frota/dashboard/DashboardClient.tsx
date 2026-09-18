@@ -299,7 +299,7 @@ export function DashboardClient({
             <Sparkles className="size-4.5" aria-hidden />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold tracking-tight text-foreground">Frota IA sugere</p>
+            <p className="text-sm font-semibold tracking-tight text-foreground">Frota IA informa</p>
             <div className="mt-1 space-y-1">
               {dividirFrasesInsight(insight).map((frase, i) => (
                 <p key={i} className="text-sm leading-relaxed text-muted-foreground">

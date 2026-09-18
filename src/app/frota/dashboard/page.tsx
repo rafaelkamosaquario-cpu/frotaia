@@ -9,7 +9,7 @@ import { listChecklistDispatchesForPanel, dispatchesFromToday } from "@/services
 import { computeFleetAlerts } from "@/services/supabase/fleetAlertsService";
 import { getOrCreatePreferences, saveDashboardInsight } from "@/services/supabase/companyPreferencesService";
 import { gerarInsightDashboard } from "@/services/dashboard/dashboardInsightService";
-import { DashboardClient, type CardStyleVariant } from "./DashboardClient";
+import { DashboardClient, type CardStyleVariant } from "./DashboardOverview";
 
 /** Insight regenerado no máximo 1x a cada 20h por empresa — mesmo espírito do daily_news_last_sent_at, evita custo de IA a cada carregamento de página. */
 const INSIGHT_CACHE_HORAS = 20;

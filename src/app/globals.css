@@ -325,6 +325,28 @@ body {
 .frota-refined .frota-safe-bottom button { gap: .3rem; }
 .frota-refined .frota-table tr { background-color: var(--surface); }
 
+/* Layout aprovado: azul sóbrio, resumo da IA e placas nos dois temas. */
+.frota-refined main { margin-bottom: calc(7.75rem + env(safe-area-inset-bottom)); padding-bottom: 1.5rem; scroll-padding-bottom: 1.5rem; }
+.frota-refined .ui-card { border-radius: .75rem; box-shadow: none; }
+.frota-refined .dashboard-insight { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); background: color-mix(in srgb, var(--primary) 7%, var(--surface)); }
+.frota-refined .dashboard-kpi { min-height: 140px; }
+.frota-refined .dashboard-currency { font-size: clamp(1.2rem, 2.4vw, 2rem); line-height: 1.25; }
+.frota-refined .dashboard-kpi-value { overflow-wrap: anywhere; }
+.frota-refined .dashboard-vehicles td { overflow-wrap: anywhere; }
+@media (min-width: 1024px) {
+  .frota-refined main { margin-bottom: 4.75rem; padding-bottom: 1.5rem; }
+}
+@media (max-width: 767px) {
+  .frota-refined .dashboard-kpi { min-height: 145px; }
+  .frota-refined .dashboard-vehicles thead { display: none; }
+  .frota-refined .dashboard-vehicles,
+  .frota-refined .dashboard-vehicles tbody { display: block; }
+  .frota-refined .dashboard-vehicles tr { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: .5rem .75rem; padding: 1rem 0; }
+  .frota-refined .dashboard-vehicles td { display: block; padding: 0; }
+  .frota-refined .dashboard-vehicles td:first-child { grid-row: span 3; align-self: center; }
+  .frota-refined .dashboard-vehicles td:last-child { text-align: left; grid-column: 2; }
+}
+
 @media (max-width: 767px) {
   .frota-refined [data-tour="kpis"] { gap: .75rem; }
   .frota-refined [data-tour="kpis"] > .ui-card { padding: 1rem; gap: .75rem; }

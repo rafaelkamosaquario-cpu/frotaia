@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import { FrotaNavIcon } from "./FrotaNavIcon";
 import { cn } from "@/lib/utils";
 import { FROTA_NAV_ITEMS, FROTA_NAV_GROUPS } from "./frotaNavItems";
 
@@ -33,6 +33,7 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                       href={item.href}
                       onClick={onNavigate}
                       data-tour-href={item.href}
+                      aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "group flex items-center gap-2.5 rounded-lg border px-2 py-1 text-sm transition-colors duration-150",
                         isActive
@@ -40,17 +41,7 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                           : "border-transparent text-muted-foreground hover:border-primary/20 hover:bg-primary/[0.05] hover:text-foreground"
                       )}
                     >
-                      <Image
-                        src={item.icon}
-                        alt=""
-                        width={32}
-                        height={32}
-                        className={cn(
-                          "size-6 shrink-0 object-contain transition-opacity duration-150 lg:size-7",
-                          isActive ? "opacity-100" : "opacity-80 group-hover:opacity-95"
-                        )}
-                        aria-hidden
-                      />
+                      <FrotaNavIcon href={item.href} />
                       <span className="flex-1 truncate">{item.label}</span>
                       {!item.disponivel && (
                         <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">

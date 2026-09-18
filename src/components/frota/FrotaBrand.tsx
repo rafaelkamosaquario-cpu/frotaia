@@ -7,7 +7,9 @@ import { LogoMark } from "@/components/icons/Logo";
 export function FrotaBrand({ compact = false, className }: { compact?: boolean; className?: string }) {
   return (
     <div className={cn("flex items-center gap-2.5 leading-none", className)}>
-      <LogoMark className="size-11" />
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#0b1628] ring-1 ring-[#243d60] dark:bg-transparent dark:ring-transparent">
+        <LogoMark className="size-11" />
+      </span>
       <div className="flex flex-col">
       <span className="text-base font-bold tracking-tight text-foreground">
         Frota <span className="text-primary">IA</span>
