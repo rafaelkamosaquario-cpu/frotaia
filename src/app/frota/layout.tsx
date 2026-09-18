@@ -28,7 +28,7 @@ export default async function FrotaLayout({ children }: { children: React.ReactN
   const access = await loadFleetPanelAccess(supabase);
 
   if (!access.ok) {
-    if (access.reason === "unauthenticated") redirect("/login");
+    if (access.reason === "unauthenticated") redirect("/login?next=/frota/dashboard");
     if (access.reason === "no_company") redirect("/onboarding");
     redirect("/frota-indisponivel");
   }

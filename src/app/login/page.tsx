@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LogoMark } from "@/components/icons/Logo";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -10,22 +10,41 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { signInWithGoogle } from "@/services/supabase/authService";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+/**
+ * Destino padrão depois do login: o Painel de Gestão (/frota/dashboard), não
+ * mais a raiz "/" (V1, chat de teste restrito a admins) — quem chega em
+ * /login sem um `next` explícito é overwhelmingly alguém tentando acessar o
+ * Painel, não o admin testando o V1. `next` explícito (ex.: vindo de
+ * /frota/layout.tsx) sempre tem prioridade.
+ */
+const DESTINO_PADRAO_POS_LOGIN = "/frota/dashboard";
+
+function LoginForm() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || DESTINO_PADRAO_POS_LOGIN;
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace("/");
+      router.replace(next);
     }
-  }, [loading, user, router]);
+  }, [loading, user, router, next]);
 
   async function handleGoogleLogin() {
     setError(null);
     setIsRedirecting(true);
     try {
-      await signInWithGoogle("/auth/callback?next=/");
+      await signInWithGoogle(`/auth/callback?next=${encodeURIComponent(next)}`);
     } catch {
       setError("Não foi possível iniciar o login com Google. Verifique se o provider está configurado no Supabase.");
       setIsRedirecting(false);
