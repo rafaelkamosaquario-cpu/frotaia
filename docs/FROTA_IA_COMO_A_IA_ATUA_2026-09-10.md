@@ -1,6 +1,8 @@
 # Frota IA — Como a IA (Claude) atua e onde cada uma das 39 ferramentas se aplica
 
-Documento criado em 10/09/2026, **atualizado em 11/09/2026** (inversão do funil — ver seção nova abaixo), montado a partir do código real (`src/ai/chat/gerarRespostaAssistente.ts`, `src/ai/tools/*`, `src/lib/anthropic/systemPrompt.ts`) e do `FROTA_IA_FERRAMENTAS_ATUAL_2026-09-06.md` já existente — aqui o foco é **como a IA decide o que fazer** e **onde o resultado de cada ferramenta aparece pro cliente**, não só o que cada uma calcula.
+Documento criado em 10/09/2026, **atualizado em 11/09/2026** (inversão do funil — ver seção nova abaixo), **reconferido em 18/09/2026**, montado a partir do código real (`src/ai/chat/gerarRespostaAssistente.ts`, `src/ai/tools/*`, `src/lib/anthropic/systemPrompt.ts`) e do `FROTA_IA_FERRAMENTAS_ATUAL_2026-09-06.md` já existente — aqui o foco é **como a IA decide o que fazer** e **onde o resultado de cada ferramenta aparece pro cliente**, não só o que cada uma calcula.
+
+**Reconferido em 18/09/2026**: nenhum arquivo citado acima foi alterado desde a última auditoria — o laço de decisão, a trava de segurança e o modo demo continuam exatamente como descritos abaixo.
 
 ---
 

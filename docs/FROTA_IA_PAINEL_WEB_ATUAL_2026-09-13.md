@@ -1,6 +1,19 @@
-# Frota IA — Painel Web: as 22 telas em detalhe (estado atual, 2026-09-13)
+# Frota IA — Painel Web: as 22 telas em detalhe (estado atual, atualizado em 2026-09-18)
 
 Documento técnico/comercial gerado direto do código real (`src/app/frota/**`, `frotaNavItems.ts`, `fleetPanelAccess.ts`, `vehicleLimit.ts`) — não é uma descrição aspiracional, é o que está em produção hoje. Complementa `FROTA_IA_FERRAMENTAS_ATUAL_2026-09-06.md`, que cita as 22 telas em uma única linha; aqui cada uma é detalhada.
+
+## Polimento visual de 18/09/2026 (commit `0a76268`, "Polish fleet dashboard, themes, vehicle plates and AI presentation")
+
+Conferido ao vivo em produção (login real no painel) e no código-fonte. Mudanças que afetam o painel inteiro, não só uma tela:
+
+- **Tema claro/escuro**: seletor novo no cabeçalho (ícones sol/lua), aplicado em todo o painel — confirmado funcionando nos dois modos ao vivo. Antes só existia o tema escuro.
+- **Placas de veículo com visual de placa real brasileira**: um componente novo (`VehiclePlate`) desenha a placa como um selo — "BRASIL" + registro pra padrão Mercosul, "BR" + formato `XXX-9999` pra placa antiga/legado — usado na tela de Veículos e na tabela nova do Dashboard (abaixo). Nunca converte uma placa antiga pra Mercosul, só exibe no formato que já é. Sem placa cadastrada, mostra "Placa não informada".
+- **Ícones da sidebar viraram vetoriais** (biblioteca Lucide) em vez de imagens PNG — mais nítidos em qualquer tamanho/tema, carregamento mais leve.
+- **Widget "Pergunte ao Frota IA"** ganhou o texto do botão visível (antes só o ícone) e reforço de acessibilidade (leitor de tela consegue anunciar estado aberto/fechado).
+
+## Achado técnico (dívida cosmética, sem correção pedida): `DashboardClient.tsx` antigo ficou órfão
+
+O Dashboard foi reescrito num componente novo (`DashboardOverview.tsx`, exportando `DashboardClient`) que substituiu por completo a versão anterior — mais elaborada, com 2 variantes visuais escolhíveis por parâmetro de URL (`?cardStyle=a` sóbria / `?cardStyle=b` premium com glow colorido), arquivo `DashboardClient.tsx` na mesma pasta. Confirmado por busca no repo: **nenhum arquivo mais importa esse arquivo antigo** — ele continua existindo no repositório, mas é código morto. Consequência prática: o parâmetro `?cardStyle=a/b` na URL do Dashboard (`page.tsx`) ainda é calculado e passado como prop pro componente novo, mas o componente novo nunca usa esse valor — outro resíduo morto, sem efeito visível. Nenhum dos dois quebra nada em produção, é só limpeza de código pendente.
 
 ## Quem acessa o Painel, de verdade
 
@@ -23,7 +36,7 @@ O Painel de Gestão (`/frota/*`) é um **add-on separado do WhatsApp**, não um 
 
 ### Visão geral
 
-**Dashboard** (`/frota/dashboard`) — agrega em uma única tela: 6 indicadores (veículos ativos, motoristas ativos, manutenções pendentes, documentos vencidos, documentos vencendo em 30 dias, despesas dos últimos 30 dias — mostra "—" quando não há dado, nunca zero falso), um insight gerado por IA (cacheado por até 20h por empresa, para não gastar chamada de IA a cada carregamento), até 5 alertas urgentes com atalho para a tela de Alertas, e o progresso do checklist diário. Somente leitura — é um agregador dos mesmos dados usados pelo WhatsApp, não uma fonte própria.
+**Dashboard** (`/frota/dashboard`) — agrega em uma única tela, **reformulado em 18/09/2026** (ver seção de polimento acima): 6 indicadores (veículos ativos, motoristas ativos, manutenções pendentes, documentos vencidos, documentos vencendo em 30 dias, custo dos últimos 30 dias — mostra "—" quando não há dado, nunca zero falso), um bloco "**Frota IA informa**" com o insight gerado por IA (cacheado por até 20h por empresa, renomeado de "Frota IA sugere" nesta reformulação, inclusive no tour guiado), uma tabela nova **"Veículos da frota"** com os 5 veículos mais recentes (placa, veículo, status, km informado — link "Ver veículos"), dois blocos de alerta **separados por categoria** — "Documentos — atenção" e "Manutenções — atenção", cada um com link próprio pra tela de origem (antes era uma lista única de "até 5 alertas urgentes") — e o progresso do checklist diário. Somente leitura — é um agregador dos mesmos dados usados pelo WhatsApp, não uma fonte própria.
 
 ### Operação
 

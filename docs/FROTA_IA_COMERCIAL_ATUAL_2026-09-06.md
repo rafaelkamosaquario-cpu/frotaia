@@ -1,6 +1,8 @@
-# Frota IA — Como vender hoje (2026-09-06, preços atualizados em 10/09/2026)
+# Frota IA — Como vender hoje (2026-09-06, preços atualizados em 10/09/2026, reconferido em 18/09/2026)
 
 Documento comercial calibrado pelo que o produto **realmente entrega hoje**, sem exagero — pensado pra Rafael usar em conversa de venda, landing page ou material de apresentação.
+
+**Reconferido em 18/09/2026**: cruzado de novo contra o catálogo real (`CATALOGO_OFERTAS`) e o enum `subscription_plan` do banco de produção — preços, planos e funcionalidades descritos abaixo continuam 100% fiéis ao que está no ar, sem nenhuma divergência encontrada.
 
 ## O pitch em 1 frase
 

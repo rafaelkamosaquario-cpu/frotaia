@@ -1,6 +1,8 @@
-# Frota IA — Ferramentas e Funcionalidades (estado atual, 2026-09-06; limite de veículos e planos atualizados em 10/09/2026)
+# Frota IA — Ferramentas e Funcionalidades (estado atual, 2026-09-06; limite de veículos e planos atualizados em 10/09/2026; reconferido em 18/09/2026)
 
 Documento técnico/funcional gerado direto do código real do repositório (`src/ai/tools/`, 39 ferramentas registradas) — não é uma descrição aspiracional, é o que está em produção hoje.
+
+**Reconferido em 18/09/2026**: contagem de 39 ferramentas revalidada direto contra o enum `frota_ia_tool_name` do banco de produção (Supabase MCP) — sem divergência, nenhuma ferramenta nova ou removida desde a última auditoria.
 
 ## Como funciona, em 1 parágrafo
 

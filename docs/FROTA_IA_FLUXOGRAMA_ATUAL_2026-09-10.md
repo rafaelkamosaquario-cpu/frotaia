@@ -1,6 +1,8 @@
-# Frota IA — Fluxograma Atual (atualizado em 2026-09-11)
+# Frota IA — Fluxograma Atual (atualizado em 2026-09-11, reconferido em 2026-09-18)
 
 Documento criado em 10/09/2026 (substitui o antigo `FROTA_IA_FLUXOGRAMA_COMPLETO_V1_V2.md`, 19/08/2026, 28 ferramentas/estrutura de planos antiga), **atualizado em 11/09/2026** para refletir a inversão do funil ("mostrar valor antes de cadastrar" — ver seção 2). Não é uma reauditoria completa de todo o sistema — é focado nos fluxos centrais: ecossistema, jornada do cliente, pagamento e arquitetura.
+
+**Reconferido em 18/09/2026**: os 4 diagramas (ecossistema, jornada, pagamento, arquitetura técnica) seguem batendo com o código real — nenhuma mudança de fluxo desde a última auditoria.
 
 ## 1. Visão geral do ecossistema
 

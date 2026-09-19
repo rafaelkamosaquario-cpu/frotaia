@@ -1,6 +1,8 @@
-# Frota IA — Jornada do cliente por plano (apresentação, demo, onboarding e checkout)
+# Frota IA — Jornada do cliente por plano (apresentação, demo, onboarding e checkout) — reconferido em 2026-09-18
 
 Documento criado em 10/09/2026 a partir do código real e dos docs técnicos existentes, **reescrito em 11/09/2026** para refletir a inversão do funil ("mostrar valor antes de cadastrar") — o cadastro completo de perfil deixou de ser a primeira coisa que o cliente vê e passou a rodar só depois do pagamento confirmado. Serve pra você analisar a jornada completa, plano por plano.
+
+**Reconferido em 18/09/2026**: código do onboarding (`demoConversation.ts`, `webhook/route.ts`, `onboardingConversation.ts`) confirmado intocado desde a última auditoria — a jornada descrita abaixo, plano por plano, continua exatamente igual ao que roda em produção hoje.
 
 ## Visão geral — onde cada plano diverge
 
