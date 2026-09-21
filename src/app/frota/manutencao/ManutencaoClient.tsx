@@ -161,6 +161,7 @@ export function ManutencaoClient({ manutencoesIniciais, veiculos, despesasVincul
       )}
 
       <MaintenanceFormModal
+        key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")}
         open={formTarget !== undefined}
         onClose={() => setFormTarget(undefined)}
         schedule={formTarget ?? null}

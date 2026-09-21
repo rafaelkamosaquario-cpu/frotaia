@@ -173,7 +173,7 @@ export function RotasClient({ rotas: rotasIniciais, veiculos }: RotasClientProps
         </Card>
       )}
 
-      <RouteFormModal open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} route={formTarget ?? null} veiculos={veiculosAtivos} onSaved={handleSaved} />
+      <RouteFormModal key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")} open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} route={formTarget ?? null} veiculos={veiculosAtivos} onSaved={handleSaved} />
 
       <Dialog
         open={deleteTarget !== null}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Truck, SquarePen, Ban, CheckCircle2 } from "lucide-react";
+import { Truck, SquarePen, Ban, CheckCircle2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Dialog } from "@/components/ui/Dialog";
@@ -41,6 +41,8 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
   const [formTarget, setFormTarget] = useState<VehicleRow | null | undefined>(undefined);
   const [toggleTarget, setToggleTarget] = useState<VehicleRow | null>(null);
   const [isToggling, setIsToggling] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<VehicleRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleSaved(veiculo: VehicleRow) {
     setVeiculos((prev) => {
@@ -84,6 +86,26 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
     } finally {
       setIsToggling(false);
       setToggleTarget(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/frota/veiculos/${deleteTarget.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        showToast({ title: "Não foi possível excluir", description: data.error ?? "Tente novamente.", variant: "error" });
+        return;
+      }
+      setVeiculos((prev) => prev.filter((v) => v.id !== deleteTarget.id));
+      showToast({ title: "Veículo excluído", variant: "success" });
+    } catch {
+      showToast({ title: "Não foi possível excluir", description: "Verifique sua conexão e tente novamente.", variant: "error" });
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
     }
   }
 
@@ -176,6 +198,16 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
                           </>
                         )}
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-danger hover:bg-danger/10"
+                        disabled={isDeleting && deleteTarget?.id === veiculo.id}
+                        onClick={() => setDeleteTarget(veiculo)}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden />
+                        Excluir
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -186,6 +218,13 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
       )}
 
       <VehicleFormModal
+        // O modal nunca desmonta sozinho (só fica oculto via `open`), então o
+        // form interno precisa de uma key que mude a cada abertura pra
+        // recarregar os dados do veículo clicado — sem isso, ele fica preso
+        // no que foi montado na primeira vez (ou resetado vazio pelo fechamento
+        // anterior). "closed" some entre uma edição e a próxima, garantindo
+        // remontagem mesmo reabrindo o mesmo veículo em seguida.
+        key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")}
         open={formTarget !== undefined}
         onClose={() => setFormTarget(undefined)}
         vehicle={formTarget ?? null}
@@ -205,6 +244,16 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
         }
         confirmLabel={toggleTarget?.active ? "Desativar" : "Ativar"}
         variant={toggleTarget?.active ? "danger" : "default"}
+      />
+
+      <Dialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Excluir veículo permanentemente"
+        description={`Tem certeza que deseja excluir "${deleteTarget?.name ?? deleteTarget?.plate}"? Isso apaga para sempre o histórico de abastecimento, manutenções agendadas, documentos e perfis de custo/pneu deste veículo — não pode ser desfeito. Despesas, receitas e análises já registradas são mantidas, só deixam de ficar vinculadas a este veículo. Se só quer parar de usar o veículo sem perder o histórico, use "Desativar" em vez de excluir.`}
+        confirmLabel={isDeleting ? "Excluindo..." : "Excluir permanentemente"}
+        variant="danger"
       />
     </div>
   );

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
-import { updateVehicle } from "@/services/supabase/vehicleService";
+import { updateVehicle, deleteVehicle } from "@/services/supabase/vehicleService";
 import { MENSAGEM_LIMITE_VEICULOS_ATIVOS, isLimiteVeiculosAtivosError } from "@/lib/frota/vehicleApiErrors";
 
 function statusForAccessReason(reason: "unauthenticated" | "no_company" | "not_entitled") {
@@ -29,6 +29,33 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (isLimiteVeiculosAtivosError(error)) {
       return NextResponse.json({ error: MENSAGEM_LIMITE_VEICULOS_ATIVOS }, { status: 409 });
     }
+    if (isNotFoundError(error)) {
+      return NextResponse.json({ error: "Veículo não encontrado." }, { status: 404 });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Exclusão física real — restrita a owner/admin (mesmo padrão de ações
+ * sensíveis do painel, ver fontes-radar/[id]/route.ts), diferente do
+ * create/editar/desativar de vehicles, liberados também a operator.
+ */
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const supabase = await createClient();
+  const access = await loadFleetPanelAccess(supabase);
+  if (!access.ok) {
+    return NextResponse.json({ error: "Sem acesso ao painel de gestão de frota." }, { status: statusForAccessReason(access.reason) });
+  }
+  if (access.role !== "owner" && access.role !== "admin") {
+    return NextResponse.json({ error: "Só o dono/administrador da empresa pode excluir veículos." }, { status: 403 });
+  }
+
+  try {
+    await deleteVehicle(supabase, id, access.company.id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
     if (isNotFoundError(error)) {
       return NextResponse.json({ error: "Veículo não encontrado." }, { status: 404 });
     }

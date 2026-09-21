@@ -160,6 +160,10 @@ export function MotoristasClient({ motoristasIniciais, veiculos }: MotoristasCli
       )}
 
       <DriverFormModal
+        // Mesmo raciocínio de VeiculosClient.tsx: o modal nunca desmonta
+        // sozinho, então a key precisa mudar a cada abertura pra recarregar
+        // os dados do motorista clicado.
+        key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")}
         open={formTarget !== undefined}
         onClose={() => setFormTarget(undefined)}
         driver={formTarget ?? null}

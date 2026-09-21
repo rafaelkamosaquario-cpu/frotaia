@@ -234,7 +234,7 @@ export function AlertasClient({ alertasIniciais, veiculos }: AlertasClientProps)
         })
       )}
 
-      <AlertFormModal open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} alerta={formTarget ?? null} veiculos={veiculos} onSaved={handleSaved} />
+      <AlertFormModal key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")} open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} alerta={formTarget ?? null} veiculos={veiculos} onSaved={handleSaved} />
 
       <Dialog
         open={cancelTarget !== null}

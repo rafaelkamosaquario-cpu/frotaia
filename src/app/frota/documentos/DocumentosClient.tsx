@@ -118,6 +118,7 @@ export function DocumentosClient({ documentosIniciais, veiculos, motoristas }: D
       )}
 
       <DocumentFormModal
+        key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")}
         open={formTarget !== undefined}
         onClose={() => setFormTarget(undefined)}
         document={formTarget ?? null}

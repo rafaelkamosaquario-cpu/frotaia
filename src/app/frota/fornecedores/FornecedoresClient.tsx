@@ -119,7 +119,7 @@ export function FornecedoresClient({ fornecedores: fornecedoresIniciais }: Forne
         </Card>
       )}
 
-      <VendorFormModal open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} vendor={formTarget ?? null} onSaved={handleSaved} />
+      <VendorFormModal key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")} open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} vendor={formTarget ?? null} onSaved={handleSaved} />
 
       <Dialog
         open={deleteTarget !== null}

@@ -187,6 +187,7 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
       )}
 
       <ExpenseFormModal
+        key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")}
         open={formTarget !== undefined}
         onClose={() => setFormTarget(undefined)}
         despesa={formTarget ?? null}

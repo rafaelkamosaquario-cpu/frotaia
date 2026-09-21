@@ -161,6 +161,7 @@ export function ReceitasClient({ receitasIniciais, veiculos, motoristas }: Recei
       )}
 
       <RevenueFormModal
+        key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")}
         open={formTarget !== undefined}
         onClose={() => setFormTarget(undefined)}
         receita={formTarget ?? null}

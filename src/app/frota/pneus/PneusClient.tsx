@@ -157,7 +157,7 @@ export function PneusClient({ pneusIniciais, veiculos }: PneusClientProps) {
         </Card>
       )}
 
-      <VehicleTireFormModal open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} tire={formTarget ?? null} veiculos={veiculos} onSaved={handleSaved} />
+      <VehicleTireFormModal key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")} open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} tire={formTarget ?? null} veiculos={veiculos} onSaved={handleSaved} />
     </div>
   );
 }

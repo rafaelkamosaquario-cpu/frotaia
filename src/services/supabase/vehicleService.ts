@@ -130,6 +130,28 @@ export async function updateVehicle(
   return data;
 }
 
+/**
+ * Exclusão física de verdade (diferente de outras telas do painel, onde
+ * "excluir" é soft delete disfarçado — ver fornecedores/route.ts). Decisão
+ * explícita do Rafael (2026-09-21): apaga em cascata abastecimentos,
+ * manutenções, documentos e perfis de custo/pneu desse veículo (FKs
+ * ON DELETE CASCADE); despesas/receitas/análises/jornadas/alertas/rotas
+ * salvas sobrevivem com o vínculo ao veículo removido (FKs ON DELETE SET
+ * NULL) — o frontend avisa isso antes de confirmar. `companyId` como
+ * filtro obrigatório, mesmo princípio de updateVehicle acima.
+ */
+export async function deleteVehicle(client: SupabaseDbClient, vehicleId: string, companyId: string): Promise<void> {
+  const { error } = await client
+    .from("vehicles")
+    .delete()
+    .eq("id", vehicleId)
+    .eq("company_id", companyId)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+}
+
 /** O trigger ensure_single_default_vehicle (migration Camada 3) já garante no máximo um padrão por empresa. */
 export async function setDefaultVehicle(
   client: SupabaseDbClient,

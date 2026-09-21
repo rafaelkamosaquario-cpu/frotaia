@@ -199,6 +199,7 @@ export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoris
       )}
 
       <FuelFillupFormModal
+        key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")}
         open={formTarget !== undefined}
         onClose={() => setFormTarget(undefined)}
         fillup={formTarget ?? null}

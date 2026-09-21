@@ -255,7 +255,7 @@ export function AgendaClient({ eventosIniciais }: AgendaClientProps) {
         </div>
       )}
 
-      <EventFormModal open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} evento={formTarget ?? null} onSaved={handleSaved} />
+      <EventFormModal key={formTarget === undefined ? "closed" : (formTarget?.id ?? "novo")} open={formTarget !== undefined} onClose={() => setFormTarget(undefined)} evento={formTarget ?? null} onSaved={handleSaved} />
 
       <Dialog
         open={deleteTarget !== null}
