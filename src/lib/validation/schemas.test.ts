@@ -31,6 +31,32 @@ describe("vehicleCreateSchema / vehicleUpdateSchema — campo active (painel V2)
   });
 });
 
+describe("vehicleCreateSchema / vehicleUpdateSchema — placa condicional ao tipo 'outro' (tratores/máquinas agrícolas, 2026-09-21)", () => {
+  it("tipo 'outro' aceita identificador livre curto (ex.: trator sem placa oficial)", () => {
+    const resultado = vehicleCreateSchema.safeParse({ name: "VALTRA BM180", plate: "BM 180", vehicleType: "outro" });
+    expect(resultado.success).toBe(true);
+  });
+
+  it("tipo 'outro' também continua aceitando placa oficial de verdade", () => {
+    expect(vehicleCreateSchema.safeParse({ plate: "ABC1D23", vehicleType: "outro" }).success).toBe(true);
+  });
+
+  it("tipo diferente de 'outro' (ex.: truck) rejeita identificador livre — precisa de placa oficial", () => {
+    const resultado = vehicleCreateSchema.safeParse({ plate: "BM 180", vehicleType: "truck" });
+    expect(resultado.success).toBe(false);
+  });
+
+  it("sem vehicleType informado, continua exigindo placa oficial (comportamento anterior preservado)", () => {
+    expect(vehicleCreateSchema.safeParse({ plate: "BM 180" }).success).toBe(false);
+    expect(vehicleCreateSchema.safeParse({ plate: "ABC1D23" }).success).toBe(true);
+  });
+
+  it("vehicleUpdateSchema aplica a mesma regra condicional (não só na criação)", () => {
+    expect(vehicleUpdateSchema.safeParse({ plate: "JD 6110", vehicleType: "outro" }).success).toBe(true);
+    expect(vehicleUpdateSchema.safeParse({ plate: "JD 6110", vehicleType: "carreta" }).success).toBe(false);
+  });
+});
+
 describe("driverCreateSchema / driverUpdateSchema (painel V2 — Motoristas)", () => {
   it("name é obrigatório na criação (drivers.name é not null no banco), mas opcional na atualização", () => {
     expect(driverCreateSchema.safeParse({}).success).toBe(false);

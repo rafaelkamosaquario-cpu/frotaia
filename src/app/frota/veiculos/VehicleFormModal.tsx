@@ -223,9 +223,12 @@ export function VehicleFormModal({ open, onClose, vehicle, documentos, onSaved }
               id="plate"
               value={form.plate}
               onChange={(e) => updateField("plate", e.target.value)}
-              placeholder="ABC1D23"
+              placeholder={form.vehicleType === "outro" ? "ABC1D23 ou BM 180" : "ABC1D23"}
               required
             />
+            {form.vehicleType === "outro" && (
+              <p className="mt-1 text-xs text-muted-foreground">Sem placa oficial (trator/máquina)? Use um identificador curto, ex.: &quot;BM 180&quot;.</p>
+            )}
           </div>
         </div>
 

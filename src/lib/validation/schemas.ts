@@ -14,11 +14,25 @@ export const phoneE164Schema = z
   .string()
   .regex(/^\+[1-9]\d{1,14}$/, "Telefone deve estar em E.164 (ex.: +5511999998888).");
 
+const placaOficialRegex = /^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$/;
+
 export const plateSchema = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$/, "Placa em formato inválido (esperado ABC1234 ou ABC1D23).");
+  .regex(placaOficialRegex, "Placa em formato inválido (esperado ABC1234 ou ABC1D23).");
+
+/**
+ * Regra pedida pelo Rafael (2026-09-21): trator/máquina agrícola cadastrado
+ * como tipo "outro" não tem placa veicular de verdade — antes disso, quem
+ * cadastrava um trator (ex.: Valtra BM180) precisava inventar uma placa
+ * Mercosul/legado falsa só pra passar na validação. Só quando `vehicleType`
+ * é "outro" o campo aceita também um identificador livre curto (sigla do
+ * modelo + potência, ex.: "BM 180") — os demais tipos continuam exigindo
+ * placa oficial. `VehiclePlate.tsx` (exibição) já trata graciosamente
+ * qualquer coisa que não seja Mercosul/legado, sem precisar de mudança lá.
+ */
+const identificadorLivreRegex = /^[A-Z0-9][A-Z0-9\-\s]{1,9}$/;
 
 export const monetarySchema = z.number().finite().nonnegative("Valor monetário não pode ser negativo.");
 
@@ -103,9 +117,10 @@ export const vehicleBodyTypeSchema = z.enum([
   "outro",
 ]);
 
-export const vehicleCreateSchema = z.object({
+const vehicleBaseSchema = z.object({
   name: maxText(120, "Nome do veículo").optional(),
-  plate: plateSchema.optional(),
+  // Validado condicionalmente em validarPlacaConformeTipo abaixo — aqui só normaliza.
+  plate: z.string().trim().toUpperCase().optional(),
   vehicleType: vehicleTypeSchema.optional(),
   bodyType: vehicleBodyTypeSchema.optional(),
   brand: maxText(80, "Marca").optional(),
@@ -123,7 +138,26 @@ export const vehicleCreateSchema = z.object({
   active: z.boolean().optional(),
 });
 
-export const vehicleUpdateSchema = vehicleCreateSchema.partial();
+/** Só o tipo "outro" (tratores/máquinas agrícolas) aceita identificador livre; os demais tipos continuam exigindo placa oficial. */
+function validarPlacaConformeTipo(data: { plate?: string; vehicleType?: string }, ctx: z.RefinementCtx) {
+  if (!data.plate) return;
+  const ehTipoOutro = data.vehicleType === "outro";
+  const placaValida = placaOficialRegex.test(data.plate);
+  const identificadorValido = ehTipoOutro && identificadorLivreRegex.test(data.plate);
+
+  if (!placaValida && !identificadorValido) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["plate"],
+      message: ehTipoOutro
+        ? "Use a placa do veículo (ex.: ABC1234) ou um identificador curto (ex.: BM 180)."
+        : "Placa em formato inválido (esperado ABC1234 ou ABC1D23).",
+    });
+  }
+}
+
+export const vehicleCreateSchema = vehicleBaseSchema.superRefine(validarPlacaConformeTipo);
+export const vehicleUpdateSchema = vehicleBaseSchema.partial().superRefine(validarPlacaConformeTipo);
 
 // ── driver ───────────────────────────────────────────────────────────────
 
