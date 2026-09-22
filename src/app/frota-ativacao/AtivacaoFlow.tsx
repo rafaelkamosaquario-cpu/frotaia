@@ -30,7 +30,6 @@ import { updateCompanyNameAction, finalizarAtivacaoAction } from "./actions";
  * pede login Google nem verifica Calendar.
  */
 
-const VEHICLE_LIMIT = 10;
 
 const ITENS_CHECKLIST: { chave: string; label: string }[] = [
   { chave: "oleo", label: "Óleo" },
@@ -48,6 +47,7 @@ const selectClass = cn(
 );
 
 interface AtivacaoFlowProps {
+  vehicleLimit: number;
   company: CompanyRow;
   veiculosIniciais: VehicleRow[];
   motoristasIniciais: DriverRow[];
@@ -65,7 +65,7 @@ const TITULOS: Record<number, string> = {
   5: "Tudo pronto",
 };
 
-export function AtivacaoFlow({ company, veiculosIniciais, motoristasIniciais, documentos, preferenciasIniciais, calendarConectado }: AtivacaoFlowProps) {
+export function AtivacaoFlow({ company, vehicleLimit, veiculosIniciais, motoristasIniciais, documentos, preferenciasIniciais, calendarConectado }: AtivacaoFlowProps) {
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
 
@@ -187,7 +187,7 @@ export function AtivacaoFlow({ company, veiculosIniciais, motoristasIniciais, do
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Seu plano permite gerenciar até {VEHICLE_LIMIT} veículos. Você já tem {veiculos.length}{" "}
+              Seu plano permite gerenciar até {vehicleLimit} veículos ativos. Você já tem {veiculos.filter(v => v.active).length}{" "}
               cadastrado{veiculos.length === 1 ? "" : "s"}. Adicionar mais veículos agora é opcional
               — você pode terminar só com o primeiro.
             </p>
@@ -209,9 +209,9 @@ export function AtivacaoFlow({ company, veiculosIniciais, motoristasIniciais, do
               variant="outline"
               className="w-full"
               onClick={() => setVehicleModalOpen(true)}
-              disabled={veiculos.length >= VEHICLE_LIMIT}
+              disabled={veiculos.filter(v => v.active).length >= vehicleLimit}
             >
-              {veiculos.length >= VEHICLE_LIMIT ? "Seu plano atual permite até 10 veículos" : "Adicionar veículo"}
+              {veiculos.filter(v => v.active).length >= vehicleLimit ? `Seu plano atual permite até ${vehicleLimit} veículos ativos` : "Adicionar veículo"}
             </Button>
 
             <Button size="lg" className="w-full" onClick={() => setStep(3)}>

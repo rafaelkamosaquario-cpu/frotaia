@@ -38,6 +38,12 @@ function fakeSubscription(overrides: Partial<SubscriptionRow> = {}): Subscriptio
 }
 
 describe("getVehicleLimitForCompany", () => {
+  it("returns the Essencial limit of 3 used by the activation wizard", async () => {
+    getCompany.mockResolvedValue(fakeCompany());
+    getSubscription.mockResolvedValue(fakeSubscription({ plan: "ESSENCIAL_MENSAL", fleet_panel_included: true }));
+    const { getVehicleLimitForCompany } = await import("./vehicleLimit");
+    expect(await getVehicleLimitForCompany({} as never, "company-1")).toBe(3);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     getCompany.mockResolvedValue(fakeCompany());

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { InvalidCompanyReference } from "@/services/supabase/companyReferences";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
@@ -37,6 +38,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sem acesso ao painel de gestão de frota." }, { status: statusForAccessReason(access.reason) });
   }
 
+  if (!["owner", "admin", "operator"].includes(access.role)) {
+    return NextResponse.json({ error: "Sem permissão para alterar lançamentos financeiros." }, { status: 403 });
+  }
   const body = await request.json();
 
   try {
@@ -54,6 +58,9 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ despesa }, { status: 201 });
   } catch (error) {
+    if (error instanceof InvalidCompanyReference) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Dados inválidos.", detalhes: error.issues }, { status: 400 });
     }

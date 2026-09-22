@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+// Link authorization is independently exercised in companyReferences.test.ts.
+vi.mock("./companyReferences", () => ({ assertCompanyReferences: vi.fn(async () => {}) }));
 import { syncMaintenanceExpense, syncFuelExpense } from "./expenseService";
 
 /**

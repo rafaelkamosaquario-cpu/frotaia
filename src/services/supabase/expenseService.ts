@@ -1,5 +1,7 @@
 import type { ExpenseRow, ExpenseTypeEnum } from "@/lib/supabase/tables";
 import type { SupabaseDbClient } from "./types";
+import { readAllPages } from "./readAllPages";
+import { assertCompanyReferences } from "./companyReferences";
 
 export interface RecordExpenseInput {
   companyId: string;
@@ -20,6 +22,8 @@ export interface RecordExpenseInput {
 }
 
 export async function recordExpense(client: SupabaseDbClient, input: RecordExpenseInput): Promise<ExpenseRow> {
+  await assertCompanyReferences(client, input.companyId, { vehicles: input.vehicleId, conversations: input.conversationId,
+    maintenance_schedules: input.maintenanceScheduleId, fuel_fillups: input.fuelFillupId });
   const { data, error } = await client
     .from("expenses")
     .insert({
@@ -137,6 +141,9 @@ export async function syncFuelExpense(client: SupabaseDbClient, input: SyncFuelE
 }
 
 export interface ListExpensesFilter {
+  /** Internal reporting option; paginates the whole selected period. */
+  all?: boolean;
+  offset?: number;
   companyId: string;
   vehicleId?: string;
   expenseType?: ExpenseTypeEnum;
@@ -146,19 +153,20 @@ export interface ListExpensesFilter {
 }
 
 export async function listExpenses(client: SupabaseDbClient, filter: ListExpensesFilter): Promise<ExpenseRow[]> {
+  if (filter.all) return readAllPages((offset, size) => listExpenses(client, { ...filter, all: false, offset, limit: size }));
   let query = client
     .from("expenses")
     .select("*")
     .eq("company_id", filter.companyId)
     .order("expense_date", { ascending: false })
-    .limit(filter.limit ?? 50);
+    .order("id", { ascending: false });
 
   if (filter.vehicleId) query = query.eq("vehicle_id", filter.vehicleId);
   if (filter.expenseType) query = query.eq("expense_type", filter.expenseType);
   if (filter.dateFrom) query = query.gte("expense_date", filter.dateFrom);
   if (filter.dateTo) query = query.lte("expense_date", filter.dateTo);
 
-  const { data, error } = await query;
+  const { data, error } = await query.range(filter.offset ?? 0, (filter.offset ?? 0) + (filter.limit ?? 50) - 1);
   if (error) throw error;
   return data ?? [];
 }
@@ -174,6 +182,7 @@ export interface UpdateExpenseInput {
 
 /** companyId é filtro obrigatório (não só id) — mesmo princípio de updateMaintenanceSchedule/updateDriver. */
 export async function updateExpense(client: SupabaseDbClient, expenseId: string, companyId: string, input: UpdateExpenseInput): Promise<ExpenseRow> {
+  await assertCompanyReferences(client, companyId, { vehicles: input.vehicleId });
   const { data, error } = await client
     .from("expenses")
     .update({

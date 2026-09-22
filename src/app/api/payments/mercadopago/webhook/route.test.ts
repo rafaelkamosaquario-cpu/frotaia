@@ -89,10 +89,56 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     sendWhatsappText.mockResolvedValue(undefined);
   });
 
+  it("ignores cancellation from a replaced recurring plan", async () => {
+    buscarAssinatura.mockResolvedValue({ status: "cancelled", externalReference: "empresa-1|MENSAL" });
+    getSubscription.mockResolvedValue({ status: "ATIVA", plan: "PRO_ANUAL_PIX", mercadopago_subscription_id: "new-subscription" });
+    const resposta = await chamarWebhook({ type: "preapproval", dataId: "old-subscription" })();
+    expect(resposta.status).toBe(200);
+    expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
+  });
+
   it("503 quando o Mercado Pago não está configurado", async () => {
     isMercadoPagoConfigured.mockReturnValue(false);
     const resposta = await chamarWebhook({})();
     expect(resposta.status).toBe(503);
+  });
+
+  it("failed activation is retryable and never writes a completion marker", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
+    atualizarAssinaturaPorPagamento.mockRejectedValueOnce(new Error("temporary database failure"));
+    const call = chamarWebhook({ dataId: "retry", type: "payment", body: {} });
+    expect((await call()).status).toBe(503);
+    expect(registrarEventoPagamento.mock.calls.some(([, event]) => event.eventType === "processing_completed_v2")).toBe(false);
+    expect((await call()).status).toBe(200);
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledTimes(2);
+    expect(registrarEventoPagamento).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ eventType: "processing_completed_v2" }));
+  });
+
+  it("retry after successful activation preserves the annual expiration", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
+    getSubscription.mockResolvedValue({ mercadopago_payment_id: "same", valido_ate: "2027-09-20T10:00:00.000Z" });
+    await chamarWebhook({ dataId: "same", type: "payment", body: {} })();
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ validoAte: "2027-09-20T10:00:00.000Z" }));
+  });
+
+  for (const status of ["refunded", "charged_back"]) {
+    it(`${status}: revokes only the matching annual payment`, async () => {
+      buscarPagamento.mockResolvedValue({ status, externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
+      getSubscription.mockResolvedValue({ mercadopago_payment_id: "annual", plan: "PRO_ANUAL_PIX" });
+      await chamarWebhook({ dataId: "annual", type: "payment", body: {} })();
+      expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fleetPanelIncluded: false, status: status === "refunded" ? "CANCELADA" : "INADIMPLENTE" }));
+      atualizarAssinaturaPorPagamento.mockClear();
+      getSubscription.mockResolvedValue({ mercadopago_payment_id: "new-payment", plan: "PRO_ANUAL_PIX" });
+      await chamarWebhook({ dataId: "annual", type: "payment", body: {} })();
+      expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
+    });
+  }
+
+  it("does not reset registration in progress after payment", async () => {
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_vehicle_plate" });
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_ANUAL_PIX", valorCentavos: 249900 });
+    await chamarWebhook({ dataId: "keep-registration", type: "payment", body: {} })();
+    expect(updateOnboardingSession).not.toHaveBeenCalled();
   });
 
   it("503 quando MERCADOPAGO_WEBHOOK_SECRET não está configurado", async () => {
@@ -225,10 +271,10 @@ describe("POST /api/payments/mercadopago/webhook", () => {
     expect(buscarAssinatura).not.toHaveBeenCalled();
   });
 
-  it("erro ao consultar a API do Mercado Pago não derruba a rota (responde 200 mesmo assim)", async () => {
+  it("erro temporário devolve 503 para permitir reentrega", async () => {
     buscarPagamento.mockRejectedValue(new Error("Mercado Pago fora do ar"));
     const resposta = await chamarWebhook({ dataId: "pay-4", type: "payment", body: { type: "payment", data: { id: "pay-4" } } })();
-    expect(resposta.status).toBe(200);
+    expect(resposta.status).toBe(503);
   });
 });
 

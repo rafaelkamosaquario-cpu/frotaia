@@ -6,6 +6,7 @@ import { loadCustomerContext, loadVehicleContext } from "@/ai/context/customerCo
 import { getConversationById, getOrCreateOpenConversation } from "@/services/supabase/conversationService";
 import { gerarRespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
 import { captureError } from "@/lib/observability/logger";
+import { getSubscription, isFleetPanelAccessAllowed } from "@/services/supabase/subscriptionService";
 
 const ROTA = "/api/chat";
 
@@ -49,13 +50,21 @@ export async function POST(request: Request) {
   }
 
   const companyId = customerContext.company.id;
+  // Preserve explicit administrative grants and the internal admin test chat.
+  // A browser session alone does not grant access to the paid AI endpoint.
+  if (!customerContext.profile?.is_admin && !customerContext.company.fleet_panel_enabled) {
+    const subscription = await getSubscription(supabase, companyId);
+    if (!isFleetPanelAccessAllowed(subscription)) {
+      return NextResponse.json({ error: "Seu plano não libera o chat do painel ou está vencido." }, { status: 403 });
+    }
+  }
   const vehicleContext = await loadVehicleContext(supabase, companyId);
 
   const conversation = body.conversationId
     ? await getConversationById(supabase, body.conversationId)
     : await getOrCreateOpenConversation(supabase, companyId, userId);
 
-  if (!conversation || conversation.user_id !== userId) {
+  if (!conversation || conversation.user_id !== userId || conversation.company_id !== companyId) {
     return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
   }
 

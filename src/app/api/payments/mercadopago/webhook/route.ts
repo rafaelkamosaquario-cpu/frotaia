@@ -37,7 +37,8 @@ async function dispararOnboardingPosPagamento(admin: SupabaseDbClient, companyId
     if (!canal || !canal.phone_e164) return;
 
     const session = await getOnboardingSession(admin, canal.user_id);
-    if (session?.state === "completed") return;
+    // Never reset a customer's registration already in progress.
+    if (session && !["awaiting_demo_input", "awaiting_demo_choice", "awaiting_payment", "awaiting_plan_choice"].includes(session.state)) return;
 
     await updateOnboardingSession(admin, canal.user_id, { state: "awaiting_name" });
     await sendWhatsappText(canal.phone_e164, "Pagamento confirmado! 🎉\n\nAgora vamos configurar sua operação — são só algumas perguntas rápidas.");
@@ -100,8 +101,8 @@ async function cancelarAssinaturaAnteriorSeTrocouDePlano(
  *
  * Responde 200 mesmo quando não há nada a processar (tipo desconhecido,
  * pagamento não aprovado) — o Mercado Pago espera 200/201 em até 22s pra
- * não reenviar a notificação; um 4xx/5xx só é usado quando a notificação em
- * si é inválida (assinatura errada) ou o servidor não está configurado.
+ * não reenviar a notificação. Falhas temporárias retornam 503 para permitir
+ * nova tentativa; assinatura inválida retorna 401.
  */
 
 const TIPOS_ASSINATURA = new Set(["preapproval", "subscription_preapproval"]);
@@ -179,6 +180,14 @@ export async function POST(request: Request) {
         const assinaturaAnterior = await getSubscription(admin, referencia.companyId);
         const preapprovalAnterior = assinaturaAnterior?.mercadopago_subscription_id;
 
+        // Do not let a delayed approval of an older purchase replace a newer plan.
+        if (pagamento.approvedAt && assinaturaAnterior?.iniciado_em
+          && assinaturaAnterior.status === "ATIVA"
+          && assinaturaAnterior.mercadopago_payment_id !== resourceId
+          && new Date(pagamento.approvedAt).getTime() < new Date(assinaturaAnterior.iniciado_em).getTime()) {
+          return NextResponse.json({ ok: true });
+        }
+
         await atualizarAssinaturaPorPagamento(admin, {
           companyId: referencia.companyId,
           plan: referencia.plano,
@@ -186,13 +195,32 @@ export async function POST(request: Request) {
           fleetPanelIncluded: CATALOGO_OFERTAS[referencia.plano].painel,
           valorCentavos: pagamento.valorCentavos,
           mercadopagoPaymentId: resourceId,
-          validoAte: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+          // A retry must not extend an already-applied annual term.
+          validoAte: assinaturaAnterior?.mercadopago_payment_id === resourceId && assinaturaAnterior.valido_ate
+            ? assinaturaAnterior.valido_ate
+            : new Date((pagamento.approvedAt ? new Date(pagamento.approvedAt).getTime() : Date.now()) + 365 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
         // Só depois da nova assinatura já confirmada ATIVA no banco.
         await cancelarAssinaturaAnteriorSeTrocouDePlano(admin, referencia.companyId, preapprovalAnterior, resourceId);
         await dispararOnboardingPosPagamento(admin, referencia.companyId);
       }
+      if (referencia && !jaProcessado && ["refunded", "charged_back"].includes(pagamento.status)
+        && CATALOGO_OFERTAS[referencia.plano].cobranca === "unica") {
+        const current = await getSubscription(admin, referencia.companyId);
+        // An old payment reversal must never revoke a newer contracted plan.
+        if (current?.mercadopago_payment_id === resourceId && current.plan === referencia.plano) {
+          await atualizarAssinaturaPorPagamento(admin, {
+            companyId: referencia.companyId, plan: referencia.plano,
+            status: pagamento.status === "refunded" ? "CANCELADA" : "INADIMPLENTE",
+            fleetPanelIncluded: false, mercadopagoPaymentId: resourceId,
+          });
+        }
+      }
+      if (!jaProcessado) await registrarEventoPagamento(admin, {
+        companyId: referencia?.companyId, eventType: "processing_completed_v2",
+        mercadopagoPaymentId: resourceId, statusRecebido: pagamento.status,
+      });
     } else if (TIPOS_ASSINATURA.has(tipo)) {
       const assinatura = await buscarAssinatura(resourceId);
       const referencia = assinatura.externalReference ? decodificarReferenciaExterna(assinatura.externalReference) : null;
@@ -215,8 +243,14 @@ export async function POST(request: Request) {
         // Captura o preapproval ANTERIOR antes de sobrescrever — só assim
         // dá pra saber depois se existia uma assinatura recorrente diferente
         // desta (troca de plano real) que precisa ser cancelada no MP.
-        const assinaturaAnterior = statusMapeado === "ATIVA" ? await getSubscription(admin, referencia.companyId) : null;
+        const assinaturaAnterior = await getSubscription(admin, referencia.companyId);
         const preapprovalAnterior = assinaturaAnterior?.mercadopago_subscription_id;
+
+        // A cancellation from a replaced recurring plan must not revoke the new plan.
+        if (statusMapeado !== "ATIVA" && assinaturaAnterior
+          && (preapprovalAnterior !== resourceId || assinaturaAnterior.plan !== referencia.plano)) {
+          return NextResponse.json({ ok: true });
+        }
 
         await atualizarAssinaturaPorPagamento(admin, {
           companyId: referencia.companyId,
@@ -241,13 +275,16 @@ export async function POST(request: Request) {
           await dispararOnboardingPosPagamento(admin, referencia.companyId);
         }
       }
+      if (!jaProcessado) await registrarEventoPagamento(admin, {
+        companyId: referencia?.companyId, eventType: "processing_completed_v2",
+        mercadopagoPaymentId: resourceId, statusRecebido: assinatura.status,
+      });
     }
   } catch (erro) {
     // Nunca passa `body` (payload bruto do MP, pode conter dado de pagador) pro tracker — só IDs técnicos e a mensagem do erro (buscarPagamento/buscarAssinatura já nunca incluem o corpo da resposta na mensagem, ver parseErrorSafely em client.ts).
     captureError({ event: "mercadopago_webhook_falhou", route: ROTA, resource_id: resourceId, tipo, error: erro });
-    // Responde 200 mesmo assim: erro nosso (ex.: Supabase fora do ar) não deve fazer o
-    // Mercado Pago reenviar em loop indefinido — o registro em payment_events (se chegou
-    // a acontecer) e o evento acima já dão o que precisa pra investigar depois.
+    // Keep failed deliveries retryable; receipt logs are not completion markers.
+    return NextResponse.json({ error: "Processamento temporariamente indisponível." }, { status: 503 });
   }
 
   return NextResponse.json({ ok: true });

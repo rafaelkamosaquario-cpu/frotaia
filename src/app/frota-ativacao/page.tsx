@@ -7,6 +7,7 @@ import { listDriversForPanel } from "@/services/supabase/driverService";
 import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
 import { getOrCreatePreferences } from "@/services/supabase/companyPreferencesService";
 import { AtivacaoFlow } from "./AtivacaoFlow";
+import { getVehicleLimitForCompany } from "@/lib/frota/vehicleLimit";
 
 /**
  * Onboarding 2 — ativação do Painel de Gestão (Frota IA Gestão, 08/2026).
@@ -38,17 +39,19 @@ export default async function FrotaAtivacaoPage() {
   // Já concluiu antes — nunca mostra o wizard de novo, vai direto pro painel.
   if (access.company.fleet_onboarding_completed_at) redirect("/frota/dashboard");
 
-  const [veiculos, motoristas, documentos, preferencias, calendarStatus] = await Promise.all([
+  const [veiculos, motoristas, documentos, preferencias, calendarStatus, vehicleLimit] = await Promise.all([
     listVehiclesForPanel(supabase, access.company.id),
     listDriversForPanel(supabase, access.company.id),
     listVehicleDocumentsForPanel(supabase, access.company.id),
     getOrCreatePreferences(supabase, access.company.id),
     checkCalendarConnection(access.company.id).catch(() => ({ connected: false })),
+    getVehicleLimitForCompany(supabase, access.company.id),
   ]);
 
   return (
     <AtivacaoFlow
       company={access.company}
+      vehicleLimit={vehicleLimit}
       veiculosIniciais={veiculos}
       motoristasIniciais={motoristas}
       documentos={documentos}

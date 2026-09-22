@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { InvalidCompanyReference } from "@/services/supabase/companyReferences";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
@@ -18,6 +19,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ error: "Sem acesso ao painel de gestão de frota." }, { status: statusForAccessReason(access.reason) });
   }
 
+  if (!["owner", "admin", "operator"].includes(access.role)) {
+    return NextResponse.json({ error: "Sem permissão para alterar lançamentos financeiros." }, { status: 403 });
+  }
   const body = await request.json();
 
   try {
@@ -25,6 +29,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const receita = await updateRevenue(createAdminClient(), id, access.company.id, parsed);
     return NextResponse.json({ receita });
   } catch (error) {
+    if (error instanceof InvalidCompanyReference) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Dados inválidos.", detalhes: error.issues }, { status: 400 });
     }
@@ -43,6 +50,9 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     return NextResponse.json({ error: "Sem acesso ao painel de gestão de frota." }, { status: statusForAccessReason(access.reason) });
   }
 
+  if (!["owner", "admin"].includes(access.role)) {
+    return NextResponse.json({ error: "Somente proprietário ou administrador pode excluir lançamentos." }, { status: 403 });
+  }
   await deleteRevenue(createAdminClient(), id, access.company.id);
   return NextResponse.json({ ok: true });
 }

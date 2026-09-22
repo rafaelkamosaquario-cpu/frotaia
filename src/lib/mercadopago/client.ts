@@ -158,6 +158,7 @@ export interface PagamentoConsultado {
   status: string;
   externalReference: string | null;
   valorCentavos: number;
+  approvedAt?: string | null;
 }
 
 /** Sempre reconsultado na API antes de confiar em qualquer notificação de webhook — nunca confia só no payload recebido. */
@@ -166,8 +167,8 @@ export async function buscarPagamento(paymentId: string): Promise<PagamentoConsu
     headers: authHeaders(),
   });
   if (!response.ok) return parseErrorSafely(response);
-  const body = (await response.json()) as { status: string; external_reference: string | null; transaction_amount: number };
-  return { status: body.status, externalReference: body.external_reference, valorCentavos: Math.round(body.transaction_amount * 100) };
+  const body = (await response.json()) as { status: string; external_reference: string | null; transaction_amount: number; date_approved?: string | null };
+  return { status: body.status, externalReference: body.external_reference, valorCentavos: Math.round(body.transaction_amount * 100), approvedAt: body.date_approved };
 }
 
 export interface AssinaturaConsultada {

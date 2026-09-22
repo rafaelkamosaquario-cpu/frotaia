@@ -1,4 +1,5 @@
 import "server-only";
+import { canExecuteFinancialTool } from "./financialAuthorization";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicClient, CLAUDE_MODEL } from "@/lib/anthropic/client";
 import {
@@ -213,6 +214,11 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
       }
 
       const inputDoModelo = (bloco.input ?? {}) as Record<string, unknown>;
+      if (!canExecuteFinancialTool(bloco.name, inputDoModelo.modo, customerContext.role)) {
+        resultadosFerramentas.push({ type: "tool_result", tool_use_id: bloco.id,
+          content: "Seu perfil não tem permissão para esta operação financeira.", is_error: true });
+        continue;
+      }
       for (const campo of CAMPOS_DE_CONTEXTO_RESERVADOS) delete inputDoModelo[campo];
 
       const entradaFinal = {

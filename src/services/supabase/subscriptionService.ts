@@ -202,6 +202,7 @@ export async function eventoPagamentoJaProcessado(
     .select("id")
     .eq("mercadopago_payment_id", mercadopagoPaymentId)
     .eq("status_recebido", statusRecebido)
+    .eq("event_type", "processing_completed_v2")
     .limit(1)
     .maybeSingle();
   if (error) throw error;
@@ -216,7 +217,7 @@ export interface RegistrarEventoPagamentoInput {
   payloadJson?: unknown;
 }
 
-/** Log bruto — nunca lança nem bloqueia o fluxo do webhook se falhar em gravar (best-effort, ver uso na Fase 2). */
+/** Persiste o evento; falhas são propagadas para permitir nova tentativa do webhook. */
 export async function registrarEventoPagamento(client: SupabaseDbClient, input: RegistrarEventoPagamentoInput): Promise<void> {
   const { error } = await client.from("payment_events").insert({
     company_id: input.companyId,

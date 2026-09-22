@@ -40,7 +40,7 @@ O Painel de Gestão (`/frota/*`) é um **add-on separado do WhatsApp**, não um 
 
 ### Operação
 
-**Veículos** (`/frota/veiculos`) — cadastro completo (nunca exclusão física, só desativação), com seguro/licenciamento vinculados. É aqui que o limite do plano (1/3/10) é aplicado na prática — tentar ativar acima do limite é bloqueado.
+**Veículos** (`/frota/veiculos`) — cadastro com desativação e, para owner/admin, exclusão definitiva com confirmação e aviso dos efeitos nos vínculos. Seguro/licenciamento são vinculados. O limite de veículos ativos por plano (1/3/10) é aplicado no servidor e no banco; o wizard utiliza a mesma regra desde a correção de 22/09/2026. Esta atualização não executa exclusões de dados existentes.
 
 **Motoristas** (`/frota/motoristas`) — cadastro completo, com vencimento de CNH e exame toxicológico visíveis na lista.
 
@@ -92,10 +92,10 @@ O Painel de Gestão (`/frota/*`) é um **add-on separado do WhatsApp**, não um 
 
 | Como o dado nasce | Telas |
 |---|---|
-| Só pelo WhatsApp (somente leitura no painel) | Fretes/Análises, Jornadas |
+| Criados pelo assistente compartilhado; sem formulário de criação nessas telas | Fretes/Análises, Jornadas |
 | Nasce nos dois canais (CRUD completo no painel e no WhatsApp) | Veículos, Motoristas, Manutenção, Documentos, Despesas, Rotas salvas, Postos e fornecedores, Abastecimentos, Pneus, Receitas, Alertas (parcial), Oportunidades |
 | Fonte externa, nunca duplicada no banco | Agenda (Google Calendar) |
-| Configuração/preferência, sem equivalente no WhatsApp | Empresa, Configurações, Notícias (o toggle) |
+| Configuração/preferência no painel, com operações também disponíveis no assistente | Empresa, Configurações, Notícias (o toggle) |
 | Só agrega o que já existe, sem dado próprio | Dashboard, Checklists, Relatórios, Documentos gerados |
 
 ## Achado e corrigido em 13/09/2026
