@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { generateCost, listCosts, saveCostRule } from "@/services/supabase/costService";
 import { monthSchema } from "@/lib/frota/costs";
+import { readCostEntry, registerCostAdvance } from "@/services/supabase/costAdvanceService";
 
 async function access() {
   const result = await loadFleetPanelAccess(await createClient());
@@ -32,6 +33,7 @@ const command = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rule"), id: z.uuid().optional(), definition: z.unknown() }).strict(),
   z.object({ action: z.literal("archive"), id: z.uuid(), active: z.boolean() }).strict(),
   z.object({ action: z.literal("generate"), input: z.unknown() }).strict(),
+  z.object({ action: z.literal("advance"), input: z.unknown() }).strict(),
   z.object({ action: z.literal("confirm"), id: z.uuid() }).strict(),
   z.object({ action: z.literal("paid"), id: z.uuid(), date: z.iso.date() }).strict(),
   z.object({ action: z.literal("discard"), id: z.uuid() }).strict(),
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
     const input = command.parse(await request.json()); const db = createAdminClient();
     if (input.action === "rule") return Response.json(await saveCostRule(db, companyId, input.definition, input.id));
     if (input.action === "generate") return Response.json(await generateCost(db, companyId, input.input));
+    if (input.action === "advance") return Response.json(await registerCostAdvance(db, companyId, auth.result!.userId, input.input));
     if (input.action === "operation") {
       const { data, error } = await db.from("cost_operations").insert({ company_id: companyId, name: input.name }).select("*").single();
       if (error) throw error; return Response.json(data);
@@ -58,11 +61,15 @@ export async function POST(request: Request) {
     if (input.action === "paid") {
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
       if (input.date > today) throw new Error("Não marque como pago em uma data futura.");
-      const { data, error } = await db.from("cost_entries").update({ paid_on: input.date }).eq("id", input.id).eq("company_id", companyId).not("expense_id", "is", null).is("paid_on", null).select("id").single();
+      const entry = await readCostEntry(db, companyId, input.id);
+      if ((entry.snapshot.advances ?? []).some(a => a.date > input.date)) throw new Error("A quitação não pode ser anterior ao último vale.");
+      const { data, error } = await db.from("cost_entries").update({ paid_on: input.date }).eq("id", input.id).eq("company_id", companyId).filter("snapshot", "eq", JSON.stringify(entry.snapshot)).not("expense_id", "is", null).is("paid_on", null).select("id").single();
       if (error) throw error; return Response.json(data);
     }
     // Only unconfirmed drafts can be discarded. Confirmed financial history is retained.
-    const { data, error } = await db.from("cost_entries").delete().eq("id", input.id).eq("company_id", companyId).is("expense_id", null).select("id").single();
+    const entry = await readCostEntry(db, companyId, input.id);
+    if (entry.snapshot.advances?.length) throw new Error("Este lançamento possui vales registrados e não pode ser descartado.");
+    const { data, error } = await db.from("cost_entries").delete().eq("id", input.id).eq("company_id", companyId).filter("snapshot", "eq", JSON.stringify(entry.snapshot)).is("expense_id", null).select("id").single();
     if (error) throw error; return Response.json(data);
   } catch (error) { return failure(error); }
 }

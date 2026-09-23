@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const m = vi.hoisted(() => ({ access:vi.fn(), list:vi.fn(), save:vi.fn(), generate:vi.fn(), rpc:vi.fn(), from:vi.fn() }));
+const m = vi.hoisted(() => ({ access:vi.fn(), list:vi.fn(), save:vi.fn(), generate:vi.fn(), rpc:vi.fn(), from:vi.fn(), advance:vi.fn(), readEntry:vi.fn() }));
 vi.mock("@/lib/supabase/server",()=>({createClient:vi.fn().mockResolvedValue({})}));
 vi.mock("@/lib/supabase/admin",()=>({createAdminClient:()=>({rpc:m.rpc,from:m.from})}));
 vi.mock("@/services/supabase/fleetPanelAccess",()=>({loadFleetPanelAccess:m.access}));
 vi.mock("@/services/supabase/costService",()=>({listCosts:m.list,saveCostRule:m.save,generateCost:m.generate}));
+vi.mock("@/services/supabase/costAdvanceService",()=>({registerCostAdvance:m.advance,readCostEntry:m.readEntry}));
 import { GET, POST } from "./route";
 const id = "00000000-0000-4000-8000-000000000001";
 const post = (body:unknown)=>POST(new Request("https://test/api/frota/custos",{method:"POST",body:JSON.stringify(body)}));
@@ -17,4 +18,8 @@ describe("costs endpoint security",()=>{
  it("reports missing migration without pretending saved",async()=>{m.list.mockRejectedValueOnce({code:"42P01"});expect((await GET(new Request("https://test/api/frota/custos?month=2026-09"))).status).toBe(503);});
  it("returns conflict for duplicate month",async()=>{m.generate.mockRejectedValueOnce({code:"23505"});expect((await post({action:"generate",input:{}})).status).toBe(409);});
  it("reads only company and selected month",async()=>{m.list.mockResolvedValue({operations:[],rules:[],entries:[]});expect((await GET(new Request("https://test/api/frota/custos?month=2026-09"))).status).toBe(200);expect(m.list).toHaveBeenCalledWith(expect.anything(),"trusted-company","2026-09");});
+ it("routes advances with trusted company/user only",async()=>{m.advance.mockResolvedValue({id});expect((await post({action:"advance",input:{id}})).status).toBe(200);expect(m.advance).toHaveBeenCalledWith(expect.anything(),"trusted-company","trusted-user",{id});});
+ it.each(["viewer","driver"])("denies advances to %s",async role=>{m.access.mockResolvedValue({ok:true,role,company:{id:"c"}});expect((await post({action:"advance",input:{}})).status).toBe(403);expect(m.advance).not.toHaveBeenCalled();});
+ it("protects drafts with recorded advances",async()=>{m.readEntry.mockResolvedValue({snapshot:{advances:[{amount:100}]}});expect((await post({action:"discard",id})).status).toBe(400);expect(m.from).not.toHaveBeenCalled();});
+ it("rejects settlement before advance date",async()=>{m.readEntry.mockResolvedValue({snapshot:{advances:[{date:"2026-09-20"}]}});expect((await post({action:"paid",id,date:"2026-09-19"})).status).toBe(400);expect(m.from).not.toHaveBeenCalled();});
 });

@@ -60,4 +60,10 @@ export function calculateCost(rule: CostRule, month: string, base: number) {
 
 export interface CostOperation { id: string; company_id: string; name: string; created_at: string }
 export interface CostRuleRow { id: string; company_id: string; definition: CostRule; active: boolean; created_at: string }
-export interface CostEntry { id: string; company_id: string; rule_id: string; month: string; snapshot: CostRule & { base: number; note: string; calculation: ReturnType<typeof calculateCost>; operationNames: Record<string,string> }; amount: number; due_date: string; expense_id: string | null; paid_on: string | null; created_at: string }
+export const advanceSchema = z.object({ id: z.uuid(), entryId: z.uuid(), amount: money.refine(v => v > 0, "Informe um valor maior que zero."), date: z.iso.date(), note: z.string().trim().max(500).default("") }).strict();
+export type CostAdvance = Omit<z.infer<typeof advanceSchema>, "entryId"> & { recordedAt: string; recordedBy: string };
+export interface CostEntry { id: string; company_id: string; rule_id: string; month: string; snapshot: CostRule & { base: number; note: string; calculation: ReturnType<typeof calculateCost>; operationNames: Record<string,string>; advances?: CostAdvance[] }; amount: number; due_date: string; expense_id: string | null; paid_on: string | null; created_at: string }
+export function advanceBalance(entry: Pick<CostEntry, "amount" | "snapshot" | "paid_on">) {
+  const cents = (entry.snapshot.advances ?? []).reduce((sum, a) => sum + Math.round(a.amount * 100), 0);
+  return { advanced: cents / 100, remaining: entry.paid_on ? 0 : Math.max(0, Math.round(entry.amount * 100) - cents) / 100 };
+}
