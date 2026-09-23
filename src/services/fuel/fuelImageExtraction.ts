@@ -1,10 +1,15 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicClient, CLAUDE_MODEL } from "@/lib/anthropic/client";
-import { fuelEvidenceSchema } from "@/lib/frota/fuelGroup";
+import { emptyFuelEvidence, fuelEvidenceSchema } from "@/lib/frota/fuelGroup";
 import { baixarMidia, paraBase64 } from "@/lib/whatsapp/mediaDownloader";
 
 export async function extractFuelEvidence(text: string, image?: { imageUrl?: string; mimeType?: string }) {
+  // Explicit, unambiguous liters-only corrections do not require model inference.
+  const litersOnly = text.trim().match(/^(\d+(?:[.,]\d{1,3})?)\s*(?:litros?|l)$/i);
+  if (!image?.imageUrl && litersOnly) {
+    return fuelEvidenceSchema.parse({ ...emptyFuelEvidence, liters: Number(litersOnly[1].replace(",", ".")) });
+  }
   const content: Anthropic.ContentBlockParam[] = [{ type: "text", text: text.slice(0, 4000) || "Leia apenas os dados claramente visíveis na imagem." }];
   if (image?.imageUrl) {
     // Only the already trusted provider media domains can be fetched; no redirects/private URLs.
@@ -27,5 +32,6 @@ export async function extractFuelEvidence(text: string, image?: { imageUrl?: str
     messages: [{ role: "user", content }],
   });
   const value = reply.content.filter((c): c is Anthropic.TextBlock => c.type === "text").map(c => c.text).join("").trim();
-  return fuelEvidenceSchema.parse(JSON.parse(value));
+  const json = value.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, "$1").trim();
+  return fuelEvidenceSchema.parse(JSON.parse(json));
 }

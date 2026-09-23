@@ -54,7 +54,16 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   let evidence = emptyFuelEvidence;
   if (!reset && !summary) {
     try { evidence = await extractFuelEvidence(text, input.image); }
-    catch { await reply("Não consegui identificar os dados com segurança. Informe placa/equipamento, quilometragem total ou horímetro, litros, condutor e data por texto. Não informe preços no grupo."); return true; }
+    catch (error) {
+      // Never log provider messages, image URLs, credentials or customer content.
+      const status = typeof error === "object" && error !== null && "status" in error && typeof error.status === "number" ? error.status : null;
+      const category = error instanceof SyntaxError ? "invalid_json" : error instanceof z.ZodError ? "invalid_evidence" : status !== null ? "provider_error" : "extraction_error";
+      console.warn("[fuel-group] extraction_failed", { category, status, image: Boolean(input.image?.imageUrl) });
+      await reply(status !== null
+        ? "O serviço de leitura está indisponível neste momento. Não registrei este envio. Tente novamente mais tarde; não informe preços no grupo."
+        : "Não consegui identificar os dados com segurança. Informe placa/equipamento, quilometragem total ou horímetro, litros, condutor e data por texto. Não informe preços no grupo.");
+      return true;
+    }
   }
   const result = await client.rpc("fuel_group_step", { ...args, p_action: reset ? "reset" : "merge", p_patch: evidence });
   if (result.error) throw result.error;
