@@ -14,6 +14,7 @@ export interface GroupFuelInput {
   phone?: string; participantPhone?: string; messageId?: string; text?: { message?: string };
   image?: { imageUrl?: string; mimeType?: string; caption?: string };
   buttonsResponseMessage?: { buttonId?: string; message?: string };
+  listResponseMessage?: { selectedRowId?: string; title?: string; message?: string };
 }
 
 /** Configured groups are always consumed; never leak into another workflow. */
@@ -24,10 +25,10 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const config = configs.find(c => c.groupId === input.phone);
   if (!config) return false;
   const sender = normalizePhoneDigits(input.participantPhone ?? "");
-  const button = input.buttonsResponseMessage?.buttonId?.trim() || null;
-  const buttonText = input.buttonsResponseMessage?.message?.trim() || "";
+  const button = input.buttonsResponseMessage?.buttonId?.trim() || input.listResponseMessage?.selectedRowId?.trim() || null;
+  const buttonText = input.buttonsResponseMessage?.message?.trim() || input.listResponseMessage?.title?.trim() || "";
   // Shape-only diagnostics: never log phones, names, tokens or media URLs.
-  console.info("[fuel-group] received", { allowedSender: config.senders.includes(sender), hasMessageId: Boolean(input.messageId), button: Boolean(button), buttonText: Boolean(buttonText), text: Boolean(input.text?.message), image: Boolean(input.image?.imageUrl) });
+  console.info("[fuel-group] received " + JSON.stringify({ allowedSender: config.senders.includes(sender), hasMessageId: Boolean(input.messageId), button: Boolean(button), buttonText: Boolean(buttonText), text: Boolean(input.text?.message), image: Boolean(input.image?.imageUrl), fields: Object.keys(input).filter(k => /^[a-zA-Z]{1,40}$/.test(k)).slice(0, 50) }));
   if (!config.senders.includes(sender) || !input.messageId || (!input.text?.message && !input.image?.imageUrl && !button && !buttonText)) return true;
   const member = await client.from("company_members").select("role").eq("company_id", config.companyId).eq("user_id", config.operatorId).eq("status", "active").maybeSingle();
   if (member.error) throw member.error;
@@ -55,9 +56,9 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const namedDrivers = !field && !token ? drivers.filter(d => d.name.trim().toLocaleLowerCase("pt-BR") === text.replace(/^MOTORISTA\s+/i, "").trim().toLocaleLowerCase("pt-BR")) : [];
   const moreByText = !token && !field && fresh && saved.success && /^(MAIS|MAIS OPÇÕES|MAIS OPCOES|MAIS NOMES)$/i.test(text);
   const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : moreByText ? "more" : namedDrivers.length === 1 ? `driver:${namedDrivers[0].id}` : null;
-  const emit = async (s: TruckFlow, id: string, revision: number, notice = "") => {
+  const emit = async (s: TruckFlow, id: string, revision: number, notice = "", retryPhoto = false) => {
     const prompt = truckPrompt(s, vehicles, drivers, id, revision);
-    if (!prompt.buttons.length) { await reply(notice + prompt.message); return; }
+    if (!prompt.buttons.length) { const missing = truckField(s); await reply(notice + (retryPhoto && missing ? truckRequest(missing, true) : prompt.message)); return; }
     // Text is independently delivered: a provider accepting buttons does not prove
     // they render in the group. A typed, unique company driver name remains usable.
     await reply(notice + "Identifique-se como condutor. Toque no seu nome nas opções ou digite seu nome completo cadastrado." + (drivers.length > 2 ? " Para ver outros nomes, toque em Mais opções ou digite MAIS." : ""));
@@ -78,13 +79,13 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
     const result = await client.rpc("fuel_group_step", { ...args, p_action: "confirm", p_patch: {}, p_revision: draft!.revision, p_draft: draft!.draft_id, p_command: command });
     if (result.error) { await reply("Não foi possível concluir. Confira o estoque no painel e envie RESUMO para tentar novamente. Nenhuma confirmação de registro foi emitida."); return true; }
     if ((result.data as { duplicate?: boolean })?.duplicate) return true;
-    const when = new Date(state.startedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-    await reply(`✅ Litragem confirmada\n✅ Odômetro confirmado\n✅ Placa confirmada\n✅ Condutor identificado\n\nPlaca: ${vehicle.plate}\nOdômetro: ${state.meter!.toLocaleString("pt-BR")} km\nLitros: ${state.liters!.toLocaleString("pt-BR")}\nCondutor: ${driver.name}\nData e hora do abastecimento: ${when}\n${config.dryRun ? "✅ Simulação concluída — nenhum lançamento realizado." : "✅ Abastecimento registrado. Estoque e custo vinculados no painel."}`);
+    await reply(`✅ Litragem: ${state.liters!.toLocaleString("pt-BR")} litros\n✅ Odômetro: ${state.meter!.toLocaleString("pt-BR")} km\n✅ Placa: ${vehicle.plate}\n✅ Motorista: ${driver.name}\n\n${config.dryRun ? "Simulação concluída — nenhum lançamento realizado." : "Abastecimento registrado."}`);
     return true;
   }
   const reset = /^(NOVO|CANCELAR)$/i.test(text);
   const summary = /^(RESUMO|TESTE ABASTECIMENTO)$/i.test(text);
   let notice = "";
+  let retryPhoto = false;
   if (reset) state = newTruckFlow();
   else if (action === "more" && !field) {
     state.page = (state.page + 1) % Math.max(1, Math.ceil(drivers.length / 2));
@@ -101,11 +102,11 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
       const before = state;
       state = acceptTruckReadings(applyTruckEvidence(state, explicit), vehicles);
       notice = (["liters", "meter", "plate"] as const).filter(f => !before.confirmed[f] && state.confirmed[f]).map(f => `✅ ${truckLabel(f)} confirmad${f === "meter" ? "o" : "a"}: ${typeof state[f] === "number" ? state[f].toLocaleString("pt-BR") : state[f]}${f === "liters" ? " litros" : f === "meter" ? " km" : ""}.\n`).join("");
-      if (!notice && input.image?.imageUrl && !state.confirmed[field]) notice = "Não consegui identificar esse dado com segurança. ";
+      if (!notice && input.image?.imageUrl && !state.confirmed[field]) { notice = "Não consegui identificar esse dado com segurança. "; retryPhoto = true; }
     } catch (error) {
       const status = typeof error === "object" && error !== null && "status" in error && typeof error.status === "number" ? error.status : null;
       console.warn("[fuel-group] extraction_failed", { status, image: Boolean(input.image?.imageUrl) });
-      await reply(status !== null ? "O serviço de leitura está indisponível. Seus dados anteriores foram mantidos. Tente novamente mais tarde." : `Não consegui ler com segurança. ${field ? truckRequest(field) : "Envie RESUMO para continuar."}`);
+      await reply(status !== null ? "O serviço de leitura está indisponível. Seus dados anteriores foram mantidos. Tente novamente mais tarde." : `Não consegui ler com segurança. ${field ? truckRequest(field, true) : "Envie RESUMO para continuar."}`);
       return true;
     }
   }
@@ -113,6 +114,6 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   if (result.error) { await reply("Outra mensagem atualizou este abastecimento. Envie RESUMO e repita somente o último dado se faltar."); return true; }
   if ((result.data as { duplicate?: boolean })?.duplicate) return true;
   const updated = result.data as { evidence: { truckFlow: unknown }; draft_id: string; revision: number };
-  await emit(truckFlowSchema.parse(updated.evidence.truckFlow), updated.draft_id, updated.revision, notice);
+  await emit(truckFlowSchema.parse(updated.evidence.truckFlow), updated.draft_id, updated.revision, notice, retryPhoto);
   return true;
 }

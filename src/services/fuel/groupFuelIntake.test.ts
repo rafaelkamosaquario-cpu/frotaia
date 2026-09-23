@@ -34,6 +34,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 const ready = (): TruckFlow => ({ ...newTruckFlow(), liters: 162, meter: 16755.9, plate: "ABC1D23", confirmed: { liters: true, meter: true, plate: true } });
 describe("interactive truck fuel intake", () => {
+  it("accepts revision-bound list replies for pagination and driver selection", async () => {
+    const db = database(true, ready(), [{ id, name: "Ana" }, { id: user, name: "Bia" }, { id: company, name: "Caio" }]);
+    await processGroupFuel(db.client, { ...input, text: undefined, listResponseMessage: { selectedRowId: truckToken(id, 1, "more"), title: "Mais opções" } });
+    expect(db.current().evidence.truckFlow.page).toBe(1);
+    const selected = mocks.buttons.mock.calls.at(-1)![2][0];
+    await processGroupFuel(db.client, { ...input, messageId: "select", text: undefined, listResponseMessage: { selectedRowId: selected.id, title: "Caio" } });
+    expect(mocks.send.mock.calls.at(-1)![1]).toBe("[TESTE — não grava estoque/despesa]\n✅ Litragem: 162 litros\n✅ Odômetro: 16.755,9 km\n✅ Placa: ABC1D23\n✅ Motorista: Caio\n\nSimulação concluída — nenhum lançamento realizado.");
+    expect(db.rpc.mock.calls.at(-1)![1]).toMatchObject({ p_action: "confirm", p_dry_run: true });
+  });
   it("limits options and typed identification to the group's selected company drivers", async () => {
     const bindings = JSON.parse(process.env.FUEL_GROUP_BINDINGS!);
     bindings[0].driverIds = [id, company]; // company UUID is deliberately absent from the driver query
@@ -111,13 +120,15 @@ describe("interactive truck fuel intake", () => {
       mocks.extract.mockResolvedValueOnce(emptyFuelEvidence);
       await processGroupFuel(db.client, { ...input, messageId, text: undefined, image: { imageUrl: "https://media.invalid/a" } });
       expect(mocks.send.mock.calls.at(-1)![1]).toContain("digite a litragem");
+      expect(mocks.send.mock.calls.at(-1)![1]).toContain("foto da bomba novamente");
       expect(db.current().evidence.truckFlow.confirmed.liters).toBe(false);
     }
     mocks.extract.mockClear();
     await processGroupFuel(db.client, { ...input, messageId: "fix", text: { message: "162" } });
     expect(mocks.extract).not.toHaveBeenCalled(); expect(mocks.buttons).not.toHaveBeenCalled();
     expect(mocks.send.mock.calls.at(-1)![1]).toContain("162 litros");
-    expect(mocks.send.mock.calls.at(-1)![1]).toContain("odômetro total");
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("odômetro");
+    expect(mocks.send.mock.calls.at(-1)![1]).not.toContain("TRIP");
     expect(db.current().evidence.truckFlow.confirmed.liters).toBe(true);
   });
   it("accepts manual km and registered plate without AI and can identify by exact typed driver name", async () => {

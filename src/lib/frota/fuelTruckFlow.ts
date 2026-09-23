@@ -61,7 +61,7 @@ export function confirmTruckField(s: TruckFlow, yes: boolean) {
   return next;
 }
 export const truckLabel = (f: TruckField) => ({ liters: "Litragem", meter: "Odômetro", plate: "Placa" })[f];
-export const truckRequest = (f: TruckField) => ({ liters: "Envie a foto da bomba ou digite a litragem abastecida.", meter: "Envie a foto do painel com o odômetro total (não TRIP), ou digite a quilometragem em km.", plate: "Envie a foto da placa ou digite a placa do caminhão." })[f];
+export const truckRequest = (f: TruckField, again = false) => ({ liters: `Envie a foto da bomba${again ? " novamente" : ""} ou digite a litragem.`, meter: `Envie a foto do painel com o odômetro${again ? " novamente" : ""} ou digite a quilometragem.`, plate: `Envie a foto da placa${again ? " novamente" : ""} ou digite a placa do caminhão.` })[f];
 /** Two people per page leaves a third reply button for navigation. No company vehicle list. */
 export function truckPrompt(s: TruckFlow, vehicles: FuelChoice[], drivers: FuelChoice[], draft: string, revision: number): { message: string; buttons: TruckButton[] } {
   const field = truckField(s);
@@ -77,4 +77,3 @@ export function truckPrompt(s: TruckFlow, vehicles: FuelChoice[], drivers: FuelC
   if (pages > 1) buttons.push({ id: truckToken(draft, revision, "more"), label: "Mais opções" });
   return { message: `Identifique-se como condutor para concluir.${pages > 1 ? ` (${page + 1}/${pages})` : ""}`, buttons };
 }
-
