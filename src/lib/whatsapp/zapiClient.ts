@@ -102,6 +102,18 @@ export interface BotaoRespostaWhatsapp {
   label: string;
 }
 
+/** Group REPLY buttons. Never normalize away the -group suffix. */
+export async function sendWhatsappGroupButtons(groupId: string, message: string, buttons: BotaoRespostaWhatsapp[]): Promise<void> {
+  if (!/^\d+-group$/.test(groupId) || buttons.length < 1 || buttons.length > 3) throw new Error("Botões de grupo inválidos.");
+  const { ZAPI_INSTANCE_ID, ZAPI_INSTANCE_TOKEN, ZAPI_CLIENT_TOKEN } = getWhatsappConfig();
+  const response = await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_INSTANCE_TOKEN}/send-button-actions`, {
+    method: "POST", headers: { "Content-Type": "application/json", "Client-Token": ZAPI_CLIENT_TOKEN },
+    body: JSON.stringify({ phone: groupId, message, buttonActions: buttons.map(b => ({ id: b.id, type: "REPLY", label: b.label })) }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error(`Falha no envio dos botões ao grupo (${response.status}).`);
+}
+
 /**
  * Envia botões de resposta rápida (tipo REPLY, não CALL/URL) — usado para
  * perguntas de sim/não do onboarding. A resposta chega no webhook em
@@ -195,3 +207,4 @@ export async function sendWhatsappImage(phoneE164: string, imageBytes: Uint8Arra
     throw new ZApiRequestError(response.status, bodyText);
   }
 }
+

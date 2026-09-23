@@ -1,17 +1,22 @@
 import "server-only";
 import { z } from "zod";
 import type { SupabaseDbClient } from "@/services/supabase/types";
-import { fuelEvidenceSchema, emptyFuelEvidence, reviewFuelEvidence, type FuelGroupDraft } from "@/lib/frota/fuelGroup";
+import { emptyFuelEvidence, fuelEvidenceSchema } from "@/lib/frota/fuelGroup";
 import { fuelStockCommand } from "@/lib/frota/fuelStock";
+import { fuelLocalDate } from "@/lib/frota/fuelConversation";
+import { applyTruckEvidence, confirmTruckField, newTruckFlow, truckAction, truckField, truckFlowSchema, truckLabel, truckPrompt, truckRequest, truckVehicle, type TruckFlow } from "@/lib/frota/fuelTruckFlow";
 import { extractFuelEvidence } from "./fuelImageExtraction";
-import { sendWhatsappGroupText } from "@/lib/whatsapp/zapiClient";
+import { sendWhatsappGroupButtons, sendWhatsappGroupText } from "@/lib/whatsapp/zapiClient";
 import { normalizePhoneDigits } from "@/lib/identity/phoneNormalizer";
-import { fuelConversation, fuelLocalDate, selectedFuelDriver } from "@/lib/frota/fuelConversation";
 
 const bindingsSchema = z.array(z.object({ groupId: z.string().regex(/^\d+-group$/), companyId: z.uuid(), operatorId: z.uuid(), senders: z.array(z.string().regex(/^\d{12,13}$/)).min(1), dryRun: z.boolean().default(true) }).strict());
-export interface GroupFuelInput { phone?: string; participantPhone?: string; messageId?: string; text?: { message?: string }; image?: { imageUrl?: string; mimeType?: string; caption?: string } }
+export interface GroupFuelInput {
+  phone?: string; participantPhone?: string; messageId?: string; text?: { message?: string };
+  image?: { imageUrl?: string; mimeType?: string; caption?: string };
+  buttonsResponseMessage?: { buttonId?: string; message?: string };
+}
 
-/** Returns true for configured fuel groups, even for unauthorized participants: never falls into radar. */
+/** Configured groups are always consumed; never leak into another workflow. */
 export async function processGroupFuel(client: SupabaseDbClient, input: GroupFuelInput): Promise<boolean> {
   if (process.env.FUEL_GROUP_ENABLED !== "true") return false;
   const configs = bindingsSchema.parse(JSON.parse(process.env.FUEL_GROUP_BINDINGS ?? "[]"));
@@ -19,65 +24,84 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const config = configs.find(c => c.groupId === input.phone);
   if (!config) return false;
   const sender = normalizePhoneDigits(input.participantPhone ?? "");
-  if (!config.senders.includes(sender) || !input.messageId || (!input.text?.message && !input.image?.imageUrl)) return true;
-  // Recheck delegated operator membership before listing any company choices or sending them to group.
+  const button = input.buttonsResponseMessage?.buttonId;
+  if (!config.senders.includes(sender) || !input.messageId || (!input.text?.message && !input.image?.imageUrl && !button)) return true;
   const member = await client.from("company_members").select("role").eq("company_id", config.companyId).eq("user_id", config.operatorId).eq("status", "active").maybeSingle();
   if (member.error) throw member.error;
   if (!member.data || !["owner", "admin", "operator"].includes(member.data.role)) return true;
-  const [vs, ds] = await Promise.all([
+  const [vs, ds, current] = await Promise.all([
     client.from("vehicles").select("id,name,plate").eq("company_id", config.companyId).limit(100),
     client.from("drivers").select("id,name").eq("company_id", config.companyId).limit(100),
+    client.from("fuel_group_drafts").select("*").eq("company_id", config.companyId).eq("group_id", config.groupId).eq("sender", sender).maybeSingle(),
   ]);
-  if (vs.error || ds.error) throw vs.error ?? ds.error;
+  if (vs.error || ds.error || current.error) throw vs.error ?? ds.error ?? current.error;
   const vehicles = (vs.data ?? []).map(v => ({ ...v, name: v.name ?? v.plate ?? v.id }));
-  const drivers = (ds.data ?? []).map(d => ({ ...d, name: d.name ?? d.id }));
+  const drivers = (ds.data ?? []).map(d => ({ ...d, name: d.name ?? d.id })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
   const text = (input.text?.message ?? input.image?.caption ?? "").trim();
+  const prefix = config.dryRun ? "[TESTE — não grava estoque/despesa]\n" : "";
+  const reply = (message: string) => sendWhatsappGroupText(config.groupId, prefix + message);
   const args = { p_company: config.companyId, p_user: config.operatorId, p_group: config.groupId, p_sender: sender, p_message: input.messageId, p_dry_run: config.dryRun };
-  const reply = (message: string) => sendWhatsappGroupText(config.groupId, `${config.dryRun ? "[TESTE — não grava estoque/despesa]\n" : ""}${message}`);
-  const current = await client.from("fuel_group_drafts").select("*").eq("company_id", config.companyId).eq("group_id", config.groupId).eq("sender", sender).maybeSingle();
-  if (current.error) throw current.error;
-  const fresh = current.data && Date.parse(current.data.updated_at) >= Date.now() - 2 * 60 * 60 * 1000;
-  const previous = fuelEvidenceSchema.parse({ ...emptyFuelEvidence, ...(fresh ? current.data!.evidence : {}) });
-  const selected = !input.image?.imageUrl ? selectedFuelDriver(text, previous, vehicles, drivers) : null;
-  if (/^CONFIRMAR\s+/i.test(text) || selected) {
-    const draft = fresh ? current.data : null;
-    if (!draft || (!selected && text.toUpperCase() !== `CONFIRMAR ${draft.draft_id.slice(0, 8)}-${draft.revision}`.toUpperCase())) { await reply("Código de confirmação inválido ou antigo. Envie RESUMO para conferir os dados atuais."); return true; }
-    const evidence = fuelEvidenceSchema.parse({ ...previous, ...(selected ? { driver: selected.name } : {}) });
-    const review = reviewFuelEvidence(evidence, vehicles, drivers, `${draft.draft_id.slice(0, 8)}-${draft.revision}`);
-    if (!review.ready) { await reply(review.message); return true; }
-    const command = fuelStockCommand.parse({ kind: "withdrawal", requestId: draft.draft_id, date: evidence.date, liters: evidence.liters, vehicleId: review.vehicleId, driverId: review.driverId, meter: evidence.meter, meterKind: evidence.meterKind });
+  const draft = current.data;
+  const fresh = draft && Date.parse(draft.updated_at) >= Date.now() - 2 * 60 * 60 * 1000;
+  const saved = truckFlowSchema.safeParse(fresh ? (draft.evidence as Record<string, unknown>).truckFlow : undefined);
+  let state = saved.success ? saved.data : newTruckFlow();
+  const field = truckField(state);
+  const token = button ?? (text.startsWith("fuel:") ? text : null);
+  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : null;
+  const emit = async (s: TruckFlow, id: string, revision: number, notice = "") => {
+    const prompt = truckPrompt(s, vehicles, drivers, id, revision);
+    if (!prompt.buttons.length) { await reply(notice + prompt.message); return; }
+    try { await sendWhatsappGroupButtons(config.groupId, prefix + notice + prompt.message, prompt.buttons); }
+    catch {
+      console.warn("[fuel-group] button_send_failed");
+      await reply("Não consegui enviar os botões. Nenhum abastecimento foi registrado. Envie RESUMO para tentar novamente.");
+    }
+  };
+  if (token && !action) { await reply("Este botão é antigo ou pertence a outro abastecimento. Envie RESUMO para receber seus botões atuais."); return true; }
+  if (action?.startsWith("driver:")) {
+    const driver = drivers.find(d => d.id === action.slice(7));
+    const vehicle = truckVehicle(state.plate, vehicles);
+    const offered = truckPrompt(state, vehicles, drivers, draft!.draft_id, draft!.revision).buttons.some(b => b.id === token);
+    if (field || !driver || !vehicle || !offered) { await reply("Identificação inválida. Envie RESUMO para continuar."); return true; }
     if (!config.dryRun && process.env.FUEL_INTERNAL_ENABLED !== "true") { await reply("Registro interno ainda não liberado. Nenhuma baixa realizada."); return true; }
-    const result = await client.rpc("fuel_group_step", { ...args, p_action: "confirm", p_patch: {}, p_revision: draft.revision, p_draft: draft.draft_id, p_command: command });
-    if (result.error) { await reply("Não foi possível confirmar. O estoque pode estar insuficiente ou os dados mudaram. Confira no painel e envie RESUMO. Nenhuma confirmação de gravação foi emitida."); return true; }
+    const command = fuelStockCommand.parse({ kind: "withdrawal", requestId: draft!.draft_id, date: fuelLocalDate(new Date(state.startedAt)), liters: state.liters, vehicleId: vehicle.id, driverId: driver.id, meter: state.meter, meterKind: "km" });
+    const result = await client.rpc("fuel_group_step", { ...args, p_action: "confirm", p_patch: {}, p_revision: draft!.revision, p_draft: draft!.draft_id, p_command: command });
+    if (result.error) { await reply("Não foi possível concluir. Confira o estoque no painel e envie RESUMO para tentar novamente. Nenhuma confirmação de registro foi emitida."); return true; }
     if ((result.data as { duplicate?: boolean })?.duplicate) return true;
-    const completed = `Placa/equipamento: ${vehicles.find(v => v.id === review.vehicleId)?.plate ?? evidence.vehicle}\nQuilometragem/horímetro: ${evidence.meter} ${evidence.meterKind === "km" ? "km" : "horas"}\nLitros: ${evidence.liters}\nMotorista: ${evidence.driver}\nData: ${evidence.date}\nHora do registro: ${new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
-    await reply(`${completed}\n${config.dryRun ? "Simulação confirmada. Nenhum abastecimento, despesa ou baixa de estoque foi criado." : "Abastecimento interno registrado e estoque atualizado. Dados financeiros disponíveis somente no painel."}`);
+    const when = new Date(state.startedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+    await reply(`✅ Litragem confirmada\n✅ Odômetro confirmado\n✅ Placa confirmada\n✅ Condutor identificado\n\nPlaca: ${vehicle.plate}\nOdômetro: ${state.meter!.toLocaleString("pt-BR")} km\nLitros: ${state.liters!.toLocaleString("pt-BR")}\nCondutor: ${driver.name}\nData e hora do abastecimento: ${when}\n${config.dryRun ? "✅ Simulação concluída — nenhum lançamento realizado." : "✅ Abastecimento registrado. Estoque e custo vinculados no painel."}`);
     return true;
   }
   const reset = /^(NOVO|CANCELAR)$/i.test(text);
   const summary = /^(RESUMO|TESTE ABASTECIMENTO)$/i.test(text);
-  let evidence = emptyFuelEvidence;
-  if (!reset && !summary) {
-    try { evidence = await extractFuelEvidence(text, input.image); }
-    catch (error) {
-      // Never log provider messages, image URLs, credentials or customer content.
+  let notice = "";
+  if (reset) state = newTruckFlow();
+  else if (action === "more" && !field) state.page = (state.page + 1) % Math.max(1, Math.ceil(drivers.length / 2));
+  else if ((action === "yes" || action === "no") && field && state[field] !== null) {
+    if (field === "plate" && !truckVehicle(state.plate, vehicles)) { await reply("Confira e digite a placa cadastrada nesta empresa."); return true; }
+    state = confirmTruckField(state, action === "yes");
+    notice = action === "yes" ? `✅ ${truckLabel(field)} confirmad${field === "meter" ? "o" : "a"}.\n` : "Certo. Informe o valor correto ou envie outra foto.\n";
+  } else if (action) { await reply("Esta opção não corresponde à etapa atual. Envie RESUMO."); return true; }
+  else if (!summary) {
+    if (/^(sim|n[aã]o|CONFIRMAR.*|MOTORISTA.*)$/i.test(text)) { await reply("Use os botões desta etapa. Se não aparecerem, envie RESUMO."); return true; }
+    try {
+      const number = text.match(/^\d+(?:[,.]\d{1,3})?$/);
+      const explicit = !input.image?.imageUrl && number && (field === "liters" || field === "meter")
+        ? fuelEvidenceSchema.parse({ ...emptyFuelEvidence, [field]: Number(text.replace(",", ".")), ...(field === "meter" ? { meterKind: "km" } : {}) })
+        : await extractFuelEvidence(text, input.image);
+      state = applyTruckEvidence(state, explicit);
+    } catch (error) {
       const status = typeof error === "object" && error !== null && "status" in error && typeof error.status === "number" ? error.status : null;
-      const category = error instanceof SyntaxError ? "invalid_json" : error instanceof z.ZodError ? "invalid_evidence" : status !== null ? "provider_error" : "extraction_error";
-      console.warn("[fuel-group] extraction_failed", { category, status, image: Boolean(input.image?.imageUrl) });
-      await reply(status !== null
-        ? "O serviço de leitura está indisponível neste momento. Não registrei este envio. Tente novamente mais tarde; não informe preços no grupo."
-        : `Não consegui identificar os dados desta imagem/mensagem com segurança. Os dados anteriores foram mantidos.\n${fuelConversation(previous, vehicles, drivers)}`);
+      console.warn("[fuel-group] extraction_failed", { status, image: Boolean(input.image?.imageUrl) });
+      await reply(status !== null ? "O serviço de leitura está indisponível. Seus dados anteriores foram mantidos. Tente novamente mais tarde." : `Não consegui ler com segurança. ${field ? truckRequest(field) : "Envie RESUMO para continuar."}`);
       return true;
     }
   }
-  // Driver names extracted from photos do not conclude or preselect a driver.
-  // Date defaults to the first message of this draft in the company's operating timezone.
-  const patch = reset ? {} : { ...evidence, driver: null, date: evidence.date ?? previous.date ?? fuelLocalDate() };
-  const result = await client.rpc("fuel_group_step", { ...args, p_action: reset ? "reset" : "merge", p_patch: patch });
-  if (result.error) throw result.error;
+  const result = await client.rpc("fuel_group_step", { ...args, p_action: reset ? "reset" : "merge", p_patch: { truckFlow: state }, p_revision: draft?.revision ?? 0, p_draft: draft?.draft_id });
+  if (result.error) { await reply("Outra mensagem atualizou este abastecimento. Envie RESUMO e repita somente o último dado se faltar."); return true; }
   if ((result.data as { duplicate?: boolean })?.duplicate) return true;
-  const draft = result.data as unknown as FuelGroupDraft;
-  if (reset) { await reply("Conferência anterior descartada. Envie os dados do novo abastecimento; nenhuma baixa foi feita."); return true; }
-  await reply(fuelConversation(fuelEvidenceSchema.parse({ ...emptyFuelEvidence, ...draft.evidence }), vehicles, drivers));
+  const updated = result.data as { evidence: { truckFlow: unknown }; draft_id: string; revision: number };
+  await emit(truckFlowSchema.parse(updated.evidence.truckFlow), updated.draft_id, updated.revision, notice);
   return true;
 }
+
