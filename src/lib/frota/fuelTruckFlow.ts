@@ -27,6 +27,27 @@ export function applyTruckEvidence(s: TruckFlow, e: FuelEvidence): TruckFlow {
   if (!s.confirmed.plate && e.vehicle && /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(normalizePlate(e.vehicle))) next.plate = normalizePlate(e.vehicle);
   return next;
 }
+/** Accept only actual readings; a plate must resolve inside this company. */
+export function acceptTruckReadings(s: TruckFlow, vehicles: FuelChoice[]): TruckFlow {
+  const next = structuredClone(s);
+  next.confirmed.liters = next.liters !== null && next.liters > 0;
+  next.confirmed.meter = next.meter !== null && next.meter >= 0;
+  next.confirmed.plate = !!truckVehicle(next.plate, vehicles);
+  return next;
+}
+/** Explicit corrections in the current step do not need an AI request. */
+export function typedTruckEvidence(text: string, field: TruckField | null): Partial<FuelEvidence> | null {
+  if (field === "plate") {
+    const plate = normalizePlate(text.replace(/^placa\s*:?\s*/i, ""));
+    return /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(plate) ? { vehicle: plate } : null;
+  }
+  if (field !== "liters" && field !== "meter") return null;
+  const raw = text.trim().replace(field === "liters" ? /\s*(litros?|l)$/i : /\s*km$/i, "").trim();
+  if (!/^\d+(?:[.,]\d+)*$/.test(raw)) return null;
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : /^\d{1,3}(?:\.\d{3})+$/.test(raw) ? raw.replace(/\./g, "") : raw;
+  const value = Number(normalized);
+  return field === "liters" ? { liters: value } : { meter: value, meterKind: "km" };
+}
 export function truckToken(draft: string, revision: number, action: string) { return `fuel:${draft}:${revision}:${action}`; }
 export function truckAction(token: string, draft: string, revision: number) {
   const prefix = truckToken(draft, revision, "");

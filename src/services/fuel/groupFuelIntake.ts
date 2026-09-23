@@ -4,7 +4,7 @@ import type { SupabaseDbClient } from "@/services/supabase/types";
 import { emptyFuelEvidence, fuelEvidenceSchema } from "@/lib/frota/fuelGroup";
 import { fuelStockCommand } from "@/lib/frota/fuelStock";
 import { fuelLocalDate } from "@/lib/frota/fuelConversation";
-import { applyTruckEvidence, confirmTruckField, newTruckFlow, truckAction, truckField, truckFlowSchema, truckLabel, truckPrompt, truckRequest, truckVehicle, type TruckFlow } from "@/lib/frota/fuelTruckFlow";
+import { acceptTruckReadings, applyTruckEvidence, newTruckFlow, truckAction, truckField, truckFlowSchema, truckLabel, truckPrompt, truckRequest, truckVehicle, typedTruckEvidence, type TruckFlow } from "@/lib/frota/fuelTruckFlow";
 import { extractFuelEvidence } from "./fuelImageExtraction";
 import { sendWhatsappGroupButtons, sendWhatsappGroupText } from "@/lib/whatsapp/zapiClient";
 import { normalizePhoneDigits } from "@/lib/identity/phoneNormalizer";
@@ -44,17 +44,21 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const draft = current.data;
   const fresh = draft && Date.parse(draft.updated_at) >= Date.now() - 2 * 60 * 60 * 1000;
   const saved = truckFlowSchema.safeParse(fresh ? (draft.evidence as Record<string, unknown>).truckFlow : undefined);
-  let state = saved.success ? saved.data : newTruckFlow();
+  let state = acceptTruckReadings(saved.success ? saved.data : newTruckFlow(), vehicles);
   const field = truckField(state);
   const token = button ?? (text.startsWith("fuel:") ? text : null);
-  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : null;
+  const namedDrivers = !field && !token ? drivers.filter(d => d.name.trim().toLocaleLowerCase("pt-BR") === text.replace(/^MOTORISTA\s+/i, "").trim().toLocaleLowerCase("pt-BR")) : [];
+  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : namedDrivers.length === 1 ? `driver:${namedDrivers[0].id}` : null;
   const emit = async (s: TruckFlow, id: string, revision: number, notice = "") => {
     const prompt = truckPrompt(s, vehicles, drivers, id, revision);
     if (!prompt.buttons.length) { await reply(notice + prompt.message); return; }
-    try { await sendWhatsappGroupButtons(config.groupId, prefix + notice + prompt.message, prompt.buttons); }
+    // Text is independently delivered: a provider accepting buttons does not prove
+    // they render in the group. A typed, unique company driver name remains usable.
+    await reply(notice + "Identifique-se como condutor. Toque no seu nome nas opções ou digite seu nome completo cadastrado.");
+    try { await sendWhatsappGroupButtons(config.groupId, prefix + prompt.message, prompt.buttons); }
     catch {
       console.warn("[fuel-group] button_send_failed");
-      await reply("Não consegui enviar os botões. Nenhum abastecimento foi registrado. Envie RESUMO para tentar novamente.");
+      await reply("Não consegui enviar os botões. Digite seu nome completo cadastrado para se identificar. Nenhum abastecimento foi registrado.");
     }
   };
   if (token && !action) { await reply("Este botão é antigo ou pertence a outro abastecimento. Envie RESUMO para receber seus botões atuais."); return true; }
@@ -62,7 +66,7 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
     const driver = drivers.find(d => d.id === action.slice(7));
     const vehicle = truckVehicle(state.plate, vehicles);
     const offered = truckPrompt(state, vehicles, drivers, draft!.draft_id, draft!.revision).buttons.some(b => b.id === token);
-    if (field || !driver || !vehicle || !offered) { await reply("Identificação inválida. Envie RESUMO para continuar."); return true; }
+    if (field || !driver || !vehicle || (token && !offered)) { await reply("Identificação inválida. Envie RESUMO para continuar."); return true; }
     if (!config.dryRun && process.env.FUEL_INTERNAL_ENABLED !== "true") { await reply("Registro interno ainda não liberado. Nenhuma baixa realizada."); return true; }
     const command = fuelStockCommand.parse({ kind: "withdrawal", requestId: draft!.draft_id, date: fuelLocalDate(new Date(state.startedAt)), liters: state.liters, vehicleId: vehicle.id, driverId: driver.id, meter: state.meter, meterKind: "km" });
     const result = await client.rpc("fuel_group_step", { ...args, p_action: "confirm", p_patch: {}, p_revision: draft!.revision, p_draft: draft!.draft_id, p_command: command });
@@ -77,19 +81,18 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   let notice = "";
   if (reset) state = newTruckFlow();
   else if (action === "more" && !field) state.page = (state.page + 1) % Math.max(1, Math.ceil(drivers.length / 2));
-  else if ((action === "yes" || action === "no") && field && state[field] !== null) {
-    if (field === "plate" && !truckVehicle(state.plate, vehicles)) { await reply("Confira e digite a placa cadastrada nesta empresa."); return true; }
-    state = confirmTruckField(state, action === "yes");
-    notice = action === "yes" ? `✅ ${truckLabel(field)} confirmad${field === "meter" ? "o" : "a"}.\n` : "Certo. Informe o valor correto ou envie outra foto.\n";
-  } else if (action) { await reply("Esta opção não corresponde à etapa atual. Envie RESUMO."); return true; }
+  else if (action) { await reply("Esta opção não corresponde à etapa atual. Envie RESUMO."); return true; }
   else if (!summary) {
-    if (/^(sim|n[aã]o|CONFIRMAR.*|MOTORISTA.*)$/i.test(text)) { await reply("Use os botões desta etapa. Se não aparecerem, envie RESUMO."); return true; }
+    if (!field) { await reply("Não identifiquei um único condutor com esse nome. Digite seu nome completo cadastrado ou envie RESUMO para ver as opções."); return true; }
     try {
-      const number = text.match(/^\d+(?:[,.]\d{1,3})?$/);
-      const explicit = !input.image?.imageUrl && number && (field === "liters" || field === "meter")
-        ? fuelEvidenceSchema.parse({ ...emptyFuelEvidence, [field]: Number(text.replace(",", ".")), ...(field === "meter" ? { meterKind: "km" } : {}) })
+      const typed = !input.image?.imageUrl ? typedTruckEvidence(text, field) : null;
+      const explicit = typed
+        ? fuelEvidenceSchema.parse({ ...emptyFuelEvidence, ...typed })
         : await extractFuelEvidence(text, input.image);
-      state = applyTruckEvidence(state, explicit);
+      const before = state;
+      state = acceptTruckReadings(applyTruckEvidence(state, explicit), vehicles);
+      notice = (["liters", "meter", "plate"] as const).filter(f => !before.confirmed[f] && state.confirmed[f]).map(f => `✅ ${truckLabel(f)} confirmad${f === "meter" ? "o" : "a"}: ${typeof state[f] === "number" ? state[f].toLocaleString("pt-BR") : state[f]}${f === "liters" ? " litros" : f === "meter" ? " km" : ""}.\n`).join("");
+      if (!notice && input.image?.imageUrl && !state.confirmed[field]) notice = "Não consegui identificar esse dado com segurança. ";
     } catch (error) {
       const status = typeof error === "object" && error !== null && "status" in error && typeof error.status === "number" ? error.status : null;
       console.warn("[fuel-group] extraction_failed", { status, image: Boolean(input.image?.imageUrl) });

@@ -42,13 +42,12 @@ describe("interactive truck fuel intake", () => {
     const db = database(); await processGroupFuel(db.client, { ...input, participantPhone: "5542999999999" }); expect(db.from).not.toHaveBeenCalled();
     const inactive = database(false); await processGroupFuel(inactive.client, input); expect(inactive.rpc).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled();
   });
-  it("runs photos and three Yes buttons then driver selection with one final dry-run confirmation", async () => {
+  it("accepts readable photos and asks the next field without Yes buttons, then identifies driver", async () => {
     const db = database(); let n = 0;
     for (const evidence of [{ ...emptyFuelEvidence, liters: 162 }, { ...emptyFuelEvidence, meter: 16755.9, meterKind: "km" }, { ...emptyFuelEvidence, vehicle: "ABC1D23" }]) {
       mocks.extract.mockResolvedValueOnce(evidence);
       await processGroupFuel(db.client, { ...input, messageId: `p${n++}`, text: undefined, image: { imageUrl: "https://media.invalid/photo" } });
-      const btn = mocks.buttons.mock.calls.at(-1)![2][0]; expect(btn.label).toBe("Sim");
-      await processGroupFuel(db.client, { ...input, messageId: `b${n++}`, text: undefined, buttonsResponseMessage: { buttonId: btn.id } });
+      if (n < 3) { expect(mocks.buttons).not.toHaveBeenCalled(); expect(mocks.send.mock.calls.at(-1)![1]).toContain("✅"); }
     }
     const driver = mocks.buttons.mock.calls.at(-1)![2][0]; expect(driver.label).toBe("Condutor");
     await processGroupFuel(db.client, { ...input, messageId: "finish", text: undefined, buttonsResponseMessage: { buttonId: driver.id } });
@@ -59,13 +58,38 @@ describe("interactive truck fuel intake", () => {
     expect(db.filters).toContainEqual(["fuel_group_drafts", "sender", input.participantPhone]);
     expect(db.filters).toContainEqual(["drivers", "company_id", company]);
   });
-  it("No clears a wrong reading and a typed correction asks again", async () => {
-    const db = database(true, { ...newTruckFlow(), liters: 100 });
-    await processGroupFuel(db.client, { ...input, text: undefined, buttonsResponseMessage: { buttonId: truckToken(id, 1, "no") } });
-    expect(db.current().evidence.truckFlow.liters).toBeNull();
+  it("unreadable pump twice then typed 162 always replies with confirmed liters and asks odometer", async () => {
+    const db = database();
+    for (const messageId of ["photo1", "photo2"]) {
+      mocks.extract.mockResolvedValueOnce(emptyFuelEvidence);
+      await processGroupFuel(db.client, { ...input, messageId, text: undefined, image: { imageUrl: "https://media.invalid/a" } });
+      expect(mocks.send.mock.calls.at(-1)![1]).toContain("digite a litragem");
+      expect(db.current().evidence.truckFlow.confirmed.liters).toBe(false);
+    }
+    mocks.extract.mockClear();
     await processGroupFuel(db.client, { ...input, messageId: "fix", text: { message: "162" } });
-    expect(mocks.extract).not.toHaveBeenCalled(); expect(mocks.buttons.mock.calls.at(-1)![1]).toContain("162 litros");
-    expect(db.current().evidence.truckFlow.confirmed.liters).toBe(false);
+    expect(mocks.extract).not.toHaveBeenCalled(); expect(mocks.buttons).not.toHaveBeenCalled();
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("162 litros");
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("odômetro total");
+    expect(db.current().evidence.truckFlow.confirmed.liters).toBe(true);
+  });
+  it("accepts manual km and registered plate without AI and can identify by exact typed driver name", async () => {
+    const db = database(true, { ...newTruckFlow(), liters: 162 });
+    await processGroupFuel(db.client, { ...input, messageId: "km", text: { message: "16.755,9 km" } });
+    expect(db.current().evidence.truckFlow.meter).toBe(16755.9);
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("foto da placa");
+    await processGroupFuel(db.client, { ...input, messageId: "plate", text: { message: "ABC-1D23" } });
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("digite seu nome completo");
+    await processGroupFuel(db.client, { ...input, messageId: "driver", text: { message: "Condutor" } });
+    expect(mocks.extract).not.toHaveBeenCalled();
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("Simulação concluída");
+  });
+  it("unknown plates remain unconfirmed and never show a company vehicle list", async () => {
+    const db = database(true, { ...ready(), plate: null, confirmed: { liters: true, meter: true, plate: false } });
+    await processGroupFuel(db.client, { ...input, text: { message: "ZZZ9999" } });
+    expect(db.current().evidence.truckFlow.confirmed.plate).toBe(false);
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("placa correta");
+    expect(mocks.send.mock.calls.at(-1)![1]).not.toContain("ABC1D23");
   });
   it("rejects stale and foreign draft buttons without changing data", async () => {
     const db = database();
@@ -90,8 +114,9 @@ describe("interactive truck fuel intake", () => {
     const db = database(); mocks.extract.mockRejectedValueOnce(new Error("unreadable"));
     await processGroupFuel(db.client, { ...input, text: undefined, image: { imageUrl: "https://media.invalid/a" } }); expect(db.rpc).not.toHaveBeenCalled();
     mocks.buttons.mockRejectedValueOnce(new Error("provider"));
-    await processGroupFuel(database(true, { ...newTruckFlow(), liters: 162 }).client, input);
+    await processGroupFuel(database(true, ready()).client, input);
     expect(mocks.send.mock.calls.at(-1)![1]).toContain("Não consegui enviar os botões");
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("Digite seu nome completo");
   });
 });
 
