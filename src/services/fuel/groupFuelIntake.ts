@@ -9,7 +9,7 @@ import { extractFuelEvidence } from "./fuelImageExtraction";
 import { sendWhatsappGroupButtons, sendWhatsappGroupText } from "@/lib/whatsapp/zapiClient";
 import { normalizePhoneDigits } from "@/lib/identity/phoneNormalizer";
 
-const bindingsSchema = z.array(z.object({ groupId: z.string().regex(/^\d+-group$/), companyId: z.uuid(), operatorId: z.uuid(), senders: z.array(z.string().regex(/^\d{12,13}$/)).min(1), dryRun: z.boolean().default(true) }).strict());
+const bindingsSchema = z.array(z.object({ groupId: z.string().regex(/^\d+-group$/), companyId: z.uuid(), operatorId: z.uuid(), senders: z.array(z.string().regex(/^\d{12,13}$/)).min(1), dryRun: z.boolean().default(true), driverIds: z.array(z.uuid()).optional() }).strict());
 export interface GroupFuelInput {
   phone?: string; participantPhone?: string; messageId?: string; text?: { message?: string };
   image?: { imageUrl?: string; mimeType?: string; caption?: string };
@@ -39,7 +39,9 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   ]);
   if (vs.error || ds.error || current.error) throw vs.error ?? ds.error ?? current.error;
   const vehicles = (vs.data ?? []).map(v => ({ ...v, name: v.name ?? v.plate ?? v.id }));
-  const drivers = (ds.data ?? []).map(d => ({ ...d, name: d.name ?? d.id })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
+  // Optional group-specific eligibility; never changes the company's driver records.
+  // IDs must also belong to the company query above. An empty selection fails closed.
+  const drivers = (ds.data ?? []).filter(d => !config.driverIds || config.driverIds.includes(d.id)).map(d => ({ ...d, name: d.name ?? d.id })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
   const text = (input.text?.message ?? input.image?.caption ?? buttonText).trim();
   const prefix = config.dryRun ? "[TESTE — não grava estoque/despesa]\n" : "";
   const reply = (message: string) => sendWhatsappGroupText(config.groupId, prefix + message);

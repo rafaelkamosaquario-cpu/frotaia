@@ -34,6 +34,27 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 const ready = (): TruckFlow => ({ ...newTruckFlow(), liters: 162, meter: 16755.9, plate: "ABC1D23", confirmed: { liters: true, meter: true, plate: true } });
 describe("interactive truck fuel intake", () => {
+  it("limits options and typed identification to the group's selected company drivers", async () => {
+    const bindings = JSON.parse(process.env.FUEL_GROUP_BINDINGS!);
+    bindings[0].driverIds = [id, company]; // company UUID is deliberately absent from the driver query
+    vi.stubEnv("FUEL_GROUP_BINDINGS", JSON.stringify(bindings));
+    const db = database(true, ready(), [{ id, name: "Condutor" }, { id: user, name: "Outra função" }]);
+    await processGroupFuel(db.client, input);
+    expect(mocks.buttons.mock.calls.at(-1)![2]).toHaveLength(1);
+    expect(mocks.buttons.mock.calls.at(-1)![2][0].label).toBe("Condutor");
+    await processGroupFuel(db.client, { ...input, messageId: "excluded-name", text: { message: "Outra função" } });
+    await processGroupFuel(db.client, { ...input, messageId: "excluded-button", text: undefined, buttonsResponseMessage: { buttonId: truckToken(id, db.current().revision, `driver:${user}`) } });
+    expect(db.rpc.mock.calls.filter(c => c[1].p_action === "confirm")).toHaveLength(0);
+    await processGroupFuel(db.client, { ...input, messageId: "allowed", text: { message: "Condutor" } });
+    expect(db.rpc.mock.calls.at(-1)![1]).toMatchObject({ p_action: "confirm", p_dry_run: true, p_command: { driverId: id } });
+  });
+  it("does not fall back to all drivers when an explicitly empty selection is configured", async () => {
+    const bindings = JSON.parse(process.env.FUEL_GROUP_BINDINGS!); bindings[0].driverIds = [];
+    vi.stubEnv("FUEL_GROUP_BINDINGS", JSON.stringify(bindings));
+    const db = database(true, ready()); await processGroupFuel(db.client, input);
+    expect(mocks.buttons).not.toHaveBeenCalled();
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("Não há condutores");
+  });
   it.each([5, 9])("reaches every one of %i drivers through More buttons, then finishes with the last driver", async count => {
     const drivers = Array.from({ length: count }, (_, i) => ({ id: `33333333-3333-4333-8333-${String(i + 1).padStart(12, "0")}`, name: `Condutor ${i + 1}` }));
     const db = database(true, ready(), drivers), seen = new Set<string>();
