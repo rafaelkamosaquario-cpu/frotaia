@@ -9,12 +9,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/hooks/useToast";
 import type { FuelFillupRow, VehicleRow, DriverRow, VendorRow } from "@/lib/supabase/tables";
 import { FuelFillupFormModal } from "./FuelFillupFormModal";
+import { InternalFuelStock } from "./InternalFuelStock";
 
 interface AbastecimentosClientProps {
   abastecimentosIniciais: FuelFillupRow[];
   veiculos: VehicleRow[];
   motoristas: DriverRow[];
   fornecedores: VendorRow[];
+  internalFuelEnabled?: boolean;
 }
 
 interface ConsumoMedio {
@@ -34,7 +36,7 @@ function formatBRL(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoristas, fornecedores }: AbastecimentosClientProps) {
+export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoristas, fornecedores, internalFuelEnabled = false }: AbastecimentosClientProps) {
   const { showToast } = useToast();
   const [abastecimentos, setAbastecimentos] = useState(abastecimentosIniciais);
   const [formTarget, setFormTarget] = useState<FuelFillupRow | null | undefined>(undefined);
@@ -108,10 +110,16 @@ export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoris
         </div>
         <Button onClick={() => setFormTarget(null)} className="gap-1.5">
           <Plus className="size-4" aria-hidden />
-          Novo abastecimento
+          {internalFuelEnabled ? "Abastecimento externo — posto" : "Novo abastecimento"}
         </Button>
       </div>
 
+      {internalFuelEnabled && <InternalFuelStock vehicles={veiculos} drivers={motoristas} onRecorded={async () => {
+        const response = await fetch("/api/frota/abastecimentos");
+        if (!response.ok) throw new Error("Registro salvo. Recarregue a página para atualizar a lista.");
+        const data = await response.json();
+        setAbastecimentos(data.abastecimentos);
+      }} />}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select
           value={filtroVeiculo}
@@ -174,17 +182,17 @@ export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoris
                   <tr key={abastecimento.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
                     <td data-label="Data" className="px-4 py-3 text-muted-foreground">{formatDate(abastecimento.fillup_date)}</td>
                     <td data-label="Veículo" className="px-4 py-3 text-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
-                    <td data-label="Fornecedor" className="px-4 py-3 text-muted-foreground">{fornecedor?.name ?? "—"}</td>
+                    <td data-label="Fornecedor" className="px-4 py-3 text-muted-foreground">{abastecimento.internal_stock ? "Estoque interno" : fornecedor?.name ?? "—"}</td>
                     <td data-label="Litros" className="px-4 py-3 text-right text-muted-foreground">{Number(abastecimento.liters)}L</td>
                     <td data-label="Km odômetro" className="px-4 py-3 text-right text-muted-foreground">{abastecimento.odometer_km !== null ? Number(abastecimento.odometer_km) : "—"}</td>
                     <td data-label="Total" className="px-4 py-3 text-right font-medium text-foreground">{formatBRL(Number(abastecimento.total_amount))}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setFormTarget(abastecimento)}>
+                        <Button disabled={abastecimento.internal_stock} variant="outline" size="sm" className="gap-1.5" onClick={() => setFormTarget(abastecimento)}>
                           <SquarePen className="size-3.5" aria-hidden />
                           Editar
                         </Button>
-                        <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => setDeleteTarget(abastecimento)}>
+                        <Button disabled={abastecimento.internal_stock} variant="ghost" size="sm" className="gap-1.5" onClick={() => setDeleteTarget(abastecimento)}>
                           <Trash2 className="size-3.5" aria-hidden />
                           Excluir
                         </Button>

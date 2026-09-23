@@ -15,14 +15,14 @@ export interface MidiaBaixada {
   contentType: string;
 }
 
-export async function baixarMidia(url: string): Promise<MidiaBaixada | null> {
+export async function baixarMidia(url: string, options?: { rejectRedirects?: boolean }): Promise<MidiaBaixada | null> {
   if (!url || !/^https?:\/\//i.test(url)) return null;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, { signal: controller.signal, ...(options?.rejectRedirects ? { redirect: "error" as const } : {}) });
     if (!response.ok) return null;
 
     const declaredLength = Number(response.headers.get("content-length") ?? "0");

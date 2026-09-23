@@ -24,6 +24,7 @@ import { AnthropicConfigError } from "@/lib/anthropic/client";
 import { isUniqueViolation } from "@/lib/supabase/errors";
 import { findPendingChecklistDispatchByPhone, recordChecklistResponse } from "@/services/supabase/checklistDispatchService";
 import { processarMensagemDeGrupo } from "@/services/freight/groupMessageIntake";
+import { processGroupFuel } from "@/services/fuel/groupFuelIntake";
 import { resolverIntencaoComercialLanding, mensagemConfirmacaoOferta, MENSAGEM_INTERESSE_EMPRESAS } from "@/lib/mercadopago/landingIntent";
 import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
 import { isOfertaPlano, type OfertaPlano } from "@/lib/mercadopago/catalog";
@@ -320,11 +321,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Radar de Fretes (MVP): mensagem de GRUPO nunca passa por
-  // resolveOrCreateUserByPhone/onboarding/conversation — desvia 100% pro
-  // pipeline do Radar (pré-filtro → extração → matching), ou é ignorada se
-  // o grupo não estiver na whitelist. Nunca responde no grupo.
+  // Grupos não passam pelo onboarding individual. O piloto de abastecimento
+  // responde somente nos grupos e remetentes explicitamente configurados;
+  // os demais continuam no Radar, que não responde no grupo.
   if (body.isGroup) {
+    if (process.env.FUEL_GROUP_ENABLED === "true") {
+      try {
+        if (await processGroupFuel(createAdminClient(), body)) return NextResponse.json({ ok: true });
+      } catch (error) {
+        captureError({ event: "whatsapp_estoque_grupo_falhou", route: ROTA, error });
+        return NextResponse.json({ error: "Falha temporária no recebimento." }, { status: 503 });
+      }
+    }
     const textoGrupo = body.text?.message?.trim();
     if (textoGrupo) {
       const adminGrupo = createAdminClient();

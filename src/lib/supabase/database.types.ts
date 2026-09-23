@@ -1,4 +1,6 @@
 import type { CostOperation, CostRuleRow, CostEntry } from "@/lib/frota/costs";
+import type { FuelBalanceRow, FuelMovementRow } from "@/lib/frota/fuelStock";
+import type { FuelGroupDraft } from "@/lib/frota/fuelGroup";
 type CostTable<T> = { Row: { [K in keyof T]: T[K] }; Insert: Partial<T> & { company_id: string }; Update: Partial<T>; Relationships: [] };
 export type Json =
   | string
@@ -16,6 +18,9 @@ export type Database = {
   }
   public: {
     Tables: {
+      fuel_group_drafts: CostTable<FuelGroupDraft>
+      fuel_stock_balances: CostTable<FuelBalanceRow>
+      fuel_stock_movements: CostTable<FuelMovementRow>
       cost_operations: CostTable<CostOperation>
       cost_rules: CostTable<CostRuleRow>
       cost_entries: CostTable<CostEntry>
@@ -1058,6 +1063,8 @@ export type Database = {
       }
       fuel_fillups: {
         Row: {
+          internal_stock?: boolean
+          hour_meter?: number | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -2602,6 +2609,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fuel_group_step: { Args: { p_company: string; p_user: string; p_group: string; p_sender: string; p_message: string; p_action: string; p_patch: Json; p_revision?: number; p_draft?: string; p_command?: Json; p_dry_run?: boolean }; Returns: Json }
+      record_fuel_stock: { Args: { p_company: string; p_user: string; p_command: Json }; Returns: Json }
       confirm_cost_entry: { Args: { p_company: string; p_user: string; p_entry: string }; Returns: string }
       default_company_id: { Args: never; Returns: string }
       delete_google_refresh_token: {

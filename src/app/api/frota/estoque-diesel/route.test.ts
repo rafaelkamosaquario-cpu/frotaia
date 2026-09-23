@@ -1,0 +1,20 @@
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({ access: vi.fn(), rpc: vi.fn() }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc: mocks.rpc }) }));
+vi.mock("@/services/supabase/fleetPanelAccess", () => ({ loadFleetPanelAccess: mocks.access }));
+import { POST } from "./route";
+const company = "11111111-1111-4111-8111-111111111111";
+const user = "22222222-2222-4222-8222-222222222222";
+const command = { kind: "purchase", requestId: "33333333-3333-4333-8333-333333333333", date: "2026-09-21", liters: 1000, total: 7120, invoice: "123", supplier: "Fornecedor" };
+const request = (body: unknown) => new Request("https://test/api/frota/estoque-diesel", { method: "POST", body: JSON.stringify(body) });
+beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("FUEL_INTERNAL_ENABLED", "true"); mocks.access.mockResolvedValue({ ok: true, role: "owner", userId: user, company: { id: company } }); mocks.rpc.mockResolvedValue({ data: {}, error: null }); });
+afterEach(() => vi.unstubAllEnvs());
+describe("fuel stock API", () => {
+  it("uses authenticated tenant and user", async () => { expect((await POST(request(command))).status).toBe(201); expect(mocks.rpc).toHaveBeenCalledWith("record_fuel_stock", { p_company: company, p_user: user, p_command: command }); });
+  it("rejects a driver", async () => { mocks.access.mockResolvedValue({ ok: true, role: "driver" }); expect((await POST(request(command))).status).toBe(403); expect(mocks.rpc).not.toHaveBeenCalled(); });
+  it("rejects no panel entitlement", async () => { mocks.access.mockResolvedValue({ ok: false, reason: "not_entitled" }); expect((await POST(request(command))).status).toBe(403); });
+  it("does not write while feature disabled", async () => { vi.stubEnv("FUEL_INTERNAL_ENABLED", "false"); expect((await POST(request(command))).status).toBe(503); expect(mocks.rpc).not.toHaveBeenCalled(); });
+  it("rejects client-supplied tenant", async () => { expect((await POST(request({ ...command, companyId: company }))).status).toBe(400); expect(mocks.rpc).not.toHaveBeenCalled(); });
+  it("hides internal database errors", async () => { mocks.rpc.mockResolvedValue({ data: null, error: { code: "XX000", message: "private database error" } }); const response = await POST(request(command)); expect(response.status).toBe(409); expect(JSON.stringify(await response.json())).not.toContain("private"); });
+});

@@ -43,6 +43,17 @@ export async function sendWhatsappText(phoneE164: string, message: string): Prom
   }
 }
 
+/** Explicit group destination, never strip its suffix or treat it as a person's phone. */
+export async function sendWhatsappGroupText(groupId: string, message: string): Promise<void> {
+  if (!/^\d+-group$/.test(groupId)) throw new Error("Identificador de grupo inválido.");
+  const { ZAPI_INSTANCE_ID, ZAPI_INSTANCE_TOKEN, ZAPI_CLIENT_TOKEN } = getWhatsappConfig();
+  const response = await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_INSTANCE_TOKEN}/send-text`, {
+    method: "POST", headers: { "Content-Type": "application/json", "Client-Token": ZAPI_CLIENT_TOKEN },
+    body: JSON.stringify({ phone: groupId, message }), signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error(`Falha no envio ao grupo (${response.status}).`);
+}
+
 export interface OpcaoListaWhatsapp {
   id: string;
   title: string;
