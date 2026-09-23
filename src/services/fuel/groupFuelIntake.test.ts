@@ -9,7 +9,7 @@ const company = "11111111-1111-4111-8111-111111111111";
 const user = "22222222-2222-4222-8222-222222222222";
 const id = "33333333-3333-4333-8333-333333333333";
 const evidence = { vehicle: "ABC1D23", driver: "Condutor", date: "2026-09-21", liters: 162, meter: 16777, meterKind: "km" };
-const draft = { company_id: company, draft_id: id, revision: 2, evidence };
+const draft = { company_id: company, draft_id: id, revision: 2, evidence, updated_at: new Date().toISOString() };
 function database(active = true) {
   const filters: unknown[][] = [];
   const from = vi.fn((table: string) => {
@@ -32,7 +32,20 @@ describe("group fuel pilot", () => {
   it("ignores other groups", async () => { const db = database(); expect(await processGroupFuel(db.client, { ...input, phone: "999-group" })).toBe(false); expect(db.from).not.toHaveBeenCalled(); });
   it("silently consumes unauthorized sender without listing company data", async () => { const db = database(); expect(await processGroupFuel(db.client, { ...input, participantPhone: "5542999999999" })).toBe(true); expect(db.from).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled(); });
   it("rejects inactive delegate", async () => { const db = database(false); await processGroupFuel(db.client, input); expect(db.filters).toContainEqual(["company_members", "status", "active"]); expect(db.rpc).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled(); });
-  it("scopes vehicle and driver options to company and sends no prices", async () => { const db = database(); await processGroupFuel(db.client, input); expect(db.filters).toContainEqual(["vehicles", "company_id", company]); expect(db.filters).toContainEqual(["drivers", "company_id", company]); expect(mocks.send.mock.calls[0][1]).toContain("CONFIRMAR"); expect(mocks.send.mock.calls[0][1]).not.toContain("R$"); });
+  it("scopes vehicle and driver options to company and sends no prices", async () => { const db = database(); await processGroupFuel(db.client, input); expect(db.filters).toContainEqual(["vehicles", "company_id", company]); expect(db.filters).toContainEqual(["drivers", "company_id", company]); expect(mocks.send.mock.calls[0][1]).toContain("MOTORISTA"); expect(mocks.send.mock.calls[0][1]).not.toContain("R$"); });
+  it("finishes with an explicit driver choice without calling AI or merging twice", async () => {
+    const db = database();
+    await processGroupFuel(db.client, { ...input, text: { message: "MOTORISTA Condutor" } });
+    expect(mocks.extract).not.toHaveBeenCalled();
+    expect(db.rpc).toHaveBeenCalledTimes(1);
+    expect(db.rpc).toHaveBeenCalledWith("fuel_group_step", expect.objectContaining({ p_action: "confirm", p_dry_run: true, p_revision: 2, p_message: "m1" }));
+    expect(mocks.send.mock.calls[0][1]).toContain("Hora do registro");
+  });
+  it("does not repeat a reply for a duplicate driver selection", async () => {
+    const db = database(); db.rpc.mockResolvedValueOnce({ data: { duplicate: true }, error: null } as never);
+    await processGroupFuel(db.client, { ...input, text: { message: "MOTORISTA Condutor" } });
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
   it("confirms only in dry run, with server-controlled tenant and sender", async () => { const db = database(); await processGroupFuel(db.client, { ...input, text: { message: "CONFIRMAR 33333333-2" } }); expect(db.rpc).toHaveBeenCalledWith("fuel_group_step", expect.objectContaining({ p_dry_run: true, p_company: company, p_user: user, p_sender: input.participantPhone, p_action: "confirm" })); expect(mocks.send.mock.calls[0][1]).toContain("Simulação confirmada"); });
   it("does not confirm stale revision", async () => { const db = database(); await processGroupFuel(db.client, { ...input, text: { message: "CONFIRMAR 33333333-1" } }); expect(db.rpc).not.toHaveBeenCalled(); });
   it("does not announce success on database failure", async () => { const db = database(); db.rpc.mockResolvedValueOnce({ data: null, error: { message: "failure" } } as never); await processGroupFuel(db.client, { ...input, text: { message: "CONFIRMAR 33333333-2" } }); expect(mocks.send.mock.calls[0][1]).toContain("Não foi possível confirmar"); });
