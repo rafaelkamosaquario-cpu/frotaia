@@ -58,6 +58,7 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/manutencao", label: "Manutenção", icon: SIDEBAR_ICONS.manutencao, group: "Gestão", disponivel: true },
   { href: "/frota/documentos", label: "Documentos", icon: SIDEBAR_ICONS.documentos, group: "Gestão", disponivel: true },
   { href: "/frota/despesas", label: "Despesas", icon: SIDEBAR_ICONS.despesas, group: "Gestão", disponivel: true },
+  { href: "/frota/custos", label: "Custos e remunerações", icon: SIDEBAR_ICONS.despesas, group: "Gestão", disponivel: true },
   { href: "/frota/jornadas", label: "Jornadas", icon: SIDEBAR_ICONS.jornadas, group: "Gestão", disponivel: true },
   { href: "/frota/rotas", label: "Rotas salvas", icon: SIDEBAR_ICONS.rotas, group: "Gestão", disponivel: true },
   { href: "/frota/checklists", label: "Checklists", icon: SIDEBAR_ICONS.checklists, group: "Gestão", disponivel: true },

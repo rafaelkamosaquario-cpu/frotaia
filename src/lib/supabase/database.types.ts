@@ -1,3 +1,5 @@
+import type { CostOperation, CostRuleRow, CostEntry } from "@/lib/frota/costs";
+type CostTable<T> = { Row: { [K in keyof T]: T[K] }; Insert: Partial<T> & { company_id: string }; Update: Partial<T>; Relationships: [] };
 export type Json =
   | string
   | number
@@ -14,6 +16,9 @@ export type Database = {
   }
   public: {
     Tables: {
+      cost_operations: CostTable<CostOperation>
+      cost_rules: CostTable<CostRuleRow>
+      cost_entries: CostTable<CostEntry>
       ai_memories: {
         Row: {
           company_id: string
@@ -2597,6 +2602,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      confirm_cost_entry: { Args: { p_company: string; p_user: string; p_entry: string }; Returns: string }
       default_company_id: { Args: never; Returns: string }
       delete_google_refresh_token: {
         Args: { p_google_integration_id: string }

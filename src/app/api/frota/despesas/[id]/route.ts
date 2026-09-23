@@ -29,6 +29,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const despesa = await updateExpense(createAdminClient(), id, access.company.id, parsed);
     return NextResponse.json({ despesa });
   } catch (error) {
+    if (isProtectedCostError(error)) return Response.json({ error: "Esta despesa foi confirmada em Custos e remunerações e está protegida contra alteração." }, { status: 409 });
     if (error instanceof InvalidCompanyReference) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
@@ -53,11 +54,20 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   if (!["owner", "admin"].includes(access.role)) {
     return NextResponse.json({ error: "Somente proprietário ou administrador pode excluir lançamentos." }, { status: 403 });
   }
-  await deleteExpense(createAdminClient(), id, access.company.id);
+  try {
+    await deleteExpense(createAdminClient(), id, access.company.id);
+  } catch (error) {
+    if (isProtectedCostError(error)) return Response.json({ error: "Esta despesa foi confirmada em Custos e remunerações e não pode ser excluída por aqui." }, { status: 409 });
+    throw error;
+  }
   return NextResponse.json({ ok: true });
 }
 
 /** .single() do Supabase lança PGRST116 quando o update não afeta nenhuma linha (id de outra empresa, ou inexistente). */
 function isNotFoundError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && (error as { code: unknown }).code === "PGRST116";
+}
+
+function isProtectedCostError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P0001" && "message" in error && String(error.message).includes("Custos e remunerações");
 }

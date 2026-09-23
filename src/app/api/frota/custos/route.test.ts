@@ -1,0 +1,20 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+const m = vi.hoisted(() => ({ access:vi.fn(), list:vi.fn(), save:vi.fn(), generate:vi.fn(), rpc:vi.fn(), from:vi.fn() }));
+vi.mock("@/lib/supabase/server",()=>({createClient:vi.fn().mockResolvedValue({})}));
+vi.mock("@/lib/supabase/admin",()=>({createAdminClient:()=>({rpc:m.rpc,from:m.from})}));
+vi.mock("@/services/supabase/fleetPanelAccess",()=>({loadFleetPanelAccess:m.access}));
+vi.mock("@/services/supabase/costService",()=>({listCosts:m.list,saveCostRule:m.save,generateCost:m.generate}));
+import { GET, POST } from "./route";
+const id = "00000000-0000-4000-8000-000000000001";
+const post = (body:unknown)=>POST(new Request("https://test/api/frota/custos",{method:"POST",body:JSON.stringify(body)}));
+describe("costs endpoint security",()=>{
+ beforeEach(()=>{vi.clearAllMocks();m.access.mockResolvedValue({ok:true,role:"owner",company:{id:"trusted-company"},userId:"trusted-user"});m.rpc.mockResolvedValue({data:"expense",error:null});});
+ it.each(["viewer","driver"])("denies %s before reading or writing",async role=>{m.access.mockResolvedValue({ok:true,role,company:{id:"c"}});expect((await post({action:"confirm",id})).status).toBe(403);expect((await GET(new Request("https://test/api/frota/custos?month=2026-09"))).status).toBe(403);expect(m.rpc).not.toHaveBeenCalled();expect(m.list).not.toHaveBeenCalled();});
+ it("requires authentication",async()=>{m.access.mockResolvedValue({ok:false,reason:"unauthenticated"});expect((await post({action:"confirm",id})).status).toBe(401);});
+ it("uses only server resolved company and user",async()=>{expect((await post({action:"confirm",id})).status).toBe(200);expect(m.rpc).toHaveBeenCalledWith("confirm_cost_entry",{p_company:"trusted-company",p_user:"trusted-user",p_entry:id});});
+ it("rejects company injection",async()=>{expect((await post({action:"confirm",id,companyId:"foreign"})).status).toBe(400);expect(m.rpc).not.toHaveBeenCalled();});
+ it("rejects invalid periods",async()=>{expect((await GET(new Request("https://test/api/frota/custos?month=2026-99"))).status).toBe(400);expect(m.list).not.toHaveBeenCalled();});
+ it("reports missing migration without pretending saved",async()=>{m.list.mockRejectedValueOnce({code:"42P01"});expect((await GET(new Request("https://test/api/frota/custos?month=2026-09"))).status).toBe(503);});
+ it("returns conflict for duplicate month",async()=>{m.generate.mockRejectedValueOnce({code:"23505"});expect((await post({action:"generate",input:{}})).status).toBe(409);});
+ it("reads only company and selected month",async()=>{m.list.mockResolvedValue({operations:[],rules:[],entries:[]});expect((await GET(new Request("https://test/api/frota/custos?month=2026-09"))).status).toBe(200);expect(m.list).toHaveBeenCalledWith(expect.anything(),"trusted-company","2026-09");});
+});
