@@ -34,6 +34,33 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 const ready = (): TruckFlow => ({ ...newTruckFlow(), liters: 162, meter: 16755.9, plate: "ABC1D23", confirmed: { liters: true, meter: true, plate: true } });
 describe("interactive truck fuel intake", () => {
+  it("handles native buttonReply tokens through all five drivers and the final receipt", async () => {
+    const drivers = Array.from({ length: 5 }, (_, i) => ({ id: `33333333-3333-4333-8333-${String(i + 1).padStart(12, "0")}`, name: `Condutor ${i + 1}` }));
+    const db = database(true, ready(), drivers), seen = new Set<string>();
+    await processGroupFuel(db.client, input);
+    for (let page = 0; page < 3; page++) {
+      const options = mocks.buttons.mock.calls.at(-1)![2] as { id: string; label: string }[];
+      options.filter(b => b.label !== "Mais opções").forEach(b => seen.add(b.label));
+      const selected = page < 2 ? options.find(b => b.label === "Mais opções")! : options.find(b => b.label === "Condutor 5")!;
+      await processGroupFuel(db.client, { ...input, text: undefined, messageId: `native-${page}`, buttonReply: { id: selected.id, displayText: selected.label } });
+    }
+    expect(seen.size).toBe(5);
+    expect(db.rpc.mock.calls.filter(c => c[1].p_action === "confirm")).toHaveLength(1);
+    expect(db.rpc.mock.calls.at(-1)![1]).toMatchObject({ p_action: "confirm", p_dry_run: true, p_command: { driverId: drivers[4].id } });
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("✅ Motorista: Condutor 5\n\nSimulação concluída — nenhum lançamento realizado.");
+  });
+  it("rejects stale, nested, label-only and ambiguous native replies", async () => {
+    const db = database(true, ready());
+    for (const [i, buttonReply] of [
+      { id: truckToken(id, 0, `driver:${id}`), displayText: "Condutor" },
+      { quoted: { id: truckToken(id, 1, `driver:${id}`) } },
+      { displayText: "Condutor" },
+      { id: truckToken(id, 1, `driver:${id}`), other: truckToken(id, 1, "more") },
+    ].entries()) {
+      await processGroupFuel(db.client, { ...input, text: undefined, messageId: `bad-native-${i}`, buttonReply });
+    }
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
   it("accepts revision-bound list replies for pagination and driver selection", async () => {
     const db = database(true, ready(), [{ id, name: "Ana" }, { id: user, name: "Bia" }, { id: company, name: "Caio" }]);
     await processGroupFuel(db.client, { ...input, text: undefined, listResponseMessage: { selectedRowId: truckToken(id, 1, "more"), title: "Mais opções" } });
@@ -177,3 +204,4 @@ describe("interactive truck fuel intake", () => {
     expect(mocks.send.mock.calls.at(-1)![1]).toContain("Digite seu nome completo");
   });
 });
+

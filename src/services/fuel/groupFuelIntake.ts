@@ -15,6 +15,16 @@ export interface GroupFuelInput {
   image?: { imageUrl?: string; mimeType?: string; caption?: string };
   buttonsResponseMessage?: { buttonId?: string; message?: string };
   listResponseMessage?: { selectedRowId?: string; title?: string; message?: string };
+  buttonReply?: unknown;
+}
+
+// The live provider sends buttonReply (not buttonsResponseMessage).
+// Accept only our own revision-bound token from its immediate string fields;
+// never interpret arbitrary labels, quoted messages or nested content as clicks.
+function nativeReplyToken(reply: unknown): string | null {
+  if (!reply || typeof reply !== "object" || Array.isArray(reply)) return null;
+  const tokens = Object.values(reply).filter((v): v is string => typeof v === "string").map(v => v.trim()).filter(v => v.startsWith("fuel:"));
+  return tokens.length === 1 ? tokens[0] : tokens.length > 1 ? "fuel:ambiguous" : null;
 }
 
 /** Configured groups are always consumed; never leak into another workflow. */
@@ -25,7 +35,7 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const config = configs.find(c => c.groupId === input.phone);
   if (!config) return false;
   const sender = normalizePhoneDigits(input.participantPhone ?? "");
-  const button = input.buttonsResponseMessage?.buttonId?.trim() || input.listResponseMessage?.selectedRowId?.trim() || null;
+  const button = nativeReplyToken(input.buttonReply) || input.buttonsResponseMessage?.buttonId?.trim() || input.listResponseMessage?.selectedRowId?.trim() || null;
   const buttonText = input.buttonsResponseMessage?.message?.trim() || input.listResponseMessage?.title?.trim() || "";
   // Shape-only diagnostics: never log phones, names, tokens or media URLs.
   console.info("[fuel-group] received " + JSON.stringify({ allowedSender: config.senders.includes(sender), hasMessageId: Boolean(input.messageId), button: Boolean(button), buttonText: Boolean(buttonText), text: Boolean(input.text?.message), image: Boolean(input.image?.imageUrl), fields: Object.keys(input).filter(k => /^[a-zA-Z]{1,40}$/.test(k)).slice(0, 50) }));
@@ -117,3 +127,4 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   await emit(truckFlowSchema.parse(updated.evidence.truckFlow), updated.draft_id, updated.revision, notice, retryPhoto);
   return true;
 }
+
