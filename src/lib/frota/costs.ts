@@ -16,6 +16,7 @@ export const costRuleSchema = z.object({
   startMonth: monthSchema,
   endMonth: monthSchema.nullable().default(null),
   dueDay: z.number().int().min(1).max(31),
+  dueMonthOffset: z.number().int().min(0).max(1).optional(),
   allocations: z.array(z.object({ operationId: z.uuid(), percent: z.number().finite().positive().max(100).multipleOf(0.01) })).max(30).default([]),
 }).strict().superRefine((r, ctx) => {
   const fail = (message: string) => ctx.addIssue({ code: "custom", message });
@@ -49,9 +50,11 @@ export function calculateCost(rule: CostRule, month: string, base: number) {
   const ordered = [...parts].sort((a, b) => b.remainder - a.remainder);
   for (let i = 0, left = cents - parts.reduce((s, p) => s + p.cents, 0); parts.length && i < left; i++) ordered[i % ordered.length].cents++;
   const [year, m] = month.split("-").map(Number);
-  const lastDay = new Date(Date.UTC(year, m, 0)).getUTCDate();
+  const dueMonthDate = new Date(Date.UTC(year, m - 1 + (rule.dueMonthOffset ?? 0), 1));
+  const dueMonth = dueMonthDate.toISOString().slice(0, 7);
+  const lastDay = new Date(Date.UTC(dueMonthDate.getUTCFullYear(), dueMonthDate.getUTCMonth() + 1, 0)).getUTCDate();
   return { amount: cents / 100, fixed: fixedCents / 100, variable: variableCents / 100,
-    dueDate: `${month}-${String(Math.min(rule.dueDay, lastDay)).padStart(2, "0")}`,
+    dueDate: `${dueMonth}-${String(Math.min(rule.dueDay, lastDay)).padStart(2, "0")}`,
     allocations: parts.map(p => ({ operationId: p.operationId, percent: p.percent, amount: p.cents / 100 })) };
 }
 

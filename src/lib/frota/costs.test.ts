@@ -3,6 +3,18 @@ import { calculateCost, costRuleSchema, type CostRule } from "./costs";
 const ids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002", "00000000-0000-4000-8000-000000000003"];
 const rule = (overrides: Partial<CostRule> = {}) => costRuleSchema.parse({ name: "Salário teste", category: "salario", person: "Pessoa de teste", method: "fixed", fixed: 5500, startMonth: "2026-09", dueDay: 31, ...overrides });
 describe("costs and remuneration", () => {
+ it("keeps September competence with payment on October 5", () => {
+  const input = rule({ dueDay: 5, dueMonthOffset: 1, endMonth: "2026-09" });
+  expect(calculateCost(input, "2026-09", 0)).toMatchObject({ amount:5500, dueDate:"2026-10-05" });
+  expect(input.startMonth).toBe("2026-09");
+ });
+ it.each([["2026-12","2027-01-31"],["2027-01","2027-02-28"],["2028-01","2028-02-29"]])("handles next month from %s", (month, expected) => {
+  expect(calculateCost(rule({ dueMonthOffset:1 }),month,0).dueDate).toBe(expected);
+ });
+ it("preserves legacy same-month rules and rejects invalid offsets", () => {
+  expect(calculateCost(rule({ dueDay:5 }),"2026-09",0).dueDate).toBe("2026-09-05");
+  for (const dueMonthOffset of [-1,2,0.5]) expect(() => rule({ dueMonthOffset })).toThrow();
+ });
  it("fixed salary is charged once and split, not multiplied", () => {
   const result = calculateCost(rule({ allocations: [{ operationId: ids[0], percent: 60 }, { operationId: ids[1], percent: 40 }] }), "2026-09", 90000);
   expect(result.amount).toBe(5500); expect(result.variable).toBe(0);

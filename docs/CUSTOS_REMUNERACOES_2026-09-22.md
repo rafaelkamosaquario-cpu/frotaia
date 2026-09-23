@@ -8,6 +8,7 @@
 2. Em **Novo cadastro**, escolha salário, pró-labore, seguro, aluguel, rastreador, administrativo ou outro.
 3. Escolha fixo mensal, percentual, por produção ou fixo mais variável. Informe pessoa, motorista e veículo somente quando aplicável.
 4. Caso compartilhe um custo entre operações, distribua 100% do valor. O rateio não duplica o custo.
+   Em **Mês do vencimento**, escolha próprio mês ou mês seguinte. Setembro + mês seguinte + dia 5 vence em 05/10, sem mudar a competência de setembro. **Mês final** apenas encerra a recorrência; deixe vazio quando não existir término previsto. Cadastros antigos mantêm vencimento no próprio mês até serem editados. Meses já gerados não são alterados por uma edição da regra.
 5. Selecione o mês e use **Gerar mês** em Cadastros recorrentes. Para comissão/produção, informe a base e sua origem. Não há busca automática dos fretes nem cálculo proporcional por dias.
 6. Confira o rascunho. Ele pode ser descartado e gerado novamente. Só confirme depois de verificar se o mesmo custo já foi lançado manualmente.
 7. Confirmar cria uma única despesa por cadastro/mês, na competência (dia 1). O vencimento fica na nova área. Isso não transfere dinheiro nem confirma pagamento.
