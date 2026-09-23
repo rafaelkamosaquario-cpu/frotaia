@@ -24,8 +24,11 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const config = configs.find(c => c.groupId === input.phone);
   if (!config) return false;
   const sender = normalizePhoneDigits(input.participantPhone ?? "");
-  const button = input.buttonsResponseMessage?.buttonId;
-  if (!config.senders.includes(sender) || !input.messageId || (!input.text?.message && !input.image?.imageUrl && !button)) return true;
+  const button = input.buttonsResponseMessage?.buttonId?.trim() || null;
+  const buttonText = input.buttonsResponseMessage?.message?.trim() || "";
+  // Shape-only diagnostics: never log phones, names, tokens or media URLs.
+  console.info("[fuel-group] received", { allowedSender: config.senders.includes(sender), hasMessageId: Boolean(input.messageId), button: Boolean(button), buttonText: Boolean(buttonText), text: Boolean(input.text?.message), image: Boolean(input.image?.imageUrl) });
+  if (!config.senders.includes(sender) || !input.messageId || (!input.text?.message && !input.image?.imageUrl && !button && !buttonText)) return true;
   const member = await client.from("company_members").select("role").eq("company_id", config.companyId).eq("user_id", config.operatorId).eq("status", "active").maybeSingle();
   if (member.error) throw member.error;
   if (!member.data || !["owner", "admin", "operator"].includes(member.data.role)) return true;
@@ -37,7 +40,7 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   if (vs.error || ds.error || current.error) throw vs.error ?? ds.error ?? current.error;
   const vehicles = (vs.data ?? []).map(v => ({ ...v, name: v.name ?? v.plate ?? v.id }));
   const drivers = (ds.data ?? []).map(d => ({ ...d, name: d.name ?? d.id })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
-  const text = (input.text?.message ?? input.image?.caption ?? "").trim();
+  const text = (input.text?.message ?? input.image?.caption ?? buttonText).trim();
   const prefix = config.dryRun ? "[TESTE — não grava estoque/despesa]\n" : "";
   const reply = (message: string) => sendWhatsappGroupText(config.groupId, prefix + message);
   const args = { p_company: config.companyId, p_user: config.operatorId, p_group: config.groupId, p_sender: sender, p_message: input.messageId, p_dry_run: config.dryRun };
@@ -48,20 +51,21 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const field = truckField(state);
   const token = button ?? (text.startsWith("fuel:") ? text : null);
   const namedDrivers = !field && !token ? drivers.filter(d => d.name.trim().toLocaleLowerCase("pt-BR") === text.replace(/^MOTORISTA\s+/i, "").trim().toLocaleLowerCase("pt-BR")) : [];
-  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : namedDrivers.length === 1 ? `driver:${namedDrivers[0].id}` : null;
+  const moreByText = !token && !field && fresh && saved.success && /^(MAIS|MAIS OPÇÕES|MAIS OPCOES|MAIS NOMES)$/i.test(text);
+  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : moreByText ? "more" : namedDrivers.length === 1 ? `driver:${namedDrivers[0].id}` : null;
   const emit = async (s: TruckFlow, id: string, revision: number, notice = "") => {
     const prompt = truckPrompt(s, vehicles, drivers, id, revision);
     if (!prompt.buttons.length) { await reply(notice + prompt.message); return; }
     // Text is independently delivered: a provider accepting buttons does not prove
     // they render in the group. A typed, unique company driver name remains usable.
-    await reply(notice + "Identifique-se como condutor. Toque no seu nome nas opções ou digite seu nome completo cadastrado.");
+    await reply(notice + "Identifique-se como condutor. Toque no seu nome nas opções ou digite seu nome completo cadastrado." + (drivers.length > 2 ? " Para ver outros nomes, toque em Mais opções ou digite MAIS." : ""));
     try { await sendWhatsappGroupButtons(config.groupId, prefix + prompt.message, prompt.buttons); }
     catch {
       console.warn("[fuel-group] button_send_failed");
       await reply("Não consegui enviar os botões. Digite seu nome completo cadastrado para se identificar. Nenhum abastecimento foi registrado.");
     }
   };
-  if (token && !action) { await reply("Este botão é antigo ou pertence a outro abastecimento. Envie RESUMO para receber seus botões atuais."); return true; }
+  if (token && !action) { console.info("[fuel-group] stale_button"); await reply("Este botão é antigo ou pertence a outro abastecimento. Envie RESUMO para receber seus botões atuais."); return true; }
   if (action?.startsWith("driver:")) {
     const driver = drivers.find(d => d.id === action.slice(7));
     const vehicle = truckVehicle(state.plate, vehicles);
@@ -80,7 +84,10 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const summary = /^(RESUMO|TESTE ABASTECIMENTO)$/i.test(text);
   let notice = "";
   if (reset) state = newTruckFlow();
-  else if (action === "more" && !field) state.page = (state.page + 1) % Math.max(1, Math.ceil(drivers.length / 2));
+  else if (action === "more" && !field) {
+    state.page = (state.page + 1) % Math.max(1, Math.ceil(drivers.length / 2));
+    console.info("[fuel-group] driver_page", { page: state.page + 1, count: drivers.length });
+  }
   else if (action) { await reply("Esta opção não corresponde à etapa atual. Envie RESUMO."); return true; }
   else if (!summary) {
     if (!field) { await reply("Não identifiquei um único condutor com esse nome. Digite seu nome completo cadastrado ou envie RESUMO para ver as opções."); return true; }
@@ -107,4 +114,3 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   await emit(truckFlowSchema.parse(updated.evidence.truckFlow), updated.draft_id, updated.revision, notice);
   return true;
 }
-

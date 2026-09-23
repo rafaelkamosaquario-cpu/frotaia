@@ -9,11 +9,11 @@ vi.mock("./fuelImageExtraction", () => ({ extractFuelEvidence: mocks.extract }))
 import { processGroupFuel } from "./groupFuelIntake";
 const company = "11111111-1111-4111-8111-111111111111", user = "22222222-2222-4222-8222-222222222222", id = "33333333-3333-4333-8333-333333333333";
 const input = { phone: "123456-group", participantPhone: "5542998006380", messageId: "m1", text: { message: "RESUMO" } };
-function database(active = true, initial: TruckFlow = newTruckFlow()) {
+function database(active = true, initial: TruckFlow = newTruckFlow(), drivers = [{ id, name: "Condutor" }]) {
   let draft = { draft_id: id, revision: 1, evidence: { truckFlow: initial }, updated_at: new Date().toISOString() };
   const filters: unknown[][] = [], seen = new Set<string>();
   const from = vi.fn((table: string) => {
-    const value = table === "company_members" ? active ? { role: "owner" } : null : table === "vehicles" ? [{ id, name: "Caminhão", plate: "ABC1D23" }] : table === "drivers" ? [{ id, name: "Condutor" }] : structuredClone(draft);
+    const value = table === "company_members" ? active ? { role: "owner" } : null : table === "vehicles" ? [{ id, name: "Caminhão", plate: "ABC1D23" }] : table === "drivers" ? drivers : structuredClone(draft);
     const q = { select: vi.fn(() => q), eq: vi.fn((...args: unknown[]) => { filters.push([table, ...args]); return q; }), maybeSingle: vi.fn(async () => ({ data: value, error: null })), limit: vi.fn(async () => ({ data: value, error: null })) };
     return q;
   });
@@ -34,6 +34,32 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 const ready = (): TruckFlow => ({ ...newTruckFlow(), liters: 162, meter: 16755.9, plate: "ABC1D23", confirmed: { liters: true, meter: true, plate: true } });
 describe("interactive truck fuel intake", () => {
+  it.each([5, 9])("reaches every one of %i drivers through More buttons, then finishes with the last driver", async count => {
+    const drivers = Array.from({ length: count }, (_, i) => ({ id: `33333333-3333-4333-8333-${String(i + 1).padStart(12, "0")}`, name: `Condutor ${i + 1}` }));
+    const db = database(true, ready(), drivers), seen = new Set<string>();
+    await processGroupFuel(db.client, input);
+    for (let page = 0; page < Math.ceil(count / 2); page++) {
+      const options = mocks.buttons.mock.calls.at(-1)![2] as { id: string; label: string }[];
+      options.filter(b => b.label !== "Mais opções").forEach(b => seen.add(b.label));
+      expect(db.current().evidence.truckFlow.page).toBe(page);
+      const selected = page === Math.ceil(count / 2) - 1 ? options.find(b => b.label === drivers.at(-1)!.name)! : options.find(b => b.label === "Mais opções")!;
+      await processGroupFuel(db.client, { ...input, messageId: `page-${page}`, text: undefined, buttonsResponseMessage: { buttonId: selected.id, message: selected.label } });
+    }
+    expect(seen.size).toBe(count);
+    expect(db.rpc.mock.calls.filter(c => c[1].p_action === "confirm")).toHaveLength(1);
+    expect(db.rpc.mock.calls.at(-1)![1]).toMatchObject({ p_dry_run: true, p_command: { driverId: drivers.at(-1)!.id } });
+  });
+  it("supports text and label-only navigation, wraps pages, and never bypasses a stale token", async () => {
+    const db = database(true, ready(), [{ id, name: "Ana" }, { id: user, name: "Bia" }, { id: company, name: "Caio" }]);
+    await processGroupFuel(db.client, { ...input, text: { message: "MAIS" } });
+    expect(db.current().evidence.truckFlow.page).toBe(1);
+    await processGroupFuel(db.client, { ...input, messageId: "label", text: undefined, buttonsResponseMessage: { message: "Mais opções" } });
+    expect(db.current().evidence.truckFlow.page).toBe(0);
+    const calls = db.rpc.mock.calls.length;
+    await processGroupFuel(db.client, { ...input, messageId: "stale", text: undefined, buttonsResponseMessage: { buttonId: truckToken(id, 0, "more"), message: "Mais opções" } });
+    expect(db.rpc).toHaveBeenCalledTimes(calls);
+    expect(db.rpc.mock.calls.every(c => c[1].p_action !== "confirm")).toBe(true);
+  });
   it("does nothing when disabled or for another group", async () => {
     const db = database(); expect(await processGroupFuel(db.client, { ...input, phone: "other" })).toBe(false);
     vi.stubEnv("FUEL_GROUP_ENABLED", "false"); expect(await processGroupFuel(db.client, input)).toBe(false); expect(db.from).not.toHaveBeenCalled();
@@ -119,4 +145,3 @@ describe("interactive truck fuel intake", () => {
     expect(mocks.send.mock.calls.at(-1)![1]).toContain("Digite seu nome completo");
   });
 });
-
