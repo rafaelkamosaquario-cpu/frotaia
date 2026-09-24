@@ -28,6 +28,8 @@ interface FormState {
   name: string;
   phoneE164: string;
   vehicleId: string;
+  additionalVehicleId1: string;
+  additionalVehicleId2: string;
   cnhExpiryDate: string;
   toxicologicoExpiryDate: string;
 }
@@ -37,6 +39,8 @@ function toFormState(driver: DriverRow | null): FormState {
     name: driver?.name ?? "",
     phoneE164: driver?.phone_e164 ?? "",
     vehicleId: driver?.vehicle_id ?? "",
+    additionalVehicleId1: driver?.additional_vehicle_id_1 ?? "",
+    additionalVehicleId2: driver?.additional_vehicle_id_2 ?? "",
     cnhExpiryDate: driver?.cnh_expiry_date ?? "",
     toxicologicoExpiryDate: driver?.toxicologico_expiry_date ?? "",
   };
@@ -45,6 +49,8 @@ function toFormState(driver: DriverRow | null): FormState {
 /** vehicleId é tratado à parte: precisa distinguir "não mexer" (ausente) de "desvincular" (null explícito). */
 function toPayload(form: FormState, isEditing: boolean): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
+  payload.additionalVehicleId1 = form.additionalVehicleId1 || null;
+  payload.additionalVehicleId2 = form.additionalVehicleId2 || null;
   if (form.name) payload.name = form.name;
   if (form.phoneE164) payload.phoneE164 = form.phoneE164;
   if (form.cnhExpiryDate) payload.cnhExpiryDate = form.cnhExpiryDate;
@@ -86,6 +92,8 @@ export function DriverFormModal({ open, onClose, driver, veiculosAtivos, onSaved
     }
 
     const payload = toPayload(form, isEditing);
+    const links = [form.vehicleId, form.additionalVehicleId1, form.additionalVehicleId2].filter(Boolean);
+    if (new Set(links).size !== links.length) { setNameError("Escolha veículos/equipamentos diferentes em cada vínculo."); return; }
     const schema = isEditing ? driverUpdateSchema : driverCreateSchema;
     const parsed = schema.safeParse(payload);
     if (!parsed.success) {
@@ -141,7 +149,7 @@ export function DriverFormModal({ open, onClose, driver, veiculosAtivos, onSaved
           </div>
           <div>
             <label htmlFor="vehicleId" className={labelClass}>
-              Veículo vinculado
+              Veículo/equipamento principal
             </label>
             <select
               id="vehicleId"
@@ -150,6 +158,7 @@ export function DriverFormModal({ open, onClose, driver, veiculosAtivos, onSaved
               className={selectClass}
             >
               <option value="">Nenhum</option>
+              {form.vehicleId && !veiculosAtivos.some(v => v.id === form.vehicleId) && <option value={form.vehicleId}>Vínculo atual (inativo)</option>}
               {veiculosAtivos.map((veiculo) => (
                 <option key={veiculo.id} value={veiculo.id}>
                   {veiculo.name || veiculo.plate || "Sem apelido"}
@@ -158,6 +167,21 @@ export function DriverFormModal({ open, onClose, driver, veiculosAtivos, onSaved
             </select>
           </div>
         </div>
+
+        <fieldset className="space-y-3">
+          <legend className={labelClass}>Vínculos adicionais (opcionais)</legend>
+          <p className="text-xs text-muted-foreground">Até 3 veículos ou equipamentos por pessoa: 1 principal e 2 adicionais.</p>
+          {(["additionalVehicleId1", "additionalVehicleId2"] as const).map((key, i) => (
+            <div key={key}>
+              <label htmlFor={key} className={labelClass}>Veículo/equipamento adicional {i + 1}</label>
+              <select id={key} value={form[key]} onChange={e => updateField(key, e.target.value)} className={selectClass}>
+                <option value="">Nenhum</option>
+                {form[key] && !veiculosAtivos.some(v => v.id === form[key]) && <option value={form[key]}>Vínculo atual (inativo)</option>}
+                {veiculosAtivos.map(v => <option key={v.id} value={v.id} disabled={v.id !== form[key] && [form.vehicleId, form.additionalVehicleId1, form.additionalVehicleId2].includes(v.id)}>{v.name || v.plate || "Sem apelido"}</option>)}
+              </select>
+            </div>
+          ))}
+        </fieldset>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -198,3 +222,4 @@ export function DriverFormModal({ open, onClose, driver, veiculosAtivos, onSaved
     </Modal>
   );
 }
+

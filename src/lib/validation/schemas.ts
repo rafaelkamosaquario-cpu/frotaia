@@ -165,6 +165,8 @@ export const driverCreateSchema = z.object({
   name: maxText(120, "Nome do motorista"),
   phoneE164: phoneE164Schema.optional(),
   vehicleId: uuidSchema.nullable().optional(),
+  additionalVehicleId1: uuidSchema.nullable().optional(),
+  additionalVehicleId2: uuidSchema.nullable().optional(),
   cnhExpiryDate: z.string().date().optional(),
   toxicologicoExpiryDate: z.string().date().optional(),
   active: z.boolean().optional(),
@@ -569,3 +571,4 @@ export const freightOpportunityExtractionSchema = z.object({
   freightValueCents: z.number().finite().nonnegative().nullable(),
   contactText: z.string().nullable(),
 });
+

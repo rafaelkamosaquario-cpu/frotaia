@@ -31,6 +31,8 @@ export async function createDriver(client: SupabaseDbClient, companyId: string, 
       name: parsed.name,
       phone_e164: parsed.phoneE164,
       vehicle_id: parsed.vehicleId,
+      additional_vehicle_id_1: parsed.additionalVehicleId1,
+      additional_vehicle_id_2: parsed.additionalVehicleId2,
       cnh_expiry_date: parsed.cnhExpiryDate,
       toxicologico_expiry_date: parsed.toxicologicoExpiryDate,
     })
@@ -56,6 +58,8 @@ export async function updateDriver(
       name: parsed.name,
       phone_e164: parsed.phoneE164,
       vehicle_id: parsed.vehicleId,
+      additional_vehicle_id_1: parsed.additionalVehicleId1,
+      additional_vehicle_id_2: parsed.additionalVehicleId2,
       cnh_expiry_date: parsed.cnhExpiryDate,
       toxicologico_expiry_date: parsed.toxicologicoExpiryDate,
       active: parsed.active,
@@ -68,3 +72,4 @@ export async function updateDriver(
   if (error) throw error;
   return data;
 }
+

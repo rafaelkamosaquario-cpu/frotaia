@@ -105,12 +105,15 @@ export function MotoristasClient({ motoristasIniciais, veiculos }: MotoristasCli
             </thead>
             <tbody>
               {motoristas.map((motorista) => {
-                const veiculo = motorista.vehicle_id ? veiculosPorId.get(motorista.vehicle_id) : null;
+                const vinculos = [motorista.vehicle_id, motorista.additional_vehicle_id_1, motorista.additional_vehicle_id_2].map((id, i) => {
+                  const veiculo = id ? veiculosPorId.get(id) : null;
+                  return veiculo ? `${veiculo.name || veiculo.plate}${i === 0 ? " (principal)" : ""}` : null;
+                }).filter(Boolean);
                 return (
                   <tr key={motorista.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
                     <td data-label="Nome" className="px-4 py-3 font-medium text-foreground">{motorista.name ?? "—"}</td>
                     <td data-label="Telefone" className="px-4 py-3 text-muted-foreground">{motorista.phone_e164 ?? "—"}</td>
-                    <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
+                    <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{vinculos.length ? vinculos.join(" · ") : "—"}</td>
                     <td data-label="CNH vence" className="px-4 py-3 text-muted-foreground">{formatDate(motorista.cnh_expiry_date)}</td>
                     <td data-label="Toxicológico vence" className="px-4 py-3 text-muted-foreground">{formatDate(motorista.toxicologico_expiry_date)}</td>
                     <td data-label="Status" className="px-4 py-3">
@@ -183,3 +186,4 @@ export function MotoristasClient({ motoristasIniciais, veiculos }: MotoristasCli
     </div>
   );
 }
+

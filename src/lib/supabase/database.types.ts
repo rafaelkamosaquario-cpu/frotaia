@@ -627,6 +627,8 @@ export type Database = {
       }
       drivers: {
         Row: {
+          additional_vehicle_id_1?: string | null
+          additional_vehicle_id_2?: string | null
           active: boolean
           cnh_expiry_date: string | null
           company_id: string
@@ -639,6 +641,8 @@ export type Database = {
           vehicle_id: string | null
         }
         Insert: {
+          additional_vehicle_id_1?: string | null
+          additional_vehicle_id_2?: string | null
           active?: boolean
           cnh_expiry_date?: string | null
           company_id: string
@@ -651,6 +655,8 @@ export type Database = {
           vehicle_id?: string | null
         }
         Update: {
+          additional_vehicle_id_1?: string | null
+          additional_vehicle_id_2?: string | null
           active?: boolean
           cnh_expiry_date?: string | null
           company_id?: string
@@ -3205,3 +3211,4 @@ export const Constants = {
     },
   },
 } as const
+
