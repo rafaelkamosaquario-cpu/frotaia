@@ -44,37 +44,55 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   if (member.error) throw member.error;
   if (!member.data || !["owner", "admin", "operator"].includes(member.data.role)) return true;
   const [vs, ds, current] = await Promise.all([
-    client.from("vehicles").select("id,name,plate").eq("company_id", config.companyId).limit(100),
-    client.from("drivers").select("id,name").eq("company_id", config.companyId).limit(100),
+    client.from("vehicles").select("id,name,plate,active").eq("company_id", config.companyId).limit(100),
+    client.from("drivers").select("id,name,active,phone_e164,vehicle_id,additional_vehicle_id_1,additional_vehicle_id_2").eq("company_id", config.companyId).limit(100),
     client.from("fuel_group_drafts").select("*").eq("company_id", config.companyId).eq("group_id", config.groupId).eq("sender", sender).maybeSingle(),
   ]);
   if (vs.error || ds.error || current.error) throw vs.error ?? ds.error ?? current.error;
-  const vehicles = (vs.data ?? []).map(v => ({ ...v, name: v.name ?? v.plate ?? v.id }));
+  let vehicles = (vs.data ?? []).filter(v => v.active !== false).map(v => ({ ...v, name: v.name ?? v.plate ?? v.id }));
+  // BR mobile aliases are compared only after the existing group sender allowlist.
+  const phoneKey = (raw: string) => {
+    const digits = normalizePhoneDigits(raw);
+    return /^55\d{2}9\d{8}$/.test(digits) ? digits.slice(0, 4) + digits.slice(5) : digits;
+  };
+  const identified = config.dryRun ? (ds.data ?? []).filter(d => d.active !== false && d.phone_e164 && phoneKey(d.phone_e164) === phoneKey(sender)) : [];
+  const person = identified.length === 1 ? identified[0] : null;
+  const linkedIds = person ? [person.vehicle_id, person.additional_vehicle_id_1, person.additional_vehicle_id_2].filter(Boolean) : [];
+  const linkedVehicles = vehicles.filter(v => linkedIds.includes(v.id));
+  const linkedPilot = !!person && linkedVehicles.length > 0;
+  if (linkedPilot) vehicles = linkedVehicles;
   // Optional group-specific eligibility; never changes the company's driver records.
   // IDs must also belong to the company query above. An empty selection fails closed.
-  const drivers = (ds.data ?? []).filter(d => !config.driverIds || config.driverIds.includes(d.id)).map(d => ({ ...d, name: d.name ?? d.id })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
+  const drivers = (ds.data ?? []).filter(d => d.active !== false && (!config.driverIds || config.driverIds.includes(d.id) || (linkedPilot && d.id === person!.id))).map(d => ({ ...d, name: d.name ?? d.id })).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
   const text = (input.text?.message ?? input.image?.caption ?? buttonText).trim();
   const prefix = config.dryRun ? "[TESTE — não grava estoque/despesa]\n" : "";
   const reply = (message: string) => sendWhatsappGroupText(config.groupId, prefix + message);
+  if (identified.length > 1) { await reply("Há mais de uma pessoa com esse telefone no cadastro. Confira no painel antes de continuar. Nenhum lançamento realizado."); return true; }
   const args = { p_company: config.companyId, p_user: config.operatorId, p_group: config.groupId, p_sender: sender, p_message: input.messageId, p_dry_run: config.dryRun };
   const draft = current.data;
   const fresh = draft && Date.parse(draft.updated_at) >= Date.now() - 2 * 60 * 60 * 1000;
   const saved = truckFlowSchema.safeParse(fresh ? (draft.evidence as Record<string, unknown>).truckFlow : undefined);
-  let state = acceptTruckReadings(saved.success ? saved.data : newTruckFlow(), vehicles);
+  const initial = (): TruckFlow => ({ ...newTruckFlow(), ...(linkedPilot ? { destinationFirst: true, suggestedDriverId: person!.id } : {}) });
+  let state = acceptTruckReadings(saved.success ? saved.data : initial(), vehicles);
+  // Refresh identity from the panel, never trust a previously stored suggestion.
+  if (linkedPilot) { state.destinationFirst = true; state.suggestedDriverId = person!.id; }
   const field = truckField(state);
   const token = button ?? (text.startsWith("fuel:") ? text : null);
   const namedDrivers = !field && !token ? drivers.filter(d => d.name.trim().toLocaleLowerCase("pt-BR") === text.replace(/^MOTORISTA\s+/i, "").trim().toLocaleLowerCase("pt-BR")) : [];
   const choosingEquipment = state.equipmentMode && field === "plate";
+  const choosingDestination = state.destinationFirst && field === "plate";
+  const namedVehicle = choosingDestination && !token ? resolveFuelChoice(text, vehicles) : null;
   const namedEquipment = choosingEquipment && !token ? resolveFuelChoice(text, equipmentChoices(vehicles)) : null;
   const moreByText = !token && (!field || choosingEquipment) && fresh && saved.success && /^(MAIS|MAIS OPÇÕES|MAIS OPCOES|MAIS NOMES)$/i.test(text);
-  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : moreByText ? "more" : namedEquipment ? `equipment:${namedEquipment.id}` : namedDrivers.length === 1 ? `driver:${namedDrivers[0].id}` : null;
+  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : moreByText ? "more" : namedVehicle ? `vehicle:${namedVehicle.id}` : namedEquipment ? `equipment:${namedEquipment.id}` : namedDrivers.length === 1 ? `driver:${namedDrivers[0].id}` : !field && linkedPilot && /^(SIM|SOU EU)$/i.test(text) ? `driver:${person!.id}` : !field && linkedPilot && /^(OUTRO|OUTRO RESPONSÁVEL|OUTRO RESPONSAVEL)$/i.test(text) ? "otherDriver" : null;
   const emit = async (s: TruckFlow, id: string, revision: number, notice = "", retryPhoto = false) => {
     const prompt = truckPrompt(s, vehicles, drivers, id, revision);
     if (!prompt.buttons.length) { const missing = truckField(s); await reply(notice + (retryPhoto && missing ? truckRequest(missing, true) : prompt.message)); return; }
     // Text is independently delivered: a provider accepting buttons does not prove
     // they render in the group. A typed, unique company driver name remains usable.
-    const equipmentStep = s.equipmentMode && truckField(s) === "plate";
-    await reply(notice + (equipmentStep ? prompt.message + " Para outras opções, digite MAIS." : `Identifique-se como ${s.equipmentMode ? "responsável" : "condutor"}. Toque no seu nome nas opções ou digite seu nome completo cadastrado.` + (drivers.length > 2 ? " Para ver outros nomes, toque em Mais opções ou digite MAIS." : "")));
+    const equipmentStep = (s.equipmentMode || s.destinationFirst) && truckField(s) === "plate";
+    const identityStep = !truckField(s) && s.suggestedDriverId && !s.chooseOtherDriver;
+    await reply(notice + (equipmentStep || identityStep ? prompt.message + (identityStep ? " Responda SIM ou OUTRO se preferir." : "") : `Identifique-se como ${s.equipmentMode ? "responsável" : "condutor"}. Toque no seu nome nas opções ou digite seu nome completo cadastrado.` + (drivers.length > 2 ? " Para ver outros nomes, toque em Mais opções ou digite MAIS." : "")));
     try { await sendWhatsappGroupButtons(config.groupId, prefix + prompt.message, prompt.buttons); }
     catch {
       console.warn("[fuel-group] button_send_failed");
@@ -82,6 +100,7 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
     }
   };
   if (token && !action) { console.info("[fuel-group] stale_button"); await reply("Este botão é antigo ou pertence a outro abastecimento. Envie RESUMO para receber seus botões atuais."); return true; }
+  if (state.destinationFirst && !linkedPilot) { await reply("Seu telefone ou vínculos foram alterados no painel. Confira o cadastro antes de continuar. Nenhum lançamento realizado."); return true; }
   if (action?.startsWith("driver:")) {
     const driver = drivers.find(d => d.id === action.slice(7));
     const vehicle = flowVehicle(state, vehicles);
@@ -104,7 +123,16 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const summary = /^(RESUMO|TESTE ABASTECIMENTO)$/i.test(text);
   let notice = "";
   let retryPhoto = false;
-  if (reset) state = { ...newTruckFlow(), ...(resetEquipment ? { equipmentMode: true, equipmentId: null } : {}) };
+  if (reset) state = { ...initial(), ...(resetEquipment && !linkedPilot ? { equipmentMode: true, equipmentId: null } : {}) };
+  else if (action?.startsWith("vehicle:") && choosingDestination) {
+    const selected = vehicles.find(v => v.id === action.slice(8));
+    const offered = truckPrompt(state, vehicles, drivers, draft!.draft_id, draft!.revision).buttons.some(b => b.id === token);
+    if (!selected || (token && !offered)) { await reply("Opção inválida. Envie RESUMO para continuar."); return true; }
+    const equipment = equipmentChoices([selected]).length > 0;
+    state = acceptTruckReadings({ ...state, equipmentMode: equipment, equipmentId: equipment ? selected.id : null, plate: equipment ? null : selected.plate, page: 0 }, vehicles);
+    notice = `✅ ${equipment ? "Equipamento" : "Veículo"}: ${selected.name}.\n`;
+  }
+  else if (action === "otherDriver" && !field && linkedPilot) { state.chooseOtherDriver = true; state.page = 0; }
   else if (action?.startsWith("equipment:") && choosingEquipment) {
     const selected = equipmentChoices(vehicles).find(v => v.id === action.slice(10));
     const offered = truckPrompt(state, vehicles, drivers, draft!.draft_id, draft!.revision).buttons.some(b => b.id === token);
@@ -120,7 +148,7 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   else if (!summary) {
     if (!field) { await reply("Não identifiquei um único condutor com esse nome. Digite seu nome completo cadastrado ou envie RESUMO para ver as opções."); return true; }
     try {
-      if (choosingEquipment) { await emit(state, draft!.draft_id, draft!.revision, "Não identifiquei um único equipamento com esse nome. "); return true; }
+      if (choosingEquipment || choosingDestination) { await emit(state, draft!.draft_id, draft!.revision, "Não identifiquei um único veículo/equipamento com esse nome. "); return true; }
       const typed = !input.image?.imageUrl ? typedTruckEvidence(text, field) : null;
       const explicit = typed
         ? fuelEvidenceSchema.parse({ ...emptyFuelEvidence, ...typed })

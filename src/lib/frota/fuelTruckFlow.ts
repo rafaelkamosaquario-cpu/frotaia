@@ -10,12 +10,15 @@ export const truckFlowSchema = z.object({
   page: z.number().int().nonnegative().default(0),
   equipmentMode: z.boolean().optional(),
   equipmentId: z.uuid().nullable().optional(),
+  destinationFirst: z.boolean().optional(),
+  suggestedDriverId: z.uuid().optional(),
+  chooseOtherDriver: z.boolean().optional(),
 }).strict();
 export type TruckFlow = z.infer<typeof truckFlowSchema>;
 export type TruckField = "liters" | "meter" | "plate";
 export type TruckButton = { id: string; label: string };
 export const newTruckFlow = (now = new Date()): TruckFlow => ({ version: 1, startedAt: now.toISOString(), liters: null, meter: null, plate: null, confirmed: { liters: false, meter: false, plate: false }, page: 0 });
-export const truckField = (s: TruckFlow): TruckField | null => (s.equipmentMode ? ["liters", "plate"] as const : ["liters", "meter", "plate"] as const).find(f => !s.confirmed[f]) ?? null;
+export const truckField = (s: TruckFlow): TruckField | null => (s.equipmentMode ? ["liters", "plate"] as const : s.destinationFirst ? ["liters", "plate", "meter"] as const : ["liters", "meter", "plate"] as const).find(f => !s.confirmed[f]) ?? null;
 export const equipmentChoices = (vehicles: FuelChoice[]) => vehicles.filter(v => !v.plate || !/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(normalizePlate(v.plate)) || /\b(trator|munck|munk|guincho|motosserra)\b/i.test(v.name));
 export const flowVehicle = (s: TruckFlow, vehicles: FuelChoice[]) => s.equipmentMode ? equipmentChoices(vehicles).find(v => v.id === s.equipmentId) ?? null : truckVehicle(s.plate, vehicles);
 export const normalizePlate = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -70,6 +73,9 @@ export const truckRequest = (f: TruckField, again = false) => ({ liters: `Envie 
 /** Two people per page leaves a third reply button for navigation. No company vehicle list. */
 export function truckPrompt(s: TruckFlow, vehicles: FuelChoice[], drivers: FuelChoice[], draft: string, revision: number): { message: string; buttons: TruckButton[] } {
   const field = truckField(s);
+  if (s.destinationFirst && field === "plate") {
+    return { message: "Qual veículo ou equipamento recebeu o combustível? Toque na opção ou digite o nome cadastrado.", buttons: vehicles.slice(0, 3).map(v => ({ id: truckToken(draft, revision, `vehicle:${v.id}`), label: v.name.slice(0, 20) })) };
+  }
   if (s.equipmentMode && field === "plate") {
     const choices = equipmentChoices(vehicles);
     if (!choices.length) return { message: "Não há equipamentos sem placa identificados no cadastro desta empresa. Confira o cadastro no painel.", buttons: [] };
@@ -85,6 +91,8 @@ export function truckPrompt(s: TruckFlow, vehicles: FuelChoice[], drivers: FuelC
     return { message: `${truckLabel(field)}: ${value}${field === "liters" ? " litros" : field === "meter" ? " km" : ""}. Confirma?`, buttons: [{ id: truckToken(draft, revision, "yes"), label: "Sim" }, { id: truckToken(draft, revision, "no"), label: "Não" }] };
   }
   if (!drivers.length) return { message: "Não há condutores cadastrados nesta empresa. Confira o cadastro no painel.", buttons: [] };
+  const identified = drivers.find(d => d.id === s.suggestedDriverId);
+  if (identified && !s.chooseOtherDriver) return { message: `Pelo número cadastrado, identifiquei ${identified.name}. Confirma você como responsável por este abastecimento?`, buttons: [{ id: truckToken(draft, revision, `driver:${identified.id}`), label: "Sim, sou eu" }, { id: truckToken(draft, revision, "otherDriver"), label: "Outro responsável" }] };
   const pages = Math.ceil(drivers.length / 2), page = s.page % pages;
   const buttons = drivers.slice(page * 2, page * 2 + 2).map(d => ({ id: truckToken(draft, revision, `driver:${d.id}`), label: d.name.slice(0, 20) }));
   if (pages > 1) buttons.push({ id: truckToken(draft, revision, "more"), label: "Mais opções" });

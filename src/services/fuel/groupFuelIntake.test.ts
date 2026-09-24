@@ -9,7 +9,7 @@ vi.mock("./fuelImageExtraction", () => ({ extractFuelEvidence: mocks.extract }))
 import { processGroupFuel } from "./groupFuelIntake";
 const company = "11111111-1111-4111-8111-111111111111", user = "22222222-2222-4222-8222-222222222222", id = "33333333-3333-4333-8333-333333333333";
 const input = { phone: "123456-group", participantPhone: "5542998006380", messageId: "m1", text: { message: "RESUMO" } };
-function database(active = true, initial: TruckFlow = newTruckFlow(), drivers = [{ id, name: "Condutor" }], vehicles = [{ id, name: "Caminhão", plate: "ABC1D23" }]) {
+function database(active = true, initial: TruckFlow = newTruckFlow(), drivers: Array<{ id: string; name: string; phone_e164?: string; vehicle_id?: string; additional_vehicle_id_1?: string; additional_vehicle_id_2?: string; active?: boolean }> = [{ id, name: "Condutor" }], vehicles = [{ id, name: "Caminhão", plate: "ABC1D23" }]) {
   let draft = { draft_id: id, revision: 1, evidence: { truckFlow: initial }, updated_at: new Date().toISOString() };
   const filters: unknown[][] = [], seen = new Set<string>();
   const from = vi.fn((table: string) => {
@@ -34,6 +34,43 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 const ready = (): TruckFlow => ({ ...newTruckFlow(), liters: 162, meter: 16755.9, plate: "ABC1D23", confirmed: { liters: true, meter: true, plate: true } });
 describe("interactive truck fuel intake", () => {
+  it.each([false, true])("starts from a photo, identifies phone and linked destination (equipment=%s)", async equipment => {
+    const db = database(true, newTruckFlow(), [{ id, name: "Rafael", phone_e164: "+5542998006380", vehicle_id: id, additional_vehicle_id_1: user }], [{ id, name: "Caminhão", plate: "ABC1D23" }, { id: user, name: "VALMET", plate: "VA980" }, { id: company, name: "Não vinculado", plate: "" }]);
+    mocks.extract.mockResolvedValueOnce({ ...emptyFuelEvidence, liters: 40 });
+    await processGroupFuel(db.client, { ...input, text: undefined, image: { imageUrl: "https://media.invalid/photo" } });
+    let buttons = mocks.buttons.mock.calls.at(-1)![2];
+    expect(buttons.map((b: { label: string }) => b.label)).toEqual(["Caminhão", "VALMET"]);
+    await processGroupFuel(db.client, { ...input, messageId: "vehicle", text: undefined, buttonReply: { id: buttons[equipment ? 1 : 0].id } });
+    if (!equipment) {
+      expect(mocks.send.mock.calls.at(-1)![1]).toContain("odômetro");
+      await processGroupFuel(db.client, { ...input, messageId: "km", text: { message: "12345 km" } });
+    }
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("identifiquei Rafael");
+    expect(db.rpc.mock.calls.some(c => c[1].p_action === "confirm")).toBe(false);
+    buttons = mocks.buttons.mock.calls.at(-1)![2];
+    const event = { ...input, messageId: "finish-linked", text: undefined, buttonReply: { id: buttons[0].id } };
+    await processGroupFuel(db.client, event);
+    expect(db.rpc.mock.calls.at(-1)![1]).toMatchObject({ p_action: "confirm", p_dry_run: true, p_command: { vehicleId: equipment ? user : id, driverId: id, meter: equipment ? null : 12345 } });
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("Simulação concluída");
+    const sent = mocks.send.mock.calls.length;
+    await processGroupFuel(db.client, event);
+    expect(mocks.send.mock.calls.length).toBe(sent);
+  });
+  it("lets the identified person choose another registered responsible without changing destination", async () => {
+    const db = database(true, newTruckFlow(), [{ id, name: "Rafael", phone_e164: "+5542998006380", vehicle_id: user }, { id: company, name: "Marcelo" }], [{ id: user, name: "VALMET", plate: "VA980" }]);
+    await processGroupFuel(db.client, { ...input, text: { message: "40 litros" } });
+    await processGroupFuel(db.client, { ...input, messageId: "equip", text: { message: "VALMET" } });
+    const other = mocks.buttons.mock.calls.at(-1)![2][1];
+    await processGroupFuel(db.client, { ...input, messageId: "other", text: undefined, buttonReply: { id: other.id } });
+    await processGroupFuel(db.client, { ...input, messageId: "choose", text: { message: "Marcelo" } });
+    expect(db.rpc.mock.calls.at(-1)![1]).toMatchObject({ p_action: "confirm", p_dry_run: true, p_command: { vehicleId: user, driverId: company } });
+  });
+  it("does not infer identity from duplicate phone records", async () => {
+    const db = database(true, newTruckFlow(), [{ id, name: "Rafael", phone_e164: "+5542998006380", vehicle_id: id }, { id: user, name: "Duplicado", phone_e164: "+5542998006380", vehicle_id: id }]);
+    await processGroupFuel(db.client, input);
+    expect(db.rpc).not.toHaveBeenCalled();
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("mais de uma pessoa");
+  });
   it("simulates equipment without plate or hour meter using registered options", async () => {
     const db = database(true, newTruckFlow(), [{ id, name: "Marcelo" }], [
       { id, name: "Trator Munck BM125", plate: "" },
