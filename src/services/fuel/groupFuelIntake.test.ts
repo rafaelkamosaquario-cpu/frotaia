@@ -9,11 +9,11 @@ vi.mock("./fuelImageExtraction", () => ({ extractFuelEvidence: mocks.extract }))
 import { processGroupFuel } from "./groupFuelIntake";
 const company = "11111111-1111-4111-8111-111111111111", user = "22222222-2222-4222-8222-222222222222", id = "33333333-3333-4333-8333-333333333333";
 const input = { phone: "123456-group", participantPhone: "5542998006380", messageId: "m1", text: { message: "RESUMO" } };
-function database(active = true, initial: TruckFlow = newTruckFlow(), drivers = [{ id, name: "Condutor" }]) {
+function database(active = true, initial: TruckFlow = newTruckFlow(), drivers = [{ id, name: "Condutor" }], vehicles = [{ id, name: "Caminhão", plate: "ABC1D23" }]) {
   let draft = { draft_id: id, revision: 1, evidence: { truckFlow: initial }, updated_at: new Date().toISOString() };
   const filters: unknown[][] = [], seen = new Set<string>();
   const from = vi.fn((table: string) => {
-    const value = table === "company_members" ? active ? { role: "owner" } : null : table === "vehicles" ? [{ id, name: "Caminhão", plate: "ABC1D23" }] : table === "drivers" ? drivers : structuredClone(draft);
+    const value = table === "company_members" ? active ? { role: "owner" } : null : table === "vehicles" ? vehicles : table === "drivers" ? drivers : structuredClone(draft);
     const q = { select: vi.fn(() => q), eq: vi.fn((...args: unknown[]) => { filters.push([table, ...args]); return q; }), maybeSingle: vi.fn(async () => ({ data: value, error: null })), limit: vi.fn(async () => ({ data: value, error: null })) };
     return q;
   });
@@ -34,6 +34,40 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 const ready = (): TruckFlow => ({ ...newTruckFlow(), liters: 162, meter: 16755.9, plate: "ABC1D23", confirmed: { liters: true, meter: true, plate: true } });
 describe("interactive truck fuel intake", () => {
+  it("simulates equipment without plate or hour meter using registered options", async () => {
+    const db = database(true, newTruckFlow(), [{ id, name: "Marcelo" }], [
+      { id, name: "Trator Munck BM125", plate: "" },
+      { id: user, name: "Trator Valmet", plate: "" },
+      { id: company, name: "Trator Guincho", plate: "" },
+    ]);
+    await processGroupFuel(db.client, { ...input, text: { message: "NOVO EQUIPAMENTO" } });
+    await processGroupFuel(db.client, { ...input, messageId: "liters", text: { message: "40 litros" } });
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("Qual equipamento");
+    let buttons = mocks.buttons.mock.calls.at(-1)![2];
+    await processGroupFuel(db.client, { ...input, messageId: "more-equip", text: undefined, buttonReply: { id: buttons.at(-1).id } });
+    buttons = mocks.buttons.mock.calls.at(-1)![2];
+    expect(buttons[0].label).toBe("Trator Guincho");
+    await processGroupFuel(db.client, { ...input, messageId: "equip", text: undefined, buttonReply: { id: buttons[0].id } });
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("Identifique-se como responsável");
+    const driver = mocks.buttons.mock.calls.at(-1)![2][0];
+    await processGroupFuel(db.client, { ...input, messageId: "driver", text: undefined, buttonReply: { id: driver.id } });
+    expect(db.rpc.mock.calls.at(-1)![1]).toMatchObject({ p_action: "confirm", p_dry_run: true, p_command: { liters: 40, vehicleId: company, meter: null, meterKind: null } });
+    const receipt = mocks.send.mock.calls.at(-1)![1];
+    expect(receipt).toContain("✅ Equipamento: Trator Guincho\n✅ Responsável: Marcelo");
+    expect(receipt).toContain("Simulação concluída");
+    expect(mocks.send.mock.calls.map(c => c[1]).join(" ")).not.toMatch(/odômetro|horímetro|foto da placa/i);
+  });
+  it("resolves equipment from photo evidence but never sends a no-meter command to live stock", async () => {
+    const db = database(true, { ...newTruckFlow(), equipmentMode: true }, [{ id, name: "Marcelo" }], [{ id, name: "Trator Munck", plate: "" }]);
+    mocks.extract.mockResolvedValueOnce({ ...emptyFuelEvidence, liters: 40, vehicle: "Trator Munck", meter: 100, meterKind: "km" });
+    await processGroupFuel(db.client, { ...input, text: undefined, image: { imageUrl: "https://media.invalid/photo", caption: "Trator Munck" } });
+    expect(db.current().evidence.truckFlow).toMatchObject({ equipmentId: id, meter: null });
+    const bindings = JSON.parse(process.env.FUEL_GROUP_BINDINGS!); bindings[0].dryRun = false;
+    vi.stubEnv("FUEL_GROUP_BINDINGS", JSON.stringify(bindings)); vi.stubEnv("FUEL_INTERNAL_ENABLED", "true");
+    await processGroupFuel(db.client, { ...input, messageId: "live", text: { message: "Marcelo" } });
+    expect(db.rpc.mock.calls.some(c => c[1].p_action === "confirm")).toBe(false);
+    expect(mocks.send.mock.calls.at(-1)![1]).toContain("Nenhum lançamento realizado");
+  });
   it("handles native buttonReply tokens through all five drivers and the final receipt", async () => {
     const drivers = Array.from({ length: 5 }, (_, i) => ({ id: `33333333-3333-4333-8333-${String(i + 1).padStart(12, "0")}`, name: `Condutor ${i + 1}` }));
     const db = database(true, ready(), drivers), seen = new Set<string>();

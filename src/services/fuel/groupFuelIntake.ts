@@ -1,10 +1,10 @@
 import "server-only";
 import { z } from "zod";
 import type { SupabaseDbClient } from "@/services/supabase/types";
-import { emptyFuelEvidence, fuelEvidenceSchema } from "@/lib/frota/fuelGroup";
+import { emptyFuelEvidence, fuelEvidenceSchema, resolveFuelChoice } from "@/lib/frota/fuelGroup";
 import { fuelStockCommand } from "@/lib/frota/fuelStock";
 import { fuelLocalDate } from "@/lib/frota/fuelConversation";
-import { acceptTruckReadings, applyTruckEvidence, newTruckFlow, truckAction, truckField, truckFlowSchema, truckLabel, truckPrompt, truckRequest, truckVehicle, typedTruckEvidence, type TruckFlow } from "@/lib/frota/fuelTruckFlow";
+import { acceptTruckReadings, applyTruckEvidence, equipmentChoices, flowVehicle, newTruckFlow, truckAction, truckField, truckFlowSchema, truckLabel, truckPrompt, truckRequest, typedTruckEvidence, type TruckFlow } from "@/lib/frota/fuelTruckFlow";
 import { extractFuelEvidence } from "./fuelImageExtraction";
 import { sendWhatsappGroupButtons, sendWhatsappGroupText } from "@/lib/whatsapp/zapiClient";
 import { normalizePhoneDigits } from "@/lib/identity/phoneNormalizer";
@@ -64,54 +64,75 @@ export async function processGroupFuel(client: SupabaseDbClient, input: GroupFue
   const field = truckField(state);
   const token = button ?? (text.startsWith("fuel:") ? text : null);
   const namedDrivers = !field && !token ? drivers.filter(d => d.name.trim().toLocaleLowerCase("pt-BR") === text.replace(/^MOTORISTA\s+/i, "").trim().toLocaleLowerCase("pt-BR")) : [];
-  const moreByText = !token && !field && fresh && saved.success && /^(MAIS|MAIS OPÇÕES|MAIS OPCOES|MAIS NOMES)$/i.test(text);
-  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : moreByText ? "more" : namedDrivers.length === 1 ? `driver:${namedDrivers[0].id}` : null;
+  const choosingEquipment = state.equipmentMode && field === "plate";
+  const namedEquipment = choosingEquipment && !token ? resolveFuelChoice(text, equipmentChoices(vehicles)) : null;
+  const moreByText = !token && (!field || choosingEquipment) && fresh && saved.success && /^(MAIS|MAIS OPÇÕES|MAIS OPCOES|MAIS NOMES)$/i.test(text);
+  const action = token && fresh && saved.success ? truckAction(token, draft.draft_id, draft.revision) : moreByText ? "more" : namedEquipment ? `equipment:${namedEquipment.id}` : namedDrivers.length === 1 ? `driver:${namedDrivers[0].id}` : null;
   const emit = async (s: TruckFlow, id: string, revision: number, notice = "", retryPhoto = false) => {
     const prompt = truckPrompt(s, vehicles, drivers, id, revision);
     if (!prompt.buttons.length) { const missing = truckField(s); await reply(notice + (retryPhoto && missing ? truckRequest(missing, true) : prompt.message)); return; }
     // Text is independently delivered: a provider accepting buttons does not prove
     // they render in the group. A typed, unique company driver name remains usable.
-    await reply(notice + "Identifique-se como condutor. Toque no seu nome nas opções ou digite seu nome completo cadastrado." + (drivers.length > 2 ? " Para ver outros nomes, toque em Mais opções ou digite MAIS." : ""));
+    const equipmentStep = s.equipmentMode && truckField(s) === "plate";
+    await reply(notice + (equipmentStep ? prompt.message + " Para outras opções, digite MAIS." : `Identifique-se como ${s.equipmentMode ? "responsável" : "condutor"}. Toque no seu nome nas opções ou digite seu nome completo cadastrado.` + (drivers.length > 2 ? " Para ver outros nomes, toque em Mais opções ou digite MAIS." : "")));
     try { await sendWhatsappGroupButtons(config.groupId, prefix + prompt.message, prompt.buttons); }
     catch {
       console.warn("[fuel-group] button_send_failed");
-      await reply("Não consegui enviar os botões. Digite seu nome completo cadastrado para se identificar. Nenhum abastecimento foi registrado.");
+      await reply(equipmentStep ? "Não consegui enviar os botões. Digite o nome do equipamento cadastrado." : "Não consegui enviar os botões. Digite seu nome completo cadastrado para se identificar. Nenhum abastecimento foi registrado.");
     }
   };
   if (token && !action) { console.info("[fuel-group] stale_button"); await reply("Este botão é antigo ou pertence a outro abastecimento. Envie RESUMO para receber seus botões atuais."); return true; }
   if (action?.startsWith("driver:")) {
     const driver = drivers.find(d => d.id === action.slice(7));
-    const vehicle = truckVehicle(state.plate, vehicles);
+    const vehicle = flowVehicle(state, vehicles);
     const offered = truckPrompt(state, vehicles, drivers, draft!.draft_id, draft!.revision).buttons.some(b => b.id === token);
     if (field || !driver || !vehicle || (token && !offered)) { await reply("Identificação inválida. Envie RESUMO para continuar."); return true; }
     if (!config.dryRun && process.env.FUEL_INTERNAL_ENABLED !== "true") { await reply("Registro interno ainda não liberado. Nenhuma baixa realizada."); return true; }
-    const command = fuelStockCommand.parse({ kind: "withdrawal", requestId: draft!.draft_id, date: fuelLocalDate(new Date(state.startedAt)), liters: state.liters, vehicleId: vehicle.id, driverId: driver.id, meter: state.meter, meterKind: "km" });
+    // Equipment without a counter is pilot-only until storage supports null meters.
+    // Never fabricate a zero reading or debit the current single-fuel stock.
+    if (state.equipmentMode && !config.dryRun) { await reply("O registro de equipamento sem medidor ainda está em validação. Nenhum lançamento realizado."); return true; }
+    const baseCommand = { kind: "withdrawal", requestId: draft!.draft_id, date: fuelLocalDate(new Date(state.startedAt)), liters: state.liters, vehicleId: vehicle.id, driverId: driver.id, meter: state.meter, meterKind: "km" };
+    const command = state.equipmentMode ? { ...baseCommand, meter: null, meterKind: null } : fuelStockCommand.parse(baseCommand);
     const result = await client.rpc("fuel_group_step", { ...args, p_action: "confirm", p_patch: {}, p_revision: draft!.revision, p_draft: draft!.draft_id, p_command: command });
     if (result.error) { await reply("Não foi possível concluir. Confira o estoque no painel e envie RESUMO para tentar novamente. Nenhuma confirmação de registro foi emitida."); return true; }
     if ((result.data as { duplicate?: boolean })?.duplicate) return true;
-    await reply(`✅ Litragem: ${state.liters!.toLocaleString("pt-BR")} litros\n✅ Odômetro: ${state.meter!.toLocaleString("pt-BR")} km\n✅ Placa: ${vehicle.plate}\n✅ Motorista: ${driver.name}\n\n${config.dryRun ? "Simulação concluída — nenhum lançamento realizado." : "Abastecimento registrado."}`);
+    await reply(`✅ Litragem: ${state.liters!.toLocaleString("pt-BR")} litros\n${state.equipmentMode ? `✅ Equipamento: ${vehicle.name}\n✅ Responsável: ${driver.name}` : `✅ Odômetro: ${state.meter!.toLocaleString("pt-BR")} km\n✅ Placa: ${vehicle.plate}\n✅ Motorista: ${driver.name}`}\n\n${config.dryRun ? "Simulação concluída — nenhum lançamento realizado." : "Abastecimento registrado."}`);
     return true;
   }
-  const reset = /^(NOVO|CANCELAR)$/i.test(text);
+  const resetEquipment = /^NOVO EQUIPAMENTO$/i.test(text);
+  const reset = /^(NOVO|CANCELAR)$/i.test(text) || resetEquipment;
   const summary = /^(RESUMO|TESTE ABASTECIMENTO)$/i.test(text);
   let notice = "";
   let retryPhoto = false;
-  if (reset) state = newTruckFlow();
-  else if (action === "more" && !field) {
-    state.page = (state.page + 1) % Math.max(1, Math.ceil(drivers.length / 2));
+  if (reset) state = { ...newTruckFlow(), ...(resetEquipment ? { equipmentMode: true, equipmentId: null } : {}) };
+  else if (action?.startsWith("equipment:") && choosingEquipment) {
+    const selected = equipmentChoices(vehicles).find(v => v.id === action.slice(10));
+    const offered = truckPrompt(state, vehicles, drivers, draft!.draft_id, draft!.revision).buttons.some(b => b.id === token);
+    if (!selected || (token && !offered)) { await reply("Equipamento inválido. Envie RESUMO para continuar."); return true; }
+    state = acceptTruckReadings({ ...state, equipmentId: selected.id, page: 0 }, vehicles);
+    notice = `✅ Equipamento: ${selected.name}.\n`;
+  }
+  else if (action === "more" && (!field || choosingEquipment)) {
+    state.page = (state.page + 1) % Math.max(1, Math.ceil((choosingEquipment ? equipmentChoices(vehicles).length : drivers.length) / 2));
     console.info("[fuel-group] driver_page", { page: state.page + 1, count: drivers.length });
   }
   else if (action) { await reply("Esta opção não corresponde à etapa atual. Envie RESUMO."); return true; }
   else if (!summary) {
     if (!field) { await reply("Não identifiquei um único condutor com esse nome. Digite seu nome completo cadastrado ou envie RESUMO para ver as opções."); return true; }
     try {
+      if (choosingEquipment) { await emit(state, draft!.draft_id, draft!.revision, "Não identifiquei um único equipamento com esse nome. "); return true; }
       const typed = !input.image?.imageUrl ? typedTruckEvidence(text, field) : null;
       const explicit = typed
         ? fuelEvidenceSchema.parse({ ...emptyFuelEvidence, ...typed })
         : await extractFuelEvidence(text, input.image);
       const before = state;
       state = acceptTruckReadings(applyTruckEvidence(state, explicit), vehicles);
-      notice = (["liters", "meter", "plate"] as const).filter(f => !before.confirmed[f] && state.confirmed[f]).map(f => `✅ ${truckLabel(f)} confirmad${f === "meter" ? "o" : "a"}: ${typeof state[f] === "number" ? state[f].toLocaleString("pt-BR") : state[f]}${f === "liters" ? " litros" : f === "meter" ? " km" : ""}.\n`).join("");
+      if (state.equipmentMode) {
+        const selected = resolveFuelChoice(explicit.vehicle, equipmentChoices(vehicles)) || resolveFuelChoice(text, equipmentChoices(vehicles));
+        if (selected) state = acceptTruckReadings({ ...state, equipmentId: selected.id, page: 0 }, vehicles);
+      }
+      notice = (["liters", "meter", "plate"] as const).filter(f => !before.confirmed[f] && state.confirmed[f] && (!state.equipmentMode || f === "liters")).map(f => `✅ ${truckLabel(f)} confirmad${f === "meter" ? "o" : "a"}: ${typeof state[f] === "number" ? state[f].toLocaleString("pt-BR") : state[f]}${f === "liters" ? " litros" : f === "meter" ? " km" : ""}.\n`).join("");
+      if (state.equipmentMode && !before.equipmentId && state.equipmentId) notice += `✅ Equipamento: ${flowVehicle(state, vehicles)!.name}.\n`;
       if (!notice && input.image?.imageUrl && !state.confirmed[field]) { notice = "Não consegui identificar esse dado com segurança. "; retryPhoto = true; }
     } catch (error) {
       const status = typeof error === "object" && error !== null && "status" in error && typeof error.status === "number" ? error.status : null;

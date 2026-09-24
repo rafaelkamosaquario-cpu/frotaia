@@ -8,12 +8,16 @@ export const truckFlowSchema = z.object({
   plate: z.string().max(20).nullable().default(null),
   confirmed: z.object({ liters: z.boolean(), meter: z.boolean(), plate: z.boolean() }),
   page: z.number().int().nonnegative().default(0),
+  equipmentMode: z.boolean().optional(),
+  equipmentId: z.uuid().nullable().optional(),
 }).strict();
 export type TruckFlow = z.infer<typeof truckFlowSchema>;
 export type TruckField = "liters" | "meter" | "plate";
 export type TruckButton = { id: string; label: string };
 export const newTruckFlow = (now = new Date()): TruckFlow => ({ version: 1, startedAt: now.toISOString(), liters: null, meter: null, plate: null, confirmed: { liters: false, meter: false, plate: false }, page: 0 });
-export const truckField = (s: TruckFlow): TruckField | null => (["liters", "meter", "plate"] as const).find(f => !s.confirmed[f]) ?? null;
+export const truckField = (s: TruckFlow): TruckField | null => (s.equipmentMode ? ["liters", "plate"] as const : ["liters", "meter", "plate"] as const).find(f => !s.confirmed[f]) ?? null;
+export const equipmentChoices = (vehicles: FuelChoice[]) => vehicles.filter(v => !v.plate || !/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(normalizePlate(v.plate)) || /\b(trator|munck|munk|guincho|motosserra)\b/i.test(v.name));
+export const flowVehicle = (s: TruckFlow, vehicles: FuelChoice[]) => s.equipmentMode ? equipmentChoices(vehicles).find(v => v.id === s.equipmentId) ?? null : truckVehicle(s.plate, vehicles);
 export const normalizePlate = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 export function truckVehicle(plate: string | null, vehicles: FuelChoice[]) {
   if (!plate) return null;
@@ -30,9 +34,10 @@ export function applyTruckEvidence(s: TruckFlow, e: FuelEvidence): TruckFlow {
 /** Accept only actual readings; a plate must resolve inside this company. */
 export function acceptTruckReadings(s: TruckFlow, vehicles: FuelChoice[]): TruckFlow {
   const next = structuredClone(s);
+  if (next.equipmentMode) { next.meter = null; next.plate = null; }
   next.confirmed.liters = next.liters !== null && next.liters > 0;
   next.confirmed.meter = next.meter !== null && next.meter >= 0;
-  next.confirmed.plate = !!truckVehicle(next.plate, vehicles);
+  next.confirmed.plate = !!flowVehicle(next, vehicles);
   return next;
 }
 /** Explicit corrections in the current step do not need an AI request. */
@@ -65,6 +70,14 @@ export const truckRequest = (f: TruckField, again = false) => ({ liters: `Envie 
 /** Two people per page leaves a third reply button for navigation. No company vehicle list. */
 export function truckPrompt(s: TruckFlow, vehicles: FuelChoice[], drivers: FuelChoice[], draft: string, revision: number): { message: string; buttons: TruckButton[] } {
   const field = truckField(s);
+  if (s.equipmentMode && field === "plate") {
+    const choices = equipmentChoices(vehicles);
+    if (!choices.length) return { message: "Não há equipamentos sem placa identificados no cadastro desta empresa. Confira o cadastro no painel.", buttons: [] };
+    const pages = Math.ceil(choices.length / 2), page = s.page % pages;
+    const buttons = choices.slice(page * 2, page * 2 + 2).map(v => ({ id: truckToken(draft, revision, `equipment:${v.id}`), label: v.name.slice(0, 20) }));
+    if (pages > 1) buttons.push({ id: truckToken(draft, revision, "more"), label: "Mais opções" });
+    return { message: `Qual equipamento recebeu o combustível? Toque na opção ou digite o nome cadastrado.${pages > 1 ? ` (${page + 1}/${pages})` : ""}`, buttons };
+  }
   if (field) {
     if (s[field] === null) return { message: truckRequest(field), buttons: [] };
     if (field === "plate" && !truckVehicle(s.plate, vehicles)) return { message: "A placa lida não corresponde a um caminhão cadastrado nesta empresa. Confira e digite a placa correta.", buttons: [] };
@@ -75,5 +88,6 @@ export function truckPrompt(s: TruckFlow, vehicles: FuelChoice[], drivers: FuelC
   const pages = Math.ceil(drivers.length / 2), page = s.page % pages;
   const buttons = drivers.slice(page * 2, page * 2 + 2).map(d => ({ id: truckToken(draft, revision, `driver:${d.id}`), label: d.name.slice(0, 20) }));
   if (pages > 1) buttons.push({ id: truckToken(draft, revision, "more"), label: "Mais opções" });
-  return { message: `Identifique-se como condutor para concluir.${pages > 1 ? ` (${page + 1}/${pages})` : ""}`, buttons };
+  return { message: `Identifique-se como ${s.equipmentMode ? "responsável" : "condutor"} para concluir.${pages > 1 ? ` (${page + 1}/${pages})` : ""}`, buttons };
 }
+
