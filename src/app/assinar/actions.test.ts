@@ -10,6 +10,17 @@ vi.mock("@/services/supabase/companyService", () => ({ getCompany: (...args: unk
 vi.mock("@/lib/mercadopago/client", () => ({ criarAssinaturaMensal: (...args: unknown[]) => mensal(...args), criarPagamentoAnual: (...args: unknown[]) => anual(...args) }));
 import { criarCheckoutAction } from "./actions";
 describe("autorização do checkout", () => {
+  it.each(["pix", "credito", "debito"])("permite mensal %s sem exigir e-mail da recorrência", async (metodo) => {
+    anual.mockResolvedValue({ id: "fake", initPoint: "https://www.mercadopago.com.br/checkout" });
+    expect(await criarCheckoutAction("token", "PRO_MENSAL", undefined, metodo)).toHaveProperty("initPoint");
+    expect(anual).toHaveBeenCalledWith({ companyId: "empresa-assinada", plano: "PRO_MENSAL", metodo });
+    expect(mensal).not.toHaveBeenCalled();
+  });
+  it("rejeita método desconhecido e anual recorrente", async () => {
+    expect(await criarCheckoutAction("token", "PRO_MENSAL", undefined, "boleto")).toHaveProperty("error");
+    expect(await criarCheckoutAction("token", "PRO_ANUAL_PIX", undefined, "recorrente")).toHaveProperty("error");
+    expect(anual).not.toHaveBeenCalled();
+  });
   beforeEach(() => { vi.resetAllMocks(); verify.mockReturnValue({ companyId: "empresa-assinada" }); company.mockResolvedValue({ id: "empresa-assinada" }); mensal.mockResolvedValue({ initPoint: "https://www.mercadopago.com.br/subscriptions/checkout" }); });
   it("rejeita companyId arbitrário ou token expirado antes de acessar o banco", async () => {
     verify.mockImplementation(() => { throw new Error("inválido"); });

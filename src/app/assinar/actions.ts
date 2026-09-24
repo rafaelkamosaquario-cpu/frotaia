@@ -7,6 +7,7 @@ import { MercadoPagoConfigError } from "@/lib/mercadopago/config";
 import { CATALOGO_OFERTAS, isOfertaPlano, type OfertaPlano } from "@/lib/mercadopago/catalog";
 import { verifyCheckoutLinkToken } from "@/services/whatsapp/checkoutLinkToken";
 import { logEvent } from "@/lib/observability/logger";
+import { isMetodoCheckout } from "@/lib/mercadopago/paymentOptions";
 
 export interface CriarCheckoutState {
   error?: string;
@@ -26,7 +27,8 @@ export interface CriarCheckoutState {
 export async function criarCheckoutAction(
   checkoutToken: string,
   planoBruto: string,
-  email: string | undefined
+  email: string | undefined,
+  metodoBruto?: string
 ): Promise<CriarCheckoutState> {
   let companyId: string;
   try {
@@ -38,6 +40,8 @@ export async function criarCheckoutAction(
     return { error: "Plano inválido." };
   }
   const plano: OfertaPlano = planoBruto;
+  const metodo = metodoBruto ?? (CATALOGO_OFERTAS[plano].cobranca === "recorrente" ? "recorrente" : CATALOGO_OFERTAS[plano].metodoUnico === "pix" ? "pix" : "credito");
+  if (!isMetodoCheckout(metodo) || (metodo === "recorrente" && CATALOGO_OFERTAS[plano].cobranca !== "recorrente")) return { error: "Forma de pagamento inválida." };
 
   const admin = createAdminClient();
   const company = await getCompany(admin, companyId);
@@ -45,10 +49,8 @@ export async function criarCheckoutAction(
     return { error: "Não encontramos sua empresa. Volte no WhatsApp e peça pra assinar de novo." };
   }
 
-  const oferta = CATALOGO_OFERTAS[plano];
-
   try {
-    if (oferta.cobranca === "recorrente") {
+    if (metodo === "recorrente") {
       if (!email || !email.includes("@")) {
         return { error: "Informe um e-mail válido para continuar." };
       }
@@ -57,7 +59,7 @@ export async function criarCheckoutAction(
       return { initPoint: resultado.initPoint };
     }
 
-    const resultado = await criarPagamentoAnual({ companyId, plano });
+    const resultado = await criarPagamentoAnual({ companyId, plano, metodo });
     logEvent({ event: "checkout_criado", route: "/assinar", company_id: companyId, plano, resource_id: resultado.id });
     return { initPoint: resultado.initPoint };
   } catch (erro) {

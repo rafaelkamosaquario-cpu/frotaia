@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getMercadoPagoConfig } from "./config";
 import { CATALOGO_OFERTAS, isOfertaPlano, type OfertaPlano } from "./catalog";
+import { paymentMethods, type MetodoCheckout } from "./paymentOptions";
 
 /**
  * Cliente mínimo pra API REST do Mercado Pago (Fase 2 do fluxo de
@@ -29,10 +30,11 @@ function codificarReferenciaExterna(companyId: string, plano: OfertaPlano): stri
   return `${companyId}|${plano}`;
 }
 
-export function decodificarReferenciaExterna(externalReference: string): { companyId: string; plano: OfertaPlano } | null {
-  const [companyId, plano] = externalReference.split("|");
+export function decodificarReferenciaExterna(externalReference: string): { companyId: string; plano: OfertaPlano; avulso?: boolean } | null {
+  const [companyId, plano, modo, extra] = externalReference.split("|");
   if (!companyId || !plano || !isOfertaPlano(plano)) return null;
-  return { companyId, plano };
+  if (extra !== undefined || (modo !== undefined && modo !== "AVULSO")) return null;
+  return modo === "AVULSO" ? { companyId, plano, avulso: true } : { companyId, plano };
 }
 
 export class MercadoPagoApiError extends Error {
@@ -108,17 +110,16 @@ export async function criarAssinaturaMensal(input: CriarAssinaturaMensalInput): 
 
 export interface CriarPagamentoAnualInput {
   companyId: string;
-  /** Qualquer chave do catálogo com cobranca==="unica" (*_ANUAL_PIX/*_ANUAL_PARCELADO) — o método (Pix/cartão) já vem de oferta.metodoUnico, nunca de um parâmetro separado. */
+  /** Existing annual keys or monthly keys with an explicit non-recurring method. */
   plano: OfertaPlano;
+  /** Explicit selection also enables a one-month, non-recurring purchase. */
+  metodo?: Exclude<MetodoCheckout, "recorrente">;
 }
 
 /**
- * Cobrança única (Checkout Pro / preference) pros planos anuais — nunca
- * recorrente, sem renovação automática (cliente decide se contrata de novo
- * ao fim dos 12 meses). `excluded_payment_types` no método Pix restringe as
- * outras formas — os IDs de tipo exatos (`credit_card`, `debit_card` etc.)
- * não têm confirmação 100% oficial na documentação pública consultada;
- * conferir visualmente na página de checkout gerada antes de divulgar.
+ * Legacy function name retained for callers. Creates prepaid monthly or
+ * annual Checkout Pro preferences. Payment type availability is ultimately
+ * decided by Mercado Pago; debit does not imply support for every bank.
  * `installments` pede até N parcelas no Checkout Pro — se isso sai
  * "sem juros" ou não depende da configuração de taxas da própria conta
  * Mercado Pago, não é algo que esta chamada controle nem que dê pra
@@ -129,21 +130,18 @@ export async function criarPagamentoAnual(input: CriarPagamentoAnualInput): Prom
   const oferta = CATALOGO_OFERTAS[plano];
   const valorReais = oferta.precoCentavos / 100;
 
-  const paymentMethods =
-    oferta.metodoUnico === "pix"
-      ? {
-          excluded_payment_types: [{ id: "credit_card" }, { id: "debit_card" }, { id: "ticket" }, { id: "prepaid_card" }],
-        }
-      : { installments: oferta.parcelas ?? 1 };
+  if (oferta.cobranca === "recorrente" && !input.metodo) throw new Error("Selecione o método para pagamento mensal avulso.");
+  const metodo = input.metodo ?? (oferta.metodoUnico === "pix" ? "pix" : "credito");
 
   const response = await fetch(`${MP_API_BASE}/checkout/preferences`, {
     method: "POST",
     signal: AbortSignal.timeout(20000),
     headers: authHeaders(),
     body: JSON.stringify({
-      items: [{ title: oferta.label, quantity: 1, unit_price: valorReais, currency_id: "BRL" }],
-      external_reference: codificarReferenciaExterna(input.companyId, plano),
-      payment_methods: paymentMethods,
+      items: [{ title: `${oferta.label} — ${oferta.cobranca === "recorrente" ? "1 mês" : "12 meses"} sem renovação automática`, quantity: 1, unit_price: valorReais, currency_id: "BRL" }],
+      external_reference: codificarReferenciaExterna(input.companyId, plano) + (oferta.cobranca === "recorrente" ? "|AVULSO" : ""),
+      payment_methods: paymentMethods(metodo, plano),
+      notification_url: `${urlPadraoRetorno()}/api/payments/mercadopago/webhook`,
       back_urls: {
         success: `${urlPadraoRetorno()}/assinar/confirmacao?resultado=sucesso&plano=${plano}`,
         pending: `${urlPadraoRetorno()}/assinar/confirmacao?resultado=pendente&plano=${plano}`,
@@ -173,6 +171,7 @@ export interface PagamentoConsultado {
   externalReference: string | null;
   valorCentavos: number;
   approvedAt?: string | null;
+  currency?: string | null;
 }
 
 /** Sempre reconsultado na API antes de confiar em qualquer notificação de webhook — nunca confia só no payload recebido. */
@@ -181,8 +180,8 @@ export async function buscarPagamento(paymentId: string): Promise<PagamentoConsu
     headers: authHeaders(),
   });
   if (!response.ok) return parseErrorSafely(response);
-  const body = (await response.json()) as { status: string; external_reference: string | null; transaction_amount: number; date_approved?: string | null };
-  return { status: body.status, externalReference: body.external_reference, valorCentavos: Math.round(body.transaction_amount * 100), approvedAt: body.date_approved };
+  const body = (await response.json()) as { status: string; external_reference: string | null; transaction_amount: number; date_approved?: string | null; currency_id?: string };
+  return { status: body.status, externalReference: body.external_reference, valorCentavos: Math.round(body.transaction_amount * 100), approvedAt: body.date_approved, currency: body.currency_id ?? null };
 }
 
 export interface AssinaturaConsultada {

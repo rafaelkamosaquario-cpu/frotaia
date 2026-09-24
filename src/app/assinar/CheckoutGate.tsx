@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import { CATALOGO_OFERTAS, formatarReais, type OfertaCatalogo, type OfertaPlano } from "@/lib/mercadopago/catalog";
 import { criarCheckoutAction } from "./actions";
+import type { MetodoCheckout } from "@/lib/mercadopago/paymentOptions";
 
 /**
  * Gate de contratação (09/2026, estrutura Individual/Essencial/Pro) —
@@ -63,6 +64,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
   const [tier, setTier] = useState<Tier>(inicial.tier);
   const [frequencia, setFrequencia] = useState<Frequencia>(inicial.frequencia);
   const [metodoAnual, setMetodoAnual] = useState<MetodoAnual>(inicial.metodoAnual);
+  const [metodo, setMetodo] = useState<MetodoCheckout>(inicial.frequencia === "MENSAL" ? "recorrente" : inicial.metodoAnual === "PIX" ? "pix" : "credito");
   const [mostrarEmail, setMostrarEmail] = useState(false);
   const [email, setEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -76,7 +78,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
     setErro(null);
     setEnviando(true);
     try {
-      const resultado = await criarCheckoutAction(checkoutToken, plano, emailInformado);
+      const resultado = await criarCheckoutAction(checkoutToken, plano, emailInformado, metodo);
       if (resultado.error || !resultado.initPoint) {
         setErro(resultado.error ?? "Não recebemos o link de pagamento. Tente novamente.");
         return;
@@ -90,7 +92,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
   }
 
   function continuar() {
-    if (oferta.cobranca === "recorrente") {
+    if (metodo === "recorrente") {
       setMostrarEmail(true);
       return;
     }
@@ -140,52 +142,43 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
               </button>
               <button
                 type="button"
-                onClick={() => setFrequencia("ANUAL")}
+                onClick={() => { setFrequencia("ANUAL"); if (metodo === "recorrente") setMetodo("credito"); }}
                 className={cn("flex-1 rounded-md py-1.5 text-sm font-medium transition-colors", frequencia === "ANUAL" ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
               >
                 Anual
               </button>
             </div>
 
-            {frequencia === "ANUAL" && (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setMetodoAnual("PARCELADO")}
-                  className={cn("w-full rounded-lg border p-3 text-left transition-colors", metodoAnual === "PARCELADO" ? "border-primary bg-primary/5" : "border-border")}
-                >
-                  <p className="text-sm font-semibold text-foreground">Cartão</p>
-                  <p className="text-sm text-muted-foreground">
-                    {CATALOGO_OFERTAS[`${tier}_ANUAL_PARCELADO` as OfertaPlano].parcelas}x{" "}
-                    {formatarReais(
-                      CATALOGO_OFERTAS[`${tier}_ANUAL_PARCELADO` as OfertaPlano].precoCentavos /
-                        (CATALOGO_OFERTAS[`${tier}_ANUAL_PARCELADO` as OfertaPlano].parcelas ?? 1)
-                    )}{" "}
-                    · Total {formatarReais(CATALOGO_OFERTAS[`${tier}_ANUAL_PARCELADO` as OfertaPlano].precoCentavos)}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMetodoAnual("PIX")}
-                  className={cn("w-full rounded-lg border p-3 text-left transition-colors", metodoAnual === "PIX" ? "border-primary bg-primary/5" : "border-border")}
-                >
-                  <p className="text-sm font-semibold text-foreground">Pix</p>
-                  <p className="text-sm text-muted-foreground">{formatarReais(CATALOGO_OFERTAS[`${tier}_ANUAL_PIX` as OfertaPlano].precoCentavos)} à vista</p>
-                </button>
-              </div>
-            )}
+            <fieldset className="space-y-2" disabled={enviando}>
+              <legend className="mb-2 text-sm font-semibold">Forma de pagamento</legend>
+              {([
+                { id: "credito", label: "Cartão de crédito", detail: frequencia === "ANUAL" ? "Até 12 parcelas; condições e juros no Mercado Pago." : "Pagamento de um mês, sem renovação automática." },
+                { id: "debito", label: "Cartão de débito", detail: "À vista. Somente cartões disponibilizados pelo Mercado Pago, como débito virtual Caixa. Se indisponível, escolha Pix ou crédito." },
+                { id: "pix", label: "Pix", detail: "À vista, sem renovação automática." },
+                ...(frequencia === "MENSAL" ? [{ id: "recorrente", label: "Crédito com renovação automática", detail: "Cobrança mensal recorrente no cartão de crédito." }] : []),
+              ] as { id: MetodoCheckout; label: string; detail: string }[]).map((option) => (
+                <label key={option.id} className={cn("block cursor-pointer rounded-lg border p-3", metodo === option.id ? "border-primary bg-primary/5" : "border-border")}>
+                  <input type="radio" name="metodo" value={option.id} checked={metodo === option.id} onChange={() => { setMetodo(option.id); setMetodoAnual(option.id === "pix" ? "PIX" : "PARCELADO"); setErro(null); }} className="mr-2" />
+                  <span className="text-sm font-semibold">{option.label}</span>
+                  <p className="mt-1 text-xs text-muted-foreground">{option.detail}</p>
+                </label>
+              ))}
+            </fieldset>
 
             <Card className="border-primary/40 bg-primary/5 p-4">
               <p className="text-sm font-semibold text-foreground">{infoTier.nome}</p>
               <p className="text-2xl font-semibold text-foreground">
-                {frequencia === "ANUAL" && metodoAnual === "PARCELADO" ? (
+                {frequencia === "ANUAL" && metodo === "credito" ? (
                   <>
-                    {oferta.parcelas}x {formatarReais(oferta.precoCentavos / (oferta.parcelas ?? 1))}
+                    {formatarReais(oferta.precoCentavos)} no total
                   </>
                 ) : (
                   formatarReais(oferta.precoCentavos)
                 )}
                 {frequencia === "MENSAL" && <span className="text-sm font-normal text-muted-foreground">/mês</span>}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {metodo === "recorrente" ? "Renovação automática mensal." : `${frequencia === "MENSAL" ? "1 mês" : "12 meses"} de acesso após pagamento aprovado. Sem renovação automática; ao vencer, será necessário pagar novamente.`}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {oferta.limiteVeiculos} veículo{oferta.limiteVeiculos > 1 ? "s" : ""} · WhatsApp{oferta.painel ? " + Painel" : ""}
@@ -203,7 +196,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
             {erro && <p className="text-sm text-danger">{erro}</p>}
 
             <Button size="lg" className="w-full" onClick={continuar} isLoading={enviando}>
-              {oferta.cobranca === "recorrente" ? "Continuar" : "Ir para pagamento"}
+              {metodo === "recorrente" ? "Continuar" : "Ir para pagamento"}
             </Button>
           </div>
         ) : (

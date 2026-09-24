@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isMercadoPagoConfigured, getMercadoPagoWebhookSecret } from "@/lib/mercadopago/config";
 import { validarAssinaturaWebhook, buscarPagamento, buscarAssinatura, decodificarReferenciaExterna } from "@/lib/mercadopago/client";
 import { CATALOGO_OFERTAS } from "@/lib/mercadopago/catalog";
+import { validadePagamentoAvulso } from "@/lib/mercadopago/paymentOptions";
 import {
   atualizarAssinaturaPorPagamento,
   registrarEventoPagamento,
@@ -150,6 +151,11 @@ export async function POST(request: Request) {
     if (tipo === "payment") {
       const pagamento = await buscarPagamento(resourceId);
       const referencia = pagamento.externalReference ? decodificarReferenciaExterna(pagamento.externalReference) : null;
+      const pagamentoAvulso = referencia && (referencia.avulso || CATALOGO_OFERTAS[referencia.plano].cobranca === "unica");
+      if (pagamentoAvulso && pagamento.status === "approved" && (pagamento.valorCentavos !== CATALOGO_OFERTAS[referencia.plano].precoCentavos || (pagamento.currency !== undefined && pagamento.currency !== "BRL"))) {
+        captureError({ event: "mercadopago_valor_divergente", route: ROTA, resource_id: resourceId, error: new Error("Valor pago diverge do catálogo") });
+        return NextResponse.json({ error: "Pagamento requer conferência." }, { status: 422 });
+      }
 
       // Idempotência: mesma notificação (mesmo pagamento + mesmo status) já
       // processada antes — registra de novo pra rastreabilidade (sempre
@@ -172,13 +178,22 @@ export async function POST(request: Request) {
         referencia &&
         !jaProcessado &&
         pagamento.status === "approved" &&
-        CATALOGO_OFERTAS[referencia.plano].cobranca === "unica"
+        pagamentoAvulso
       ) {
         // Captura o preapproval ANTES de sobrescrever — só ele sabe se
         // existia uma assinatura recorrente ativa (ex.: veio do MENSAL ou
         // GESTAO_MENSAL) que agora precisa ser cancelada no MP.
         const assinaturaAnterior = await getSubscription(admin, referencia.companyId);
         const preapprovalAnterior = assinaturaAnterior?.mercadopago_subscription_id;
+        const aprovadoEm = pagamento.approvedAt ?? new Date().toISOString();
+        // Early renewal of the same prepaid plan must retain already-paid days.
+        const inicioPeriodo = assinaturaAnterior?.status === "ATIVA"
+          && assinaturaAnterior.plan === referencia.plano
+          && assinaturaAnterior.mercadopago_payment_id
+          && assinaturaAnterior.mercadopago_payment_id !== resourceId
+          && assinaturaAnterior.valido_ate
+          && new Date(assinaturaAnterior.valido_ate).getTime() > new Date(aprovadoEm).getTime()
+          ? assinaturaAnterior.valido_ate : aprovadoEm;
 
         // Do not let a delayed approval of an older purchase replace a newer plan.
         if (pagamento.approvedAt && assinaturaAnterior?.iniciado_em
@@ -195,10 +210,11 @@ export async function POST(request: Request) {
           fleetPanelIncluded: CATALOGO_OFERTAS[referencia.plano].painel,
           valorCentavos: pagamento.valorCentavos,
           mercadopagoPaymentId: resourceId,
+          mercadopagoSubscriptionId: null,
           // A retry must not extend an already-applied annual term.
           validoAte: assinaturaAnterior?.mercadopago_payment_id === resourceId && assinaturaAnterior.valido_ate
             ? assinaturaAnterior.valido_ate
-            : new Date((pagamento.approvedAt ? new Date(pagamento.approvedAt).getTime() : Date.now()) + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            : validadePagamentoAvulso(referencia.plano, inicioPeriodo),
         });
 
         // Só depois da nova assinatura já confirmada ATIVA no banco.
@@ -206,7 +222,7 @@ export async function POST(request: Request) {
         await dispararOnboardingPosPagamento(admin, referencia.companyId);
       }
       if (referencia && !jaProcessado && ["refunded", "charged_back"].includes(pagamento.status)
-        && CATALOGO_OFERTAS[referencia.plano].cobranca === "unica") {
+        && pagamentoAvulso) {
         const current = await getSubscription(admin, referencia.companyId);
         // An old payment reversal must never revoke a newer contracted plan.
         if (current?.mercadopago_payment_id === resourceId && current.plan === referencia.plano) {

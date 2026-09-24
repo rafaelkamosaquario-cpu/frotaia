@@ -153,7 +153,7 @@ export interface AtualizarAssinaturaPorPagamentoInput {
   /** Entitlement do Painel de Gestão que este plano concede — resolvido pelo chamador a partir de CATALOGO_OFERTAS (src/lib/mercadopago/catalog.ts), nunca lido do payload do Mercado Pago. Grava sempre (nunca deixa o campo intocado), pra downgrade de plano também revogar o painel corretamente. */
   fleetPanelIncluded: boolean;
   valorCentavos?: number;
-  mercadopagoSubscriptionId?: string;
+  mercadopagoSubscriptionId?: string | null;
   mercadopagoPaymentId?: string;
   /** string = define validade explícita (planos anuais); null = limpa validade residual (ex.: trial→recorrente ATIVA); undefined = não mexe no campo. */
   validoAte?: string | null;

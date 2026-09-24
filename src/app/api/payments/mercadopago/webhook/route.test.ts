@@ -73,6 +73,39 @@ function chamarWebhook(opts: { body?: unknown; dataId?: string; type?: string; x
 }
 
 describe("POST /api/payments/mercadopago/webhook", () => {
+  it("ativa mensal avulso por um mês e limpa vínculo recorrente", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|INDIVIDUAL_MENSAL|AVULSO", valorCentavos: 8990, approvedAt: "2026-09-24T10:00:00Z" });
+    expect((await chamarWebhook({ dataId: "monthly-pix", type: "payment" })()).status).toBe(200);
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ plan: "INDIVIDUAL_MENSAL", fleetPanelIncluded: false, validoAte: "2026-10-24T10:00:00.000Z", mercadopagoSubscriptionId: null }));
+  });
+  it("não libera acesso com valor divergente", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_MENSAL|AVULSO", valorCentavos: 1 });
+    expect((await chamarWebhook({ dataId: "underpaid", type: "payment" })()).status).toBe(422);
+    expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
+    expect(sendWhatsappText).not.toHaveBeenCalled();
+  });
+  it("renovação antecipada preserva dias pagos", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_MENSAL|AVULSO", valorCentavos: 24990, currency: "BRL", approvedAt: "2026-09-24T10:00:00Z" });
+    getSubscription.mockResolvedValue({ plan: "PRO_MENSAL", status: "ATIVA", mercadopago_payment_id: "previous", valido_ate: "2026-10-01T10:00:00Z" });
+    await chamarWebhook({ dataId: "renewal", type: "payment" })();
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ validoAte: "2026-11-01T10:00:00.000Z" }));
+  });
+  it("não libera pagamento em moeda diferente", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_MENSAL|AVULSO", valorCentavos: 24990, currency: "USD" });
+    expect((await chamarWebhook({ dataId: "wrong-currency", type: "payment" })()).status).toBe(422);
+    expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
+  });
+  it.each(["pending", "rejected"])("mensal %s não libera acesso", async (status) => {
+    buscarPagamento.mockResolvedValue({ status, externalReference: "empresa-1|PRO_MENSAL|AVULSO", valorCentavos: 24990 });
+    await chamarWebhook({ dataId: "unpaid", type: "payment" })();
+    expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();
+  });
+  it("reentrega mensal não estende validade", async () => {
+    buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|PRO_MENSAL|AVULSO", valorCentavos: 24990 });
+    getSubscription.mockResolvedValue({ mercadopago_payment_id: "same-month", valido_ate: "2026-10-24T10:00:00.000Z" });
+    await chamarWebhook({ dataId: "same-month", type: "payment" })();
+    expect(atualizarAssinaturaPorPagamento).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ validoAte: "2026-10-24T10:00:00.000Z" }));
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     isMercadoPagoConfigured.mockReturnValue(true);

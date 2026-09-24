@@ -58,11 +58,9 @@ export default async function ConfirmacaoPage({
         {resultado === "sucesso" ? (
           <>
             <CheckCircle2 className="mx-auto mb-3 size-8 text-success" aria-hidden />
-            <h1 className="mb-1 text-base font-semibold text-foreground">Pagamento confirmado</h1>
+            <h1 className="mb-1 text-base font-semibold text-foreground">Estamos confirmando seu pagamento</h1>
             <p className="mb-5 text-sm text-muted-foreground">
-              {ehGestao
-                ? "Seu Frota IA Gestão está ativo."
-                : "Seu Frota IA Individual está ativo."}
+              O acesso será liberado após a confirmação do Mercado Pago. Voltar a esta página não comprova o pagamento.
             </p>
             {ehGestao ? (
               <>
