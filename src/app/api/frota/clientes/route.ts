@@ -5,7 +5,13 @@ import { freightCustomerSchema } from "@/lib/frota/freightCustomers";
 
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
+  // Railway terminates HTTPS before forwarding: request.url can be internal.
+  const publicHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? new URL(request.url).host;
+  if (origin) {
+    let allowed = false;
+    try { const source = new URL(origin); allowed = ["https:", "http:"].includes(source.protocol) && source.host === publicHost; } catch { /* invalid origin */ }
+    if (!allowed) return NextResponse.json({ error: "Origem inválida." }, { status: 403 });
+  }
   const client = await createClient();
   const access = await loadFleetPanelAccess(client);
   if (!access.ok) return NextResponse.json({ error: "Sem acesso ao painel." }, { status: access.reason === "unauthenticated" ? 401 : 403 });

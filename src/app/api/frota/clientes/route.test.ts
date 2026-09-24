@@ -13,6 +13,10 @@ beforeEach(() => {
   mocks.single.mockResolvedValue({ data: { id: "saved", ...values }, error: null });
 });
 describe("V2 freight customer registration", () => {
+  it("accepts same public origin behind Railway proxy", async () => {
+    const req = new Request("http://localhost:8080/api/frota/clientes", { method: "POST", headers: { origin: "https://frotaia.up.railway.app", "x-forwarded-host": "frotaia.up.railway.app" }, body: JSON.stringify(values) });
+    expect((await POST(req)).status).toBe(201);
+  });
   it("creates only a customer in the authenticated company", async () => {
     expect((await POST(request(values))).status).toBe(201);
     expect(mocks.from).toHaveBeenCalledWith("freight_customers");
