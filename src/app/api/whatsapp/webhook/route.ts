@@ -83,6 +83,7 @@ interface ZApiWebhookBody {
   contact?: { displayName?: string; vcard?: string };
   listResponseMessage?: { selectedRowId?: string; title?: string; message?: string };
   buttonsResponseMessage?: { buttonId?: string; message?: string };
+  buttonReply?: Record<string, unknown>;
 }
 
 const TIPOS_IMAGEM_SUPORTADOS = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -114,7 +115,13 @@ function logZapiSendFailure(error: unknown, phoneE164: string, contexto: string)
  * prioridade, já que uma mesma mensagem nunca traz mais de um desses tipos.
  */
 function resolverEntradaOnboarding(body: ZApiWebhookBody): string | undefined {
-  return body.listResponseMessage?.selectedRowId ?? body.buttonsResponseMessage?.buttonId ?? body.text?.message?.trim();
+  return body.listResponseMessage?.selectedRowId ?? body.buttonsResponseMessage?.buttonId ?? botaoComercial(body) ?? body.text?.message?.trim();
+}
+
+function botaoComercial(body: ZApiWebhookBody): string | undefined {
+  const permitidos = new Set(["demo_ver_planos", "demo_conhecer_funcoes", "demo_agora_nao", "demo_plano_individual", "demo_plano_essencial", "demo_plano_pro"]);
+  const valores = Object.values(body.buttonReply ?? {}).filter((v): v is string => typeof v === "string" && permitidos.has(v));
+  return new Set(valores).size === 1 ? valores[0] : undefined;
 }
 
 /** Envia a `reply` estruturada do onboarding usando o método certo da Z-API conforme o `kind`. */
@@ -429,7 +436,10 @@ export async function POST(request: Request) {
 
   // ── Menu de demo pré-cadastro (inversão do funil, 09/2026) ──────────────
 
-  if (session.state === "awaiting_demo_choice") {
+  const pedidoComercialDemo = Boolean(resolverIntencaoComercialLanding(textoDireto)
+    || (textoDireto && PARECE_QUERER_ASSINAR.test(textoDireto))
+    || (entradaOnboarding && [CTA_DEMO_VER_PLANOS, ...BOTOES_PLANO.map(b => b.id)].includes(entradaOnboarding)));
+  if (session.state === "awaiting_demo_choice" && !pedidoComercialDemo) {
     if (!entradaOnboarding) {
       await sendWhatsappText(phoneE164, "Por enquanto, toque numa das opções acima ou digite o que você quer testar.").catch((err) => logZapiSendFailure(err, phoneE164, "demo_pede_toque"));
       return NextResponse.json({ ok: true });
@@ -457,7 +467,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (session.state === "awaiting_demo_input") {
+  if (session.state === "awaiting_demo_input" || (session.state === "awaiting_demo_choice" && pedidoComercialDemo)) {
     const collectedDataAtual = (session.collected_data ?? {}) as Record<string, unknown>;
     const companyIdDemo = collectedDataAtual.companyId as string | undefined;
     const demoTrack = collectedDataAtual.demoTrack as DemoTrack | undefined;
@@ -465,13 +475,36 @@ export async function POST(request: Request) {
     // Estado inconsistente (não deveria acontecer — companyId sempre é
     // gravado junto com a transição pra este estado) — recomeça o menu em
     // vez de travar a conversa.
-    if (!companyIdDemo || !demoTrack) {
+    if (!companyIdDemo) {
       await updateOnboardingSession(admin, userId, { state: "awaiting_demo_choice", collectedData: collectedDataAtual });
       await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_estado_inconsistente"));
       return NextResponse.json({ ok: true });
     }
 
-    const botaoTocado = body.buttonsResponseMessage?.buttonId;
+    const botaoTocado = body.buttonsResponseMessage?.buttonId ?? botaoComercial(body);
+    const ofertaEscolhida = BOTOES_PLANO.find(b => b.id === botaoTocado)?.oferta
+      ?? resolverIntencaoComercialLanding(textoDireto);
+
+    // Contratação tem prioridade sobre a demo e sobre o bloqueio de trial.
+    if (ofertaEscolhida && ofertaEscolhida !== "EMPRESAS") {
+      const conversa = await getOrCreateOpenConversation(admin, companyIdDemo, userId, channelId);
+      await appendMessage(admin, { conversation_id: conversa.id, company_id: companyIdDemo, user_id: userId,
+        role: "user", direction: "inbound", content: textoDireto ?? botaoTocado ?? "Escolha de plano", content_type: "text",
+        ...(body.messageId ? { external_message_id: body.messageId } : {})
+      }).catch(err => { if (!isUniqueViolation(err)) throw err; });
+      try {
+        const link = buildCheckoutLinkUrl(companyIdDemo, ofertaEscolhida);
+        await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(ofertaEscolhida)}\n\n${link}`);
+        await appendMessage(admin, { conversation_id: conversa.id, company_id: companyIdDemo, user_id: userId,
+          role: "assistant", direction: "outbound", content: `${mensagemConfirmacaoOferta(ofertaEscolhida)}\nLink de contratação enviado (token omitido).`, content_type: "text" });
+        await updateOnboardingSession(admin, userId, { collectedData: { ...collectedDataAtual, awaitingPlanChoice: false } });
+      } catch (err) {
+        logZapiSendFailure(err, phoneE164, "demo_checkout_link");
+        await sendWhatsappText(phoneE164, "Não consegui enviar seu link de pagamento agora. Responda Individual, Essencial ou Pro para tentar novamente.").catch(e => logZapiSendFailure(e, phoneE164, "checkout_fallback"));
+        return NextResponse.json({ error: "Falha temporária no envio do checkout." }, { status: 503 });
+      }
+      return NextResponse.json({ ok: true });
+    }
 
     if (botaoTocado === CTA_DEMO_VER_PLANOS || (textoDireto && PARECE_QUERER_ASSINAR.test(textoDireto))) {
       await enviarRespostaOnboarding(phoneE164, buildBotoesPlano()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_botoes_plano"));
@@ -493,16 +526,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    if (collectedDataAtual.awaitingPlanChoice && botaoTocado) {
-      const botaoPlano = BOTOES_PLANO.find((b) => b.id === botaoTocado);
-      if (botaoPlano) {
-        const link = buildCheckoutLinkUrl(companyIdDemo, botaoPlano.oferta);
-        await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(botaoPlano.oferta)}\n\n${link}`).catch((err) => logZapiSendFailure(err, phoneE164, "demo_checkout_link"));
-        await updateOnboardingSession(admin, userId, { collectedData: { ...collectedDataAtual, awaitingPlanChoice: false } });
-        return NextResponse.json({ ok: true });
-      }
+    if (!demoTrack) {
+      await enviarRespostaOnboarding(phoneE164, askDemoChoice());
+      return NextResponse.json({ ok: true });
     }
-
     if (!textoDireto) {
       await sendWhatsappText(phoneE164, "Por enquanto, durante o teste, me responda por texto.").catch((err) => logZapiSendFailure(err, phoneE164, "demo_pede_texto"));
       return NextResponse.json({ ok: true });
@@ -787,12 +814,20 @@ export async function POST(request: Request) {
       content: textoDireto ?? "",
       content_type: "text",
       ...inboundBase,
-    });
+    }).catch(err => { if (!isUniqueViolation(err)) throw err; });
     if (intencaoComercial === "EMPRESAS") {
       await sendWhatsappText(phoneE164, MENSAGEM_INTERESSE_EMPRESAS).catch((err) => logZapiSendFailure(err, phoneE164, "landing_empresas_mensagem_interesse_existente"));
     } else {
-      const link = buildCheckoutLinkUrl(companyId, intencaoComercial);
-      await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(intencaoComercial)}\n\n${link}`).catch((err) => logZapiSendFailure(err, phoneE164, "landing_link_checkout_cliente_existente"));
+      try {
+        const link = buildCheckoutLinkUrl(companyId, intencaoComercial);
+        await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(intencaoComercial)}\n\n${link}`);
+        await appendMessage(admin, { conversation_id: conversation.id, company_id: companyId, user_id: userId,
+          role: "assistant", direction: "outbound", content: `${mensagemConfirmacaoOferta(intencaoComercial)}\nLink de contratação enviado (token omitido).`, content_type: "text" });
+      } catch (err) {
+        logZapiSendFailure(err, phoneE164, "landing_link_checkout_cliente_existente");
+        await sendWhatsappText(phoneE164, "Não consegui enviar seu link de pagamento agora. Responda o nome do plano para tentar novamente.").catch(e => logZapiSendFailure(e, phoneE164, "checkout_fallback"));
+        return NextResponse.json({ error: "Falha temporária no envio do checkout." }, { status: 503 });
+      }
     }
     return NextResponse.json({ ok: true });
   }

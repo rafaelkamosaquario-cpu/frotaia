@@ -40,7 +40,7 @@ export default async function AssinarPage({ searchParams }: { searchParams: Prom
     return <ErroLink mensagem="Não encontramos sua empresa. Volte no WhatsApp e peça pra assinar de novo." />;
   }
 
-  return <CheckoutGate companyId={company.id} companyName={company.name} planoPreSelecionado={payload.planoPreSelecionado} />;
+  return <CheckoutGate checkoutToken={token} companyName={company.name} planoPreSelecionado={payload.planoPreSelecionado} />;
 }
 
 function ErroLink({ mensagem }: { mensagem: string }) {

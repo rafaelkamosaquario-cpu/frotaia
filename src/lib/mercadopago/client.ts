@@ -84,11 +84,13 @@ export async function criarAssinaturaMensal(input: CriarAssinaturaMensalInput): 
 
   const response = await fetch(`${MP_API_BASE}/preapproval`, {
     method: "POST",
+    signal: AbortSignal.timeout(20000),
     headers: authHeaders(),
     body: JSON.stringify({
       reason: oferta.label,
       external_reference: codificarReferenciaExterna(input.companyId, input.plano),
       payer_email: input.email,
+      status: "pending",
       auto_recurring: {
         frequency: 1,
         frequency_type: "months",
@@ -101,7 +103,7 @@ export async function criarAssinaturaMensal(input: CriarAssinaturaMensalInput): 
 
   if (!response.ok) return parseErrorSafely(response);
   const body = (await response.json()) as { id: string; init_point: string };
-  return { id: body.id, initPoint: body.init_point };
+  return validarLinkPagamento(body);
 }
 
 export interface CriarPagamentoAnualInput {
@@ -136,6 +138,7 @@ export async function criarPagamentoAnual(input: CriarPagamentoAnualInput): Prom
 
   const response = await fetch(`${MP_API_BASE}/checkout/preferences`, {
     method: "POST",
+    signal: AbortSignal.timeout(20000),
     headers: authHeaders(),
     body: JSON.stringify({
       items: [{ title: oferta.label, quantity: 1, unit_price: valorReais, currency_id: "BRL" }],
@@ -151,7 +154,18 @@ export async function criarPagamentoAnual(input: CriarPagamentoAnualInput): Prom
 
   if (!response.ok) return parseErrorSafely(response);
   const body = (await response.json()) as { id: string; init_point: string };
-  return { id: body.id, initPoint: body.init_point };
+  return validarLinkPagamento(body);
+}
+
+function validarLinkPagamento(body: { id?: string; init_point?: string }): LinkPagamentoResultado {
+  let url: URL;
+  try { url = new URL(body.init_point ?? ""); } catch {
+    throw new MercadoPagoApiError("Mercado Pago não retornou um link de pagamento válido.");
+  }
+  if (!body.id || url.protocol !== "https:" || !(url.hostname === "mercadopago.com.br" || url.hostname.endsWith(".mercadopago.com.br"))) {
+    throw new MercadoPagoApiError("Mercado Pago não retornou um link de pagamento válido.");
+  }
+  return { id: body.id, initPoint: url.href };
 }
 
 export interface PagamentoConsultado {

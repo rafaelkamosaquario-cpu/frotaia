@@ -683,6 +683,34 @@ describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 pergu
     );
   });
 
+  it.each(["Individual", "quero assinar Individual", "Essencial", "Pro"])("aceita plano por texto com trial vencido: %s", async (texto) => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete", awaitingPlanChoice: true } });
+    getSubscription.mockResolvedValue({ status: "TRIAL", valido_ate: "2020-01-01" });
+    const response = await chamarWebhook(mensagemTexto(texto))();
+    expect(response.status).toBe(200);
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.any(String), expect.stringContaining("/assinar?token="));
+    expect(getSubscription).not.toHaveBeenCalled();
+    expect(appendMessage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ direction: "outbound" }));
+  });
+
+  it("aceita callback buttonReply da Z-API para plano", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete", awaitingPlanChoice: true } });
+    await chamarWebhook({ phone: "5541999998888", buttonReply: { buttonId: "demo_plano_individual" } })();
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.any(String), expect.stringContaining("/assinar?token="));
+  });
+
+  it("falha de envio não conclui escolha e informa nova tentativa", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete", awaitingPlanChoice: true } });
+    sendWhatsappText.mockRejectedValueOnce(new Error("falha simulada"));
+    const response = await chamarWebhook(mensagemTexto("Individual"))();
+    expect(response.status).toBe(503);
+    expect(updateOnboardingSession).not.toHaveBeenCalledWith(expect.anything(), USER_ID, expect.objectContaining({ collectedData: expect.objectContaining({ awaitingPlanChoice: false }) }));
+    expect(sendWhatsappText).toHaveBeenLastCalledWith(expect.any(String), expect.stringContaining("tentar novamente"));
+  });
+
   it("CTA 'Conhecer mais funções' volta pro menu de demo (awaiting_demo_choice)", async () => {
     resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
     getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "frete" } });

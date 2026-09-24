@@ -53,12 +53,12 @@ function derivarEstadoInicial(planoPreSelecionado: OfertaPlano): { tier: Tier; f
 }
 
 interface CheckoutGateProps {
-  companyId: string;
+  checkoutToken: string;
   companyName: string;
   planoPreSelecionado: OfertaPlano;
 }
 
-export function CheckoutGate({ companyId, companyName, planoPreSelecionado }: CheckoutGateProps) {
+export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }: CheckoutGateProps) {
   const inicial = derivarEstadoInicial(planoPreSelecionado);
   const [tier, setTier] = useState<Tier>(inicial.tier);
   const [frequencia, setFrequencia] = useState<Frequencia>(inicial.frequencia);
@@ -75,14 +75,17 @@ export function CheckoutGate({ companyId, companyName, planoPreSelecionado }: Ch
   async function confirmar(emailInformado?: string) {
     setErro(null);
     setEnviando(true);
-    const resultado = await criarCheckoutAction(companyId, plano, emailInformado);
-    if (resultado.error) {
-      setErro(resultado.error);
-      setEnviando(false);
-      return;
-    }
-    if (resultado.initPoint) {
+    try {
+      const resultado = await criarCheckoutAction(checkoutToken, plano, emailInformado);
+      if (resultado.error || !resultado.initPoint) {
+        setErro(resultado.error ?? "Não recebemos o link de pagamento. Tente novamente.");
+        return;
+      }
       window.location.href = resultado.initPoint;
+    } catch {
+      setErro("Não foi possível abrir o pagamento. Tente novamente em instantes.");
+    } finally {
+      setEnviando(false);
     }
   }
 
