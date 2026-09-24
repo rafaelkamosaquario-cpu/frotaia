@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { TrendingUp, SquarePen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -86,6 +87,7 @@ export function ReceitasClient({ receitasIniciais, veiculos, motoristas }: Recei
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
+        <Link href="/frota/receitas/clientes" className="inline-flex h-9 items-center rounded-lg border border-border bg-surface px-3 text-sm font-medium hover:bg-surface-muted">Clientes do transporte</Link>
         <select
           value={filtroVeiculo}
           onChange={(e) => setFiltroVeiculo(e.target.value)}
@@ -182,3 +184,4 @@ export function ReceitasClient({ receitasIniciais, veiculos, motoristas }: Recei
     </div>
   );
 }
+

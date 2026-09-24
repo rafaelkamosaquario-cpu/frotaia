@@ -1,6 +1,7 @@
 import type { CostOperation, CostRuleRow, CostEntry } from "@/lib/frota/costs";
 import type { FuelBalanceRow, FuelMovementRow } from "@/lib/frota/fuelStock";
 import type { FuelGroupDraft } from "@/lib/frota/fuelGroup";
+import type { FreightCustomerRow } from "@/lib/frota/freightCustomers";
 type CostTable<T> = { Row: { [K in keyof T]: T[K] }; Insert: Partial<T> & { company_id: string }; Update: Partial<T>; Relationships: [] };
 export type Json =
   | string
@@ -18,6 +19,7 @@ export type Database = {
   }
   public: {
     Tables: {
+      freight_customers: CostTable<FreightCustomerRow>
       fuel_group_drafts: CostTable<FuelGroupDraft>
       fuel_stock_balances: CostTable<FuelBalanceRow>
       fuel_stock_movements: CostTable<FuelMovementRow>
