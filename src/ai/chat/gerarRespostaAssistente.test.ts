@@ -74,6 +74,18 @@ beforeEach(() => {
 });
 
 describe("gerarRespostaAssistente — ferramentasPermitidas (inversão do funil, 09/2026)", () => {
+  it("bloqueia execução fora da permissão mesmo quando o modelo solicita a ferramenta", async () => {
+    messagesCreate.mockResolvedValueOnce(respostaToolUse("consultar_rota"));
+    messagesCreate.mockResolvedValueOnce(respostaTextoFinal("vamos continuar com a análise"));
+    const { gerarRespostaAssistente } = await import("./gerarRespostaAssistente");
+    const resposta = await gerarRespostaAssistente({
+      client: {} as never, userId: "user-1", companyId: "empresa-1",
+      conversation: CONVERSATION, customerContext: CUSTOMER_CONTEXT, vehicleContext: VEHICLE_CONTEXT,
+      mensagemUsuario: "consulte a rota", ferramentasPermitidas: ["analisar_frete"], modoDemo: true,
+    });
+    expect(executarConsultarRota).not.toHaveBeenCalled();
+    expect(resposta.ferramentasExecutadas).toEqual([]);
+  });
   it("sem ferramentasPermitidas, manda as 2 ferramentas completas pra Anthropic (comportamento de sempre)", async () => {
     messagesCreate.mockResolvedValueOnce(respostaTextoFinal("oi"));
     const { gerarRespostaAssistente } = await import("./gerarRespostaAssistente");

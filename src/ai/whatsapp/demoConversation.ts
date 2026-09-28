@@ -1,86 +1,54 @@
 import type { FrotaIaToolName } from "@/lib/supabase/tables";
 import type { OnboardingReply } from "./onboardingConversation";
+import { APRESENTACAO_V1 } from "./conversationExperience";
 
-/**
- * Menu pré-cadastro da inversão do funil (09/2026, "mostrar valor antes de
- * cadastrar" — a pedido do Rafael). Roda logo no primeiro contato, com a
- * empresa mínima já criada (ver `criarEmpresaMinima` em
- * finalizeOnboarding.ts) mas ANTES das 11+1 perguntas de perfil (que agora
- * só rodam depois do pagamento). Função pura, sem I/O — mesmo princípio de
- * `onboardingConversation.ts`, só que pequena o bastante (1 escolha, sem
- * cadeia de perguntas) pra não precisar do mesmo formato de máquina de
- * estado: as transições de `onboarding_sessions.state` ficam no
- * webhook/route.ts, que já é quem monta o restante do fluxo de demo
- * (handoff pra `gerarRespostaAssistente` em modo restrito).
- */
-
-export type DemoTrack = "frete" | "rota" | "custo";
-
-const OPCOES_DEMO: Array<{ id: DemoTrack | "funcionalidades"; title: string }> = [
-  { id: "frete", title: "🚛 Analisar um frete" },
-  { id: "rota", title: "🗺️ Calcular uma rota" },
-  { id: "custo", title: "💰 Calcular custo de viagem" },
-  { id: "funcionalidades", title: "📋 Conhecer o que o Frota IA faz" },
-];
-
-/**
- * Texto curto, focado em mostrar valor rápido — deliberadamente mais
- * enxuto que o `firstOnboardingMessage()` antigo (que já emendava pra
- * pedir nome/perfil). Aqui ainda não se pede nenhum dado de cadastro.
- */
+// IDs antigos permanecem válidos para sessões e listas já enviadas.
+export type DemoTrack = "frete" | "rota" | "custo" | "combustivel" | "manutencao" | "pneus" | "livre";
 export function askDemoChoice(): OnboardingReply {
-  return {
-    kind: "list",
-    text:
-      "Olá! Eu sou o Frota IA, seu gestor de frota direto no WhatsApp. 🚛\n\n" +
-      "Posso ajudar você a saber se um frete compensa, calcular custos e rotas, controlar combustível, pneus e manutenção, acompanhar documentos e alertas e consultar informações atualizadas do transporte.\n\n" +
-      "Você pode falar comigo por texto, áudio, foto ou documento.\n\n" +
-      "Quer ver como funciona na prática?",
-    title: "Escolha um teste",
-    buttonLabel: "Escolher opção",
-    options: OPCOES_DEMO.map((o) => ({ id: o.id, title: o.title })),
-  };
+  return { kind: "list", text: APRESENTACAO_V1, title: "Experimente na prática", buttonLabel: "Escolher assunto", options: [
+    { id: "combustivel", title: "Combustível" }, { id: "manutencao", title: "Manutenção" },
+    { id: "pneus", title: "Pneus" }, { id: "frete", title: "Fretes e oportunidades" },
+    { id: "funcionalidades", title: "O que mais você faz?" },
+  ] };
 }
-
-/** Aceita o id da lista (toque) ou, como fallback, o título/texto digitado — mesmo padrão de resolverIntencao em onboardingConversation.ts. */
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 export function resolverEscolhaDemo(texto: string): DemoTrack | "funcionalidades" | null {
-  const t = texto.trim().toLowerCase();
-  const porId = OPCOES_DEMO.find((o) => o.id === t);
-  if (porId) return porId.id;
-  const porTitulo = OPCOES_DEMO.find((o) => t.includes(o.title.replace(/^\S+\s/, "").toLowerCase()));
-  return porTitulo?.id ?? null;
+  const t = norm(texto);
+  if (Object.hasOwn(FERRAMENTAS_POR_TRACK, t)) return t as DemoTrack;
+  if (/funcionalidades|conhecer.*fun|o que.*faz|ver tudo/.test(t)) return "funcionalidades";
+  if (/\b(pneu|pneus|recapar|recapagem|recapado)\b/.test(t)) return "pneus";
+  if (/\b(manutencao|revisao|oficina|oleo|barulho)\b/.test(t)) return "manutencao";
+  if (/\b(frete|fretes|carga|retorno|oportunidades)\b/.test(t)) return "frete";
+  if (/\b(diesel|gasolina|combustivel|litros?|consumo|abasteci|abastecimento)\b|bebendo demais/.test(t)) return "combustivel";
+  if (/\b(rota|distancia|trajeto)\b/.test(t)) return "rota";
+  if (/\b(custo|custos|viagem)\b/.test(t)) return "custo";
+  return null;
 }
-
-/**
- * Pergunta de transição fixa ao entrar em `awaiting_demo_input` — pede só
- * o dado necessário pro cálculo daquele track, nunca nome/perfil/cidade/
- * veículo. Só promete TEXTO (achado real, 11/09/2026): o handler de
- * `awaiting_demo_input` no webhook só resolve `textoDireto` nesta fase —
- * foto/PDF/áudio ainda não têm o mesmo tratamento multimodal do fluxo
- * pós-cadastro, então prometer isso aqui geraria expectativa que o
- * produto não cumpre ainda.
- */
+export function ehAtalhoDemo(texto: string): boolean {
+  return /^(frete|fretes e oportunidades|rota|custo|combustivel|manutencao|pneus|livre|analisar um frete|calcular uma rota|calcular custo de viagem)$/.test(norm(texto));
+}
 export const TRANSICAO_POR_TRACK: Record<DemoTrack, string> = {
-  frete: "Perfeito. Me mande os dados do frete — origem, destino, valor ofertado e o que mais você tiver.",
-  rota: "Perfeito. Me diga a origem e o destino que eu calculo a distância e a duração real da rota.",
-  custo: "Perfeito. Me conta o trajeto (ou a rota) e o consumo do seu veículo — ou os dados que você já tiver — que eu calculo o custo da viagem.",
+  frete: "Me mande a oferta do frete e o que já sabe da viagem. Para carga de retorno, explico como o Radar funciona nas fontes disponíveis.",
+  rota: "De onde você sai e para onde vai? Vou consultar a distância e o tempo estimado.",
+  custo: "Qual o percurso total e quanto seu caminhão faz por litro? Pode mandar os dados que já tiver.",
+  combustivel: "Quer calcular o gasto da viagem ou conferir o consumo? Pode me contar ou mandar os dados do abastecimento.",
+  manutencao: "O que você precisa ver: uma revisão, um gasto ou uma dúvida de manutenção? No teste posso orientar, sem agendar ou registrar serviços.",
+  pneus: "Quer comparar pneus ou entender o custo de rodar? Me mande os preços e a duração que você conhece, se tiver.",
+  livre: "O que você quer conferir? Posso interpretar os dados e demonstrar uma análise, sem registrar gastos neste teste.",
 };
-
-/**
- * Ferramentas liberadas pra IA em `awaiting_demo_input`, por track — nunca
- * as 39 completas (decisão confirmada com o Rafael). Cada lista cobre o
- * cálculo-alvo do track + o que a IA precisaria pra chegar lá numa
- * conversa real (ex.: frete pode precisar saber se bate o piso legal).
- */
+// Demonstração só usa ferramentas sem escrita operacional.
 export const FERRAMENTAS_POR_TRACK: Record<DemoTrack, FrotaIaToolName[]> = {
   frete: ["analisar_frete", "calcular_margem", "calcular_valor_minimo_frete", "verificar_piso_minimo_antt"],
-  rota: ["consultar_rota"],
-  custo: ["calcular_custo_viagem", "calcular_combustivel"],
+  rota: ["consultar_rota"], custo: ["calcular_custo_viagem", "calcular_combustivel"],
+  combustivel: ["calcular_combustivel", "calcular_custo_viagem"],
+  manutencao: ["consultar_conhecimento_operacional", "calcular_cpk"],
+  pneus: ["comparar_pneus", "calcular_cpk", "consultar_conhecimento_operacional"],
+  livre: ["analisar_frete", "calcular_combustivel", "calcular_custo_viagem", "calcular_cpk", "calcular_margem", "calcular_valor_minimo_frete", "comparar_pneus", "consultar_rota", "consultar_conhecimento_operacional", "verificar_piso_minimo_antt"],
 };
-
-/** Ferramenta cujo sucesso marca "demo entregue" (dispara o CTA pós-demo em webhook/route.ts) — a primeira/principal de cada track. */
 export const FERRAMENTA_ALVO_POR_TRACK: Record<DemoTrack, FrotaIaToolName> = {
-  frete: "analisar_frete",
-  rota: "consultar_rota",
-  custo: "calcular_custo_viagem",
+  frete: "analisar_frete", rota: "consultar_rota", custo: "calcular_custo_viagem",
+  combustivel: "calcular_combustivel", manutencao: "consultar_conhecimento_operacional", pneus: "comparar_pneus", livre: "analisar_frete",
 };
+export function demoEntregouValor(track: DemoTrack, executadas: string[] = []): boolean {
+  return executadas.some(nome => FERRAMENTAS_POR_TRACK[track].includes(nome as FrotaIaToolName));
+}

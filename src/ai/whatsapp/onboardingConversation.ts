@@ -1,7 +1,8 @@
 import type { OnboardingState, VehicleTypeEnum, VehicleBodyTypeEnum } from "@/lib/supabase/tables";
 import type { CompanyRow } from "@/lib/supabase/tables";
 import { classificarConfiguracaoVeiculo, resolverDesambiguacaoArticulado } from "./vehicleConfigClassifier";
-import { CATEGORIAS_AJUDA, construirTextoAjudaCompleto } from "@/lib/helpMenu";
+import { CATEGORIAS_AJUDA } from "@/lib/helpMenu";
+import { ajudaConversacionalV1 } from "./conversationExperience";
 
 /**
  * Onboarding conversacional pelo WhatsApp (Camada 6, seções 3-6 do prompt
@@ -66,6 +67,9 @@ export interface OnboardingCollectedData {
   bodyType?: VehicleBodyTypeEnum;
   averageConsumptionKmL?: number;
   consumptionAsked?: boolean;
+  /** Dados múltiplos só finalizam após resumo confirmado, sem novo enum no banco. */
+  pendingCombinedConfirmation?: boolean;
+  usedCombinedInput?: boolean;
 }
 
 export type OnboardingReply =
@@ -114,10 +118,10 @@ function textReply(text: string): OnboardingReply {
  */
 export function firstOnboardingMessage(): string {
   return (
-    "Olá! Eu sou o Frota IA, seu assistente especializado em transporte. 🚛\n\n" +
-    "Posso analisar fretes, calcular custos, organizar despesas, manutenção, documentos e rotas, criar lembretes e ajudar você a encontrar oportunidades de carga com o Radar de Fretes.\n\n" +
-    "Você pode falar comigo por texto, áudio, foto, PDF ou planilha.\n\n" +
-    "Para eu usar os dados corretos do seu veículo nas análises e recomendações, vou configurar sua operação primeiro.\n\n" +
+    "Sou o Frota IA, seu assistente para o dia a dia do caminhão. 🚛\n\n" +
+    "Combustível, manutenção, pneus e fretes: vamos usar os dados do seu caminhão para te ajudar. O Radar de Fretes acompanha oportunidades nas fontes disponíveis.\n\n" +
+    "Pode responder por texto ou áudio. Depois do cadastro, também pode mandar foto, PDF ou planilha para analisar.\n\n" +
+    "Vamos configurar sua operação, uma pergunta por vez.\n\n" +
     "Como posso chamar você (ou sua empresa/operação)?"
   );
 }
@@ -156,8 +160,10 @@ function askIntent(): OnboardingReply {
     title: "Por onde começar",
     buttonLabel: "Escolher opção",
     options: [
-      ...CATEGORIAS_AJUDA.map((c) => ({ id: c.id, title: `${c.emoji} ${c.titulo}` })),
-      { id: ID_VER_TUDO, title: "📋 Ver tudo que o Frota IA faz" },
+      { id: "combustivel_custos", title: "Combustível e custos" },
+      { id: "pneus_manutencao", title: "Manutenção e pneus" },
+      { id: "fretes", title: "Fretes e oportunidades" },
+      { id: ID_VER_TUDO, title: "Outras possibilidades" },
     ],
   };
 }
@@ -166,7 +172,7 @@ function askIntent(): OnboardingReply {
 const TRANSICAO_POR_INTENCAO: Record<string, string> = {
   fretes:
     "Perfeito! Você pode me mandar uma proposta de frete para analisar ou usar o Radar de Fretes para procurar oportunidades compatíveis com sua operação.\n\nAgora vamos configurar sua base e seu veículo para eu usar informações mais precisas nas análises.",
-  combustivel_custos: "Show! Me conta o consumo do seu veículo (km/l) e o trajeto, ou os custos que quer calcular — CPK, gasto de combustível, margem, o que precisar.",
+  combustivel_custos: "Certo. Vamos usar o consumo e os custos do seu caminhão, sem chutar valores.",
   pneus_manutencao: "Legal! Quando quiser, me diz se é pra comparar pneu novo com recapado, calcular custo por km, ou tirar dúvida sobre manutenção preventiva.",
   documentos: "Beleza! Pode mandar foto de nota fiscal, CRLV, CT-e ou comprovante de seguro assim que quiser — eu leio e te digo o que encontrei.",
   alertas_agenda: "Combinado! Quando quiser, me diz o que devo te lembrar (vencimento, cobrança, revisão) e quando.",
@@ -179,6 +185,8 @@ const TRANSICAO_POR_INTENCAO: Record<string, string> = {
 /** Aceita o id da lista (toque) ou, como fallback, o título/texto digitado. */
 function resolverIntencao(texto: string): { id: string; label: string } | null {
   const t = norm(texto);
+  if (/combust[ií]vel|diesel|consumo/.test(t)) return { id: "combustivel_custos", label: "Combustível e custos" };
+  if (/pneu|manuten[cç][aã]o|revis[aã]o/.test(t)) return { id: "pneus_manutencao", label: "Manutenção e pneus" };
   if (t === ID_VER_TUDO || t.includes("ver tudo")) return { id: ID_VER_TUDO, label: "Ver tudo que o Frota IA faz" };
   const porId = CATEGORIAS_AJUDA.find((c) => norm(c.id) === t);
   if (porId) return { id: porId.id, label: porId.titulo };
@@ -261,7 +269,7 @@ function parsePrimaryRoute(texto: string): { origin: string; destination: string
 }
 
 function askPrimaryVehicle(): OnboardingReply {
-  return textReply("Agora vamos configurar o veículo que você vai usar no Frota IA.\n\nQual a marca, modelo e ano?\n\nEx.: Scania R450 2022");
+  return textReply("Vamos conhecer seu caminhão para reaproveitar os dados nas próximas conversas.\n\nQual a marca, modelo e ano?\n\nEx.: Scania R450 2022");
 }
 
 function askPlate(): OnboardingReply {
@@ -419,7 +427,7 @@ function parseBaseLocation(text: string): { city: string; state?: string } {
  * para cá). `incomingText` já vem resolvido pelo webhook: texto livre,
  * `selectedRowId` de uma lista, ou `buttonId` de um botão.
  */
-export function processOnboardingMessage(
+function processOnboardingStep(
   state: OnboardingState,
   collectedData: OnboardingCollectedData,
   incomingText: string
@@ -492,7 +500,7 @@ export function processOnboardingMessage(
         return { nextState: state, reply: askIntent(), collectedData, finalize: false };
       }
       const updated = { ...collectedData, intentId: resolvido.id, intentLabel: resolvido.label };
-      const textoTransicao = resolvido.id === ID_VER_TUDO ? construirTextoAjudaCompleto() : TRANSICAO_POR_INTENCAO[resolvido.id];
+      const textoTransicao = resolvido.id === ID_VER_TUDO ? ajudaConversacionalV1() : TRANSICAO_POR_INTENCAO[resolvido.id];
       return {
         nextState: "awaiting_base_location",
         reply: textReply(`${textoTransicao}\n\n${(askBaseLocation() as { kind: "text"; text: string }).text}`),
@@ -651,4 +659,53 @@ export function processOnboardingMessage(
     default:
       return { nextState: state, reply: textReply("Pode repetir, por favor?"), collectedData, finalize: false };
   }
+}
+
+/** Aproveita campos explícitos em uma fala, mantendo a validação e os estados existentes. */
+export function processOnboardingMessage(state: OnboardingState, collectedData: OnboardingCollectedData, incomingText: string): OnboardingStepResult {
+  const t = norm(incomingText);
+  if (collectedData.pendingCombinedConfirmation) {
+    if (/^(sim|confirmo|confirmado|certo|est[aá] certo|isso|isso mesmo|ok|pode)$/.test(t)) {
+      return { nextState: "completed", finalize: true, reply: completionMessage(), collectedData: { ...collectedData, pendingCombinedConfirmation: false } };
+    }
+    if (/^(n[aã]o|corrigir|errado)$/.test(t)) {
+      return { nextState: "awaiting_primary_vehicle", finalize: false, reply: textReply("Vamos corrigir o caminhão. Me diga marca, modelo e ano; pode incluir placa, configuração, carroceria e consumo."), collectedData: { ...collectedData, primaryVehicleRaw: undefined, plate: undefined, plateAsked: false, vehicleType: undefined, axleCount: undefined, bodyType: undefined, averageConsumptionKmL: undefined, consumptionAsked: false, pendingCombinedConfirmation: false } };
+    }
+    if (!/cancelar|pausar|continuar depois|depois eu continuo/.test(t)) return { nextState: state, finalize: false, reply: textReply("Está certo o resumo do caminhão? Responda sim ou corrigir."), collectedData };
+    collectedData = { ...collectedData, pendingCombinedConfirmation: false };
+  }
+  let data = { ...collectedData };
+  let extras = 0;
+  if (["awaiting_primary_vehicle", "awaiting_plate", "awaiting_vehicle_configuration", "awaiting_body_type"].includes(state) && !/cancelar|pausar|continuar depois|depois eu continuo/.test(t)) {
+    const plate = incomingText.toUpperCase().match(/\b([A-Z]{3})[- ]?([0-9][0-9A-Z][0-9]{2})\b/);
+    if (plate && state !== "awaiting_plate") { data.plate = plate[1] + plate[2]; data.plateAsked = true; extras++; }
+    const consumo = incomingText.match(/\b(\d+(?:[.,]\d+)?)\s*(?:km\s*\/\s*l|km por litro|quil[oô]metros por litro)\b/i);
+    if (consumo) {
+      const value = Number(consumo[1].replace(",", "."));
+      if (value > 0 && value <= 30) { data.averageConsumptionKmL = value; data.consumptionAsked = true; extras++; }
+    }
+    if (state !== "awaiting_body_type" && OPCOES_CARROCERIA.some(o => o.palavras.some(p => t.includes(p)))) { data.bodyType = resolverCarroceria(incomingText); extras++; }
+    if (state !== "awaiting_vehicle_configuration" && /\b(toco|truck|bitruck|carreta|cavalo|vuc|van|utilitario|rodotrem|bitrem|eixos)\b/.test(t)) {
+      const conf = classificarConfiguracaoVeiculo(incomingText);
+      if (conf.status === "resolvido") { data.vehicleType = conf.vehicleType; data.axleCount = conf.axleCount; extras++; }
+    }
+    // Placa com frase natural: o parser estrito recebe só a placa identificada.
+    if (state === "awaiting_plate" && plate) incomingText = plate[1] + plate[2];
+    if (extras) data.usedCombinedInput = true;
+  }
+  let result = processOnboardingStep(state, data, incomingText);
+  // Nunca consome de novo uma resposta em uma etapa que está pedindo desambiguação.
+  for (let i = 0; i < 5 && !result.finalize && result.nextState !== state; i++) {
+    data = result.collectedData;
+    if (result.nextState === "awaiting_plate" && data.plateAsked) result = processOnboardingStep(result.nextState, data, data.plate ?? "depois");
+    else if (result.nextState === "awaiting_vehicle_configuration" && data.vehicleType && !data.awaitingVehicleConfigChoice) result = { ...result, nextState: "awaiting_body_type", reply: askBodyType() };
+    else if (result.nextState === "awaiting_body_type" && data.bodyType) result = processOnboardingStep(result.nextState, data, data.bodyType);
+    else if (result.nextState === "awaiting_consumption" && data.consumptionAsked) result = processOnboardingStep(result.nextState, data, data.averageConsumptionKmL?.toString() ?? "não sei");
+    else break;
+  }
+  if (result.finalize && result.collectedData.usedCombinedInput) {
+    const d = result.collectedData;
+    return { ...result, nextState: "awaiting_consumption", finalize: false, collectedData: { ...d, pendingCombinedConfirmation: true }, reply: textReply(`Confere o que entendi do caminhão:\n${d.primaryVehicleRaw}\nPlaca: ${d.plate ?? "não informada"}\nConfiguração: ${d.vehicleType ?? "não definida"}${d.axleCount ? `, ${d.axleCount} eixos` : ""}\nCarroceria: ${d.bodyType ?? "não informada"}\nConsumo informado: ${d.averageConsumptionKmL ? `${d.averageConsumptionKmL} km/l` : "não informado"}\n\nEstá certo? Responda sim ou corrigir.`) };
+  }
+  return result;
 }

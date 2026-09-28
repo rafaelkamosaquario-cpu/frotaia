@@ -91,6 +91,8 @@ export interface GerarRespostaAssistenteParams {
   ferramentasPermitidas?: FrotaIaToolName[];
   /** Acrescenta o bloco de instrução de modo demo ao system prompt (ver systemPrompt.ts) — sempre usado junto de `ferramentasPermitidas`. */
   modoDemo?: boolean;
+  /** Experiência de conversa aplicada apenas ao canal WhatsApp, sem mudar o painel. */
+  experienciaWhatsappV1?: boolean;
 }
 
 export interface RespostaAssistente {
@@ -132,7 +134,7 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
   });
 
   const anthropic = createAnthropicClient();
-  const system = construirSystemPrompt(customerContext, vehicleContext, new Date(), params.modoDemo);
+  const system = construirSystemPrompt(customerContext, vehicleContext, new Date(), params.modoDemo, params.experienciaWhatsappV1);
   const todasFerramentas = construirFerramentasAnthropic();
   const ferramentasProprias = params.ferramentasPermitidas
     ? todasFerramentas.filter((f) => params.ferramentasPermitidas!.includes(f.name as FrotaIaToolName))
@@ -201,6 +203,11 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     const resultadosFerramentas: Anthropic.ToolResultBlockParam[] = [];
 
     for (const bloco of blocosFerramenta) {
+      if (params.ferramentasPermitidas && !params.ferramentasPermitidas.includes(bloco.name as FrotaIaToolName)) {
+        resultadosFerramentas.push({ type: "tool_result", tool_use_id: bloco.id,
+          content: "Esta ferramenta não está disponível nesta demonstração. Não foi executada.", is_error: true });
+        continue;
+      }
       const ferramenta = FERRAMENTAS_FROTA_IA.find((f) => f.nome === bloco.name);
 
       if (!ferramenta) {

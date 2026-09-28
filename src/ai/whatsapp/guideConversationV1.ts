@@ -129,12 +129,12 @@ const STEP_BUILDERS: Record<GuideStepV1, (ctx: GuideContextV1) => GuideReplyV1> 
     ),
   custos: (ctx) =>
     listReply(
-      `${progresso(3)} ${prefixoPersonalizado("custos", ctx.intentId)}Você também pode pedir combustível, custo de viagem, CPK, margem, receita por km ou custo de veículo parado.\n\nExemplo: "Quanto gasto de combustível de Curitiba a Campinas?"`,
+      `${progresso(3)} ${prefixoPersonalizado("custos", ctx.intentId)}Vamos cuidar do gasto de diesel. Me diga a distância, o consumo e o preço por litro; eu calculo o que dá com esses dados.\n\nExemplo: "Quanto gasto de combustível de Curitiba a Campinas?"`,
       OPCOES_PASSO
     ),
   registro: (ctx) =>
     listReply(
-      `${progresso(4)} ${prefixoPersonalizado("registro", ctx.intentId)}Dá pra registrar despesa, manutenção, documento ou lembrete direto por aqui.\n\nExemplo: "Registre R$ 850 de manutenção no Scania."`,
+      `${progresso(4)} ${prefixoPersonalizado("registro", ctx.intentId)}Pode me contar uma manutenção, comparar pneus ou mandar o comprovante de um gasto. Eu confiro os dados e peço sua confirmação antes de registrar.\n\nExemplo: "Registre R$ 850 de manutenção no Scania."`,
       OPCOES_PASSO
     ),
   radar: (ctx) =>
@@ -164,7 +164,7 @@ export function indiceDoPassoV1(step: GuideStepV1): number {
 /** Convite inicial, enviado uma única vez logo após o onboarding concluir (ver finalizeOnboarding/webhook). */
 export function buildGuideOfferV1(): GuideReplyV1 {
   return listReply(
-    "Seu Frota IA está pronto. Quer fazer um guia rápido (5 passos, menos de 2 minutos) pra conhecer as principais funções?",
+    "Seu cadastro está pronto. Quer conhecer o essencial em um guia rápido de 6 passos ou já tem algo para resolver? Pode perguntar direto.",
     [
       { id: GUIDE_V1_CONTROL_IDS.start, title: "Fazer agora" },
       { id: GUIDE_V1_CONTROL_IDS.later, title: "Depois" },
@@ -195,7 +195,7 @@ export function buildGuideReabrirV1(status: GuideStatus, stepAtual: GuideStepV1 
       { id: GUIDE_V1_CONTROL_IDS.exit, title: "Agora não" },
     ]);
   }
-  return listReply("Quer fazer o guia rápido (5 passos, menos de 2 minutos)?", [
+  return listReply("Quer conhecer o essencial em um guia rápido de 6 passos?", [
     { id: GUIDE_V1_CONTROL_IDS.start, title: "Fazer agora" },
     { id: GUIDE_V1_CONTROL_IDS.exit, title: "Agora não" },
   ]);

@@ -45,13 +45,13 @@ describe("awaiting_intent", () => {
     }
   });
 
-  it("'ver tudo' manda o catálogo completo (todas as categorias) e ainda segue o fluxo normalmente", () => {
+  it("'ver tudo' apresenta as necessidades sem catálogo longo e segue o cadastro", () => {
     const resultado = processOnboardingMessage("awaiting_intent", collectedBase, "ver_tudo");
     expect(resultado.nextState).toBe("awaiting_base_location");
     expect(resultado.collectedData.intentId).toBe("ver_tudo");
     if (resultado.reply.kind === "text") {
-      expect(resultado.reply.text).toContain("Notícias do transporte");
-      expect(resultado.reply.text).toContain("Fretes e oportunidades");
+      expect(resultado.reply.text).toContain("Combustível");
+      expect(resultado.reply.text).toContain("Fretes");
     }
   });
 

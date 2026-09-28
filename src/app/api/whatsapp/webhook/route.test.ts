@@ -10,6 +10,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  */
 
 vi.mock("server-only", () => ({}));
+const prepararEntradaDemo = vi.fn();
+vi.mock("@/ai/whatsapp/demoMedia", () => ({ prepararEntradaDemo: (...args: unknown[]) => prepararEntradaDemo(...args) }));
 
 vi.mock("@/lib/whatsapp/config", () => ({
   isWhatsappConfigured: () => true,
@@ -122,6 +124,7 @@ function mensagemLista(selectedRowId: string) {
 describe("Guia de Primeiros Passos V1 — dispatch no webhook do WhatsApp (08/2026)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prepararEntradaDemo.mockImplementation(async (body) => ({ ok: true, texto: body.text?.message ?? "dados da mídia", extra: { content_type: "text" } }));
     resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
     criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
     getOnboardingSession.mockResolvedValue({ state: "completed", collected_data: {} });
@@ -357,6 +360,7 @@ describe("Guia de Primeiros Passos V1 — dispatch no webhook do WhatsApp (08/20
 describe("Guia V1 — oferta automática exige isAccessAllowed (validação 08/2026)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prepararEntradaDemo.mockImplementation(async (body) => ({ ok: true, texto: body.text?.message ?? "dados da mídia", extra: { content_type: "text" } }));
     resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
     criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
     loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
@@ -452,6 +456,7 @@ describe("Guia V1 — oferta automática exige isAccessAllowed (validação 08/2
 describe("Guia V1 — interação manual/em andamento também exige isAccessAllowed (validação 08/2026)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prepararEntradaDemo.mockImplementation(async (body) => ({ ok: true, texto: body.text?.message ?? "dados da mídia", extra: { content_type: "text" } }));
     resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
     criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
     getOnboardingSession.mockResolvedValue({ state: "completed", collected_data: {} });
@@ -509,6 +514,7 @@ function mensagemBotao(buttonId: string) {
 describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 perguntas", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prepararEntradaDemo.mockImplementation(async (body) => ({ ok: true, texto: body.text?.message ?? "dados da mídia", extra: { content_type: "text" } }));
     criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
     loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
     loadVehicleContext.mockResolvedValue({ vehicle: null, costProfile: null, tireProfiles: [], insuranceExpiryDate: null, licensingExpiryDate: null });
@@ -729,5 +735,64 @@ describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 pergu
 
     expect(updateOnboardingSession).not.toHaveBeenCalled();
     expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("continuar testando"));
+  });
+});
+describe("V1 conversacional — demonstração, mídia e checkout preservado", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_choice", collected_data: { companyId: EMPRESA } });
+    getSubscription.mockResolvedValue({ status: "ATIVA", valido_ate: null });
+    findPendingChecklistDispatchByPhone.mockResolvedValue(null);
+    loadCustomerContext.mockResolvedValue({ company: { id: EMPRESA }, memories: [], role: "owner", preferences: {}, activeRadars: [] });
+    loadVehicleContext.mockResolvedValue({ vehicle: null });
+    getOrCreateOpenConversation.mockResolvedValue({ id: "conv-1" });
+    updateOnboardingSession.mockResolvedValue(undefined);
+    appendMessage.mockResolvedValue(undefined);
+    sendWhatsappText.mockResolvedValue(undefined); sendWhatsappOptionList.mockResolvedValue(undefined);
+    gerarRespostaAssistente.mockResolvedValue({ message: { id: "m1", content: "resultado" }, ferramentasExecutadas: [] });
+    prepararEntradaDemo.mockResolvedValue({ ok: true, texto: "600 km, 3 km/l", extra: { content_type: "audio" } });
+  });
+  it("pedido natural completo segue direto sem pedir reenvio", async () => {
+    await chamarWebhook(mensagemTexto("Quanto gasto de diesel em 600 km?"))();
+    expect(gerarRespostaAssistente).toHaveBeenCalledWith(expect.objectContaining({ modoDemo: true, experienciaWhatsappV1: true, ferramentasPermitidas: ["calcular_combustivel", "calcular_custo_viagem"] }));
+  });
+  it.each(["image", "audio", "document"])("mídia %s já no menu segue para análise restrita", async (tipo) => {
+    prepararEntradaDemo.mockResolvedValue({ ok: true, texto: "arquivo", conteudoMultimodal: [{ type: "image" }], extra: { content_type: tipo } });
+    await chamarWebhook({ phone: "5541999998888", messageId: "media-1", [tipo]: {} })();
+    expect(gerarRespostaAssistente).toHaveBeenCalledWith(expect.objectContaining({ mensagemUsuario: "arquivo", modoDemo: true, conteudoMultimodal: [{ type: "image" }], inboundMessageExtra: expect.objectContaining({ external_message_id: "media-1" }) }));
+    const params = gerarRespostaAssistente.mock.calls[0][0];
+    expect(params.ferramentasPermitidas.every((n: string) => !/^(registrar_|gerenciar_)/.test(n))).toBe(true);
+  });
+  it("trial vencido bloqueia antes de baixar/transcrever mídia", async () => {
+    getSubscription.mockResolvedValue({ status: "TRIAL", valido_ate: "2020-01-01T00:00:00Z" });
+    await chamarWebhook({ phone: "5541999998888", audio: {} })();
+    expect(prepararEntradaDemo).not.toHaveBeenCalled(); expect(gerarRespostaAssistente).not.toHaveBeenCalled();
+  });
+  it("falha de leitura pede somente reenvio, não inventa resultado nem CTA", async () => {
+    prepararEntradaDemo.mockResolvedValue({ ok: false, mensagem: "Pode reenviar a foto?" });
+    await chamarWebhook({ phone: "5541999998888", image: {} })();
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.anything(), "Pode reenviar a foto?");
+    expect(gerarRespostaAssistente).not.toHaveBeenCalled(); expect(sendWhatsappButtons).not.toHaveBeenCalled();
+  });
+  it("áudio no cadastro usa o mesmo parser determinístico", async () => {
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_name", collected_data: {} });
+    prepararEntradaDemo.mockResolvedValue({ ok: true, texto: "João", extra: { content_type: "audio" } });
+    processOnboardingMessage.mockReturnValue({ nextState: "awaiting_profile", collectedData: { name: "João" }, reply: { kind: "text", text: "Qual seu perfil?" }, finalize: false });
+    await chamarWebhook({ phone: "5541999998888", audio: {} })();
+    expect(processOnboardingMessage).toHaveBeenCalledWith("awaiting_name", {}, "João");
+  });
+  it("ferramenta de combustível entregue libera CTA; pergunta isolada não", async () => {
+    getOnboardingSession.mockResolvedValue({ state: "awaiting_demo_input", collected_data: { companyId: EMPRESA, demoTrack: "combustivel" } });
+    gerarRespostaAssistente.mockResolvedValue({ message: { content: "200 litros" }, ferramentasExecutadas: ["calcular_combustivel"] });
+    await chamarWebhook(mensagemTexto("600 km, 3 km/l"))();
+    expect(sendWhatsappButtons).toHaveBeenCalled();
+  });
+  it("primeira foto do novo cliente não é descartada depois da apresentação", async () => {
+    resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: true });
+    criarEmpresaMinima.mockResolvedValue({ id: EMPRESA });
+    updateOnboardingSession.mockResolvedValue({ state: "awaiting_demo_choice", collected_data: { companyId: EMPRESA } });
+    await chamarWebhook({ phone: "5541999998888", image: {} })();
+    expect(sendWhatsappOptionList).toHaveBeenCalled(); expect(gerarRespostaAssistente).toHaveBeenCalled();
   });
 });

@@ -8,14 +8,14 @@ import { baixarMidia, paraBase64 } from "@/lib/whatsapp/mediaDownloader";
 import { isWhisperConfigured } from "@/lib/openai/whisperConfig";
 import { transcreverAudio } from "@/lib/openai/whisperClient";
 import { planilhaParaTexto, MIME_TYPES_PLANILHA_SUPORTADOS, SpreadsheetParseError } from "@/lib/spreadsheet/spreadsheetParser";
-import { ehPedidoDeAjuda, ehPedidoDeFuncionalidades, ehPedidoDeGuia, construirTextoAjudaCompleto } from "@/lib/helpMenu";
-import { FROTA_SUGGESTIONS, SUGESTOES_LISTA_NATIVA_WHATSAPP, resolverSelecaoNumerada } from "@/lib/frotaSuggestions";
+import { ehPedidoDeAjuda, ehPedidoDeFuncionalidades, ehPedidoDeGuia } from "@/lib/helpMenu";
+import { FROTA_SUGGESTIONS, resolverSelecaoNumerada } from "@/lib/frotaSuggestions";
 import { toPhoneE164 } from "@/lib/identity/phoneNormalizer";
 import { resolveOrCreateUserByPhone } from "@/services/supabase/userIdentityService";
 import { getOnboardingSession, createOnboardingSession, updateOnboardingSession } from "@/services/supabase/onboardingSessionService";
 import { firstOnboardingMessage, processOnboardingMessage, type OnboardingCollectedData, type OnboardingReply } from "@/ai/whatsapp/onboardingConversation";
 import { finalizeOnboarding, criarEmpresaMinima } from "@/ai/whatsapp/finalizeOnboarding";
-import { askDemoChoice, resolverEscolhaDemo, TRANSICAO_POR_TRACK, FERRAMENTAS_POR_TRACK, FERRAMENTA_ALVO_POR_TRACK, type DemoTrack } from "@/ai/whatsapp/demoConversation";
+import { askDemoChoice, resolverEscolhaDemo, ehAtalhoDemo, demoEntregouValor, TRANSICAO_POR_TRACK, FERRAMENTAS_POR_TRACK, type DemoTrack } from "@/ai/whatsapp/demoConversation";
 import { loadCustomerContext, loadVehicleContext } from "@/ai/context/customerContext";
 import { getOrCreateOpenConversation, appendMessage } from "@/services/supabase/conversationService";
 import { gerarRespostaAssistente, type GerarRespostaAssistenteParams, type RespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
@@ -38,6 +38,8 @@ import {
   processGuideControlV1,
   type GuideStepV1,
 } from "@/ai/whatsapp/guideConversationV1";
+import { prepararEntradaDemo } from "@/ai/whatsapp/demoMedia";
+import { ajudaConversacionalV1, SUGESTOES_V1, resolverSugestaoV1 } from "@/ai/whatsapp/conversationExperience";
 import type { MessageInsert } from "@/lib/supabase/tables";
 
 const ROTA = "/api/whatsapp/webhook";
@@ -192,7 +194,7 @@ async function gerarRespostaEEnviar(
   paramsIA: GerarRespostaAssistenteParams
 ): Promise<RespostaAssistente | null> {
   try {
-    const resposta = await gerarRespostaAssistente(paramsIA);
+    const resposta = await gerarRespostaAssistente({ ...paramsIA, experienciaWhatsappV1: true });
     await sendWhatsappText(phoneE164, resposta.message.content);
     return resposta;
   } catch (err) {
@@ -230,7 +232,7 @@ function construirMensagemPosCadastro(intentId: unknown, intentLabel: unknown): 
   return `Cadastro concluído! Sobre ${intentLabel.toLowerCase()}, é só mandar quando quiser que eu já calculo.\n\nAqui embaixo tem outras coisas que também faço — ou envie sua própria pergunta por texto, áudio, foto ou documento.`;
 }
 
-const TEXTO_LISTA_SUGESTOES = "Como posso ajudar com sua frota hoje?";
+const TEXTO_LISTA_SUGESTOES = "O que você quer resolver no caminhão hoje? Pode escolher ou falar do seu jeito.";
 
 /**
  * Enviado como mensagem separada logo após a lista — nunca dentro do corpo
@@ -249,7 +251,7 @@ const LEMBRETE_PERGUNTA_LIVRE = "Se preferir, pode digitar sua própria pergunta
  * corte de `SUGESTOES_LISTA_NATIVA_WHATSAPP`.
  */
 function construirFallbackNumerado(): string {
-  const linhas = FROTA_SUGGESTIONS.map((s, i) => `${i + 1}. ${s.title}`).join("\n");
+  const linhas = SUGESTOES_V1.map((s, i) => `${i + 1}. ${s.title}`).join("\n");
   return `${TEXTO_LISTA_SUGESTOES}\n\n${linhas}\n\nResponda com o número ou escreva sua pergunta normalmente.`;
 }
 
@@ -286,7 +288,7 @@ async function enviarSugestoesIniciais(
       TEXTO_LISTA_SUGESTOES,
       "Escolha uma opção",
       "Ver sugestões",
-      SUGESTOES_LISTA_NATIVA_WHATSAPP.map((s) => ({ id: s.id, title: s.title, description: s.description }))
+      SUGESTOES_V1.map((s) => ({ id: s.id, title: s.title, description: s.description }))
     );
     await sendWhatsappText(phoneE164, LEMBRETE_PERGUNTA_LIVRE).catch((err) => logZapiSendFailure(err, phoneE164, "sugestoes_lembrete_pergunta_livre"));
     await updateOnboardingSession(admin, userId, {
@@ -295,7 +297,7 @@ async function enviarSugestoesIniciais(
   } catch {
     await sendWhatsappText(phoneE164, construirFallbackNumerado()).catch((err) => logZapiSendFailure(err, phoneE164, "sugestoes_fallback_numerado"));
     await updateOnboardingSession(admin, userId, {
-      collectedData: { ...collectedDataAtual, suggestionsMenuSentAt: new Date().toISOString(), awaitingNumberedMenuSelection: true },
+      collectedData: { ...collectedDataAtual, suggestionsMenuSentAt: new Date().toISOString(), awaitingNumberedMenuSelection: true, suggestionsVersion: 2 },
     }).catch(() => {});
   }
 }
@@ -352,7 +354,7 @@ export async function POST(request: Request) {
 
   const phoneE164 = toPhoneE164(body.phone);
   const textoDireto = body.text?.message?.trim();
-  const entradaOnboarding = resolverEntradaOnboarding(body);
+  let entradaOnboarding = resolverEntradaOnboarding(body);
 
   // Callback sem nenhum tipo reconhecido (ex.: status de entrega/leitura) — ignora.
   if (!entradaOnboarding && !body.image && !body.document && !body.audio && !body.location && !body.contact) {
@@ -380,6 +382,7 @@ export async function POST(request: Request) {
 
   const { userId, channelId, isNew } = await resolveOrCreateUserByPhone(admin, body.phone, body.senderName);
 
+  let sessaoCriadaAgora: Awaited<ReturnType<typeof updateOnboardingSession>> | null = null;
   if (isNew) {
     // resolveOrCreateUserByPhone já criou a sessão de onboarding em awaiting_name.
     const intencaoComercial = resolverIntencaoComercialLanding(textoDireto);
@@ -410,15 +413,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    await updateOnboardingSession(admin, userId, {
+    sessaoCriadaAgora = await updateOnboardingSession(admin, userId, {
       state: "awaiting_demo_choice",
       collectedData: { companyId: empresaMinima.id, ...(intencaoComercial ? { ofertaPretendida: intencaoComercial } : {}) },
     });
     await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_inicial"));
-    return NextResponse.json({ ok: true });
+    const temPedido = Boolean(body.audio || body.image || body.document || (textoDireto && resolverEscolhaDemo(textoDireto) && !ehAtalhoDemo(textoDireto)));
+    if (!temPedido || intencaoComercial) return NextResponse.json({ ok: true });
   }
 
-  let session = await getOnboardingSession(admin, userId);
+  let session = sessaoCriadaAgora ?? await getOnboardingSession(admin, userId);
 
   if (!session) {
     // Usuário anterior à Camada 6 (ex.: veio do vínculo web da Camada 5).
@@ -440,21 +444,16 @@ export async function POST(request: Request) {
     || (textoDireto && PARECE_QUERER_ASSINAR.test(textoDireto))
     || (entradaOnboarding && [CTA_DEMO_VER_PLANOS, ...BOTOES_PLANO.map(b => b.id)].includes(entradaOnboarding)));
   if (session.state === "awaiting_demo_choice" && !pedidoComercialDemo) {
-    if (!entradaOnboarding) {
-      await sendWhatsappText(phoneE164, "Por enquanto, toque numa das opções acima ou digite o que você quer testar.").catch((err) => logZapiSendFailure(err, phoneE164, "demo_pede_toque"));
-      return NextResponse.json({ ok: true });
-    }
-
     const collectedDataAtual = (session.collected_data ?? {}) as Record<string, unknown>;
-    const escolha = resolverEscolhaDemo(entradaOnboarding);
-
+    const temMidia = Boolean(body.image || body.document || body.audio);
+    const escolha = resolverEscolhaDemo(entradaOnboarding ?? "") ?? (temMidia ? "livre" : null);
     if (!escolha) {
-      await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_repete"));
+      await enviarRespostaOnboarding(phoneE164, askDemoChoice());
       return NextResponse.json({ ok: true });
     }
 
     if (escolha === "funcionalidades") {
-      await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_funcionalidades_texto"));
+      await sendWhatsappText(phoneE164, ajudaConversacionalV1()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_funcionalidades_texto"));
       await enviarRespostaOnboarding(phoneE164, askDemoChoice()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_menu_apos_funcionalidades"));
       return NextResponse.json({ ok: true });
     }
@@ -463,14 +462,20 @@ export async function POST(request: Request) {
       state: "awaiting_demo_input",
       collectedData: { ...collectedDataAtual, demoTrack: escolha },
     });
-    await sendWhatsappText(phoneE164, TRANSICAO_POR_TRACK[escolha]).catch((err) => logZapiSendFailure(err, phoneE164, "demo_transicao_track"));
-    return NextResponse.json({ ok: true });
+    if (!temMidia && ehAtalhoDemo(entradaOnboarding ?? "")) {
+      await sendWhatsappText(phoneE164, TRANSICAO_POR_TRACK[escolha]).catch((err) => logZapiSendFailure(err, phoneE164, "demo_transicao_track"));
+      return NextResponse.json({ ok: true });
+    }
+    // Pedido completo ou mídia: não pedir que o cliente repita o que já enviou.
+    session = { ...session, state: "awaiting_demo_input", collected_data: { ...collectedDataAtual, demoTrack: escolha } };
+
   }
 
   if (session.state === "awaiting_demo_input" || (session.state === "awaiting_demo_choice" && pedidoComercialDemo)) {
     const collectedDataAtual = (session.collected_data ?? {}) as Record<string, unknown>;
     const companyIdDemo = collectedDataAtual.companyId as string | undefined;
-    const demoTrack = collectedDataAtual.demoTrack as DemoTrack | undefined;
+    const trackSalvo = collectedDataAtual.demoTrack;
+    const demoTrack = typeof trackSalvo === "string" && Object.hasOwn(FERRAMENTAS_POR_TRACK, trackSalvo) ? trackSalvo as DemoTrack : undefined;
 
     // Estado inconsistente (não deveria acontecer — companyId sempre é
     // gravado junto com a transição pra este estado) — recomeça o menu em
@@ -530,10 +535,6 @@ export async function POST(request: Request) {
       await enviarRespostaOnboarding(phoneE164, askDemoChoice());
       return NextResponse.json({ ok: true });
     }
-    if (!textoDireto) {
-      await sendWhatsappText(phoneE164, "Por enquanto, durante o teste, me responda por texto.").catch((err) => logZapiSendFailure(err, phoneE164, "demo_pede_texto"));
-      return NextResponse.json({ ok: true });
-    }
 
     // Mesmo gate de assinatura do fluxo normal (mais abaixo) — o trial
     // criado em criarEmpresaMinima já vale a partir daqui.
@@ -546,6 +547,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    const entradaDemo = await prepararEntradaDemo(body);
+    if (!entradaDemo.ok) {
+      await sendWhatsappText(phoneE164, entradaDemo.mensagem);
+      return NextResponse.json({ ok: true });
+    }
     const customerContextDemo = await loadCustomerContext(admin, userId);
     const vehicleContextDemo = await loadVehicleContext(admin, companyIdDemo);
     const conversationDemo = await getOrCreateOpenConversation(admin, companyIdDemo, userId, channelId);
@@ -557,13 +563,14 @@ export async function POST(request: Request) {
       conversation: conversationDemo,
       customerContext: customerContextDemo,
       vehicleContext: vehicleContextDemo,
-      mensagemUsuario: textoDireto,
-      inboundMessageExtra: body.messageId ? { external_message_id: body.messageId } : {},
+      mensagemUsuario: entradaDemo.texto,
+      conteudoMultimodal: entradaDemo.conteudoMultimodal,
+      inboundMessageExtra: { ...entradaDemo.extra, ...(body.messageId ? { external_message_id: body.messageId } : {}) },
       ferramentasPermitidas: FERRAMENTAS_POR_TRACK[demoTrack],
       modoDemo: true,
     });
 
-    if (resposta?.ferramentasExecutadas.includes(FERRAMENTA_ALVO_POR_TRACK[demoTrack])) {
+    if (resposta && demoEntregouValor(demoTrack, resposta.ferramentasExecutadas)) {
       await enviarRespostaOnboarding(phoneE164, buildCtaPosDemo()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_cta_pos_resultado"));
     }
 
@@ -581,8 +588,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, deduped: true });
     }
 
+    if (!entradaOnboarding && body.audio) {
+      const audio = await prepararEntradaDemo(body);
+      if (!audio.ok) {
+        await sendWhatsappText(phoneE164, audio.mensagem);
+        return NextResponse.json({ ok: true });
+      }
+      entradaOnboarding = audio.texto;
+    }
     if (!entradaOnboarding) {
-      await sendWhatsappText(phoneE164, "Por enquanto, durante o cadastro, preciso que você responda em texto ou toque numa das opções.").catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_pede_texto_ou_toque"));
+      await sendWhatsappText(phoneE164, "Para este dado do cadastro, pode escrever, mandar áudio ou tocar numa opção.").catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_pede_texto_ou_toque"));
       return NextResponse.json({ ok: true });
     }
 
@@ -791,7 +806,7 @@ export async function POST(request: Request) {
       content_type: "text",
       ...inboundBase,
     });
-    await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch((err) => logZapiSendFailure(err, phoneE164, "funcionalidades_texto_completo"));
+    await sendWhatsappText(phoneE164, ajudaConversacionalV1()).catch((err) => logZapiSendFailure(err, phoneE164, "funcionalidades_texto_completo"));
     return NextResponse.json({ ok: true });
   }
 
@@ -836,7 +851,7 @@ export async function POST(request: Request) {
   // no WhatsApp não existe "só preencher", o toque já é o envio. Segue pro
   // fluxo normal da IA como se o cliente tivesse digitado o exemplo.
   const sugestaoSelecionada = body.listResponseMessage?.selectedRowId
-    ? FROTA_SUGGESTIONS.find((s) => s.id === body.listResponseMessage?.selectedRowId)
+    ? [...SUGESTOES_V1, ...FROTA_SUGGESTIONS].find((s) => s.id === body.listResponseMessage?.selectedRowId)
     : undefined;
 
   // Fallback numerado: só interpreta "3" (ou o título exato) como escolha
@@ -844,7 +859,8 @@ export async function POST(request: Request) {
   // quando o envio da lista nativa falhou) — nunca em mensagem solta, pra
   // não confundir com um número de cálculo (ex.: "3" toneladas, "3" dias).
   const aguardandoSelecaoNumerada = Boolean((session.collected_data as Record<string, unknown> | null)?.awaitingNumberedMenuSelection);
-  const selecaoNumerada = aguardandoSelecaoNumerada ? resolverSelecaoNumerada(textoDireto) : undefined;
+  const menuV1 = (session.collected_data as Record<string, unknown> | null)?.suggestionsVersion === 2;
+  const selecaoNumerada = aguardandoSelecaoNumerada ? (menuV1 ? resolverSugestaoV1(textoDireto) : resolverSelecaoNumerada(textoDireto)) : undefined;
   if (aguardandoSelecaoNumerada) {
     // Passou o momento de interpretar como escolha, tenha batido ou não —
     // nunca deixa a sessão esperando indefinidamente uma resposta numérica.
@@ -869,7 +885,7 @@ export async function POST(request: Request) {
       content_type: "text",
       ...inboundBase,
     });
-    await sendWhatsappText(phoneE164, construirTextoAjudaCompleto()).catch((err) => logZapiSendFailure(err, phoneE164, "sugestao_ver_tudo_texto_completo"));
+    await sendWhatsappText(phoneE164, ajudaConversacionalV1()).catch((err) => logZapiSendFailure(err, phoneE164, "sugestao_ver_tudo_texto_completo"));
     return NextResponse.json({ ok: true });
   }
 
@@ -1064,6 +1080,7 @@ export async function POST(request: Request) {
       vehicleContext,
       mensagemUsuario,
       conteudoMultimodal,
+      experienciaWhatsappV1: true,
       inboundMessageExtra: inboundExtra,
     });
 
