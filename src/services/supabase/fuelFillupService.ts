@@ -1,6 +1,7 @@
 import { fuelFillupCreateSchema, fuelFillupUpdateSchema } from "@/lib/validation/schemas";
 import type { FuelFillupRow } from "@/lib/supabase/tables";
 import type { SupabaseDbClient } from "./types";
+import { readAllPages } from "./readAllPages";
 
 function arredondar(valor: number, casas: number): number {
   const fator = 10 ** casas;
@@ -106,6 +107,9 @@ export async function deleteFuelFillup(client: SupabaseDbClient, fillupId: strin
 }
 
 export interface AverageFuelConsumptionResult {
+  /** Indicador condicionado a tanque cheio nos extremos; nunca telemetria. */
+  qualidade: "estimado" | "insuficiente" | "inconsistente";
+  aviso: string;
   vehicleId: string;
   litrosConsiderados: number;
   kmRodado: number;
@@ -119,14 +123,10 @@ export interface AverageFuelConsumptionResult {
 }
 
 /**
- * Consumo médio MEDIDO (litros/km real), método "tanque cheio a tanque
- * cheio": para cada par de abastecimentos consecutivos com odometer_km
- * informado, o km rodado é a diferença de odômetro e os litros
- * consumidos nesse trecho são os litros colocados no abastecimento
- * SEGUINTE (não no primeiro do par — é o que reabastece o que foi
- * gasto). Precisa de pelo menos 2 leituras de odômetro no período;
- * abastecimentos sem odometer_km entram no gasto total mas não no
- * cálculo de consumo (nunca interpola/estima um km que não foi informado).
+ * Indicador estimado entre primeira e última leitura. Inclui todos os litros
+ * entre os extremos, exclui o abastecimento inicial e os posteriores à última
+ * leitura. Não há confirmação de tanque cheio no cadastro: nunca chamar de
+ * consumo medido. Leituras inconsistentes invalidam o resultado inteiro.
  */
 export async function computeAverageFuelConsumption(
   client: SupabaseDbClient,
@@ -135,37 +135,66 @@ export async function computeAverageFuelConsumption(
   dateFrom?: string,
   dateTo?: string
 ): Promise<AverageFuelConsumptionResult> {
-  let query = client
-    .from("fuel_fillups")
-    .select("*")
-    .eq("company_id", companyId)
-    .eq("vehicle_id", vehicleId)
-    .order("fillup_date", { ascending: true });
+  const todos = await readAllPages<FuelFillupRow>(async (offset, size) => {
+    let query = client
+      .from("fuel_fillups")
+      .select("*")
+      .eq("company_id", companyId)
+      .eq("vehicle_id", vehicleId)
+      .order("fillup_date", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
 
-  if (dateFrom) query = query.gte("fillup_date", dateFrom);
-  if (dateTo) query = query.lte("fillup_date", dateTo);
+    if (dateFrom) query = query.gte("fillup_date", dateFrom);
+    if (dateTo) query = query.lte("fillup_date", dateTo);
 
-  const { data, error } = await query;
-  if (error) throw error;
-  const todos = data ?? [];
+    const { data, error } = await query.range(offset, offset + size - 1);
+    if (error) throw error;
+    return data ?? [];
+  });
 
   const gastoTotal = arredondar(
     todos.reduce((acc, r) => acc + Number(r.total_amount), 0),
     2
   );
-  const comKm = todos.filter((r) => r.odometer_km !== null);
+  const comKm = todos.filter((r) => r.odometer_km != null);
 
   let kmRodado = 0;
   let litrosConsiderados = 0;
-  for (let i = 1; i < comKm.length; i++) {
-    const delta = Number(comKm[i].odometer_km) - Number(comKm[i - 1].odometer_km);
-    if (delta > 0) {
-      kmRodado += delta;
-      litrosConsiderados += Number(comKm[i].liters);
+  let anterior: number | null = null;
+  let litrosPendentes = 0;
+  let inconsistente = false;
+  for (const row of todos) {
+    // Sem leitura inicial não há intervalo; depois dela TODOS os litros contam,
+    // inclusive abastecimentos intermediários sem odômetro.
+    if (anterior !== null) {
+      const litros = Number(row.liters);
+      if (!Number.isFinite(litros) || litros <= 0) inconsistente = true;
+      litrosPendentes += litros;
     }
+    if (row.odometer_km == null) continue;
+    const km = Number(row.odometer_km);
+    if (!Number.isFinite(km) || km < 0) inconsistente = true;
+    if (anterior !== null) {
+      const delta = km - anterior;
+      if (delta <= 0) inconsistente = true;
+      kmRodado += delta;
+      litrosConsiderados += litrosPendentes;
+    }
+    anterior = km;
+    litrosPendentes = 0;
   }
+  if (inconsistente) { kmRodado = 0; litrosConsiderados = 0; }
+  const qualidade = inconsistente ? "inconsistente" : litrosConsiderados > 0 ? "estimado" : "insuficiente";
+  const aviso = inconsistente
+    ? "Há odômetro repetido/retrocedendo ou litros inválidos. Corrija os registros antes de calcular o consumo."
+    : qualidade === "insuficiente"
+      ? "Informe pelo menos duas leituras de odômetro em abastecimentos para fechar um intervalo."
+      : "Estimativa: o cálculo pressupõe tanque cheio nos extremos e todos os abastecimentos registrados. Sem essa confirmação, não é consumo medido. Litros sem km entre as leituras estão incluídos; fora do intervalo entram apenas no gasto.";
 
   return {
+    qualidade,
+    aviso,
     vehicleId,
     litrosConsiderados: arredondar(litrosConsiderados, 2),
     kmRodado: arredondar(kmRodado, 1),

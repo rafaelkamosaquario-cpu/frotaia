@@ -231,8 +231,8 @@ async function executar(entrada: GerenciarAbastecimentoEntrada): Promise<Gerenci
 
       const mensagemResumo =
         consumo.consumoMedioKmL !== null
-          ? `Consumo médio real: ${consumo.consumoMedioKmL} km/l, com base em ${consumo.abastecimentosComKm} abastecimentos com km informado (${consumo.kmRodado} km rodados, ${consumo.litrosConsiderados}L).`
-          : "Ainda não há abastecimentos suficientes com km informado para calcular o consumo médio real (preciso de pelo menos 2, com o km do odômetro em cada um).";
+          ? `Consumo estimado: ${consumo.consumoMedioKmL} km/l (${consumo.kmRodado} km, ${consumo.litrosConsiderados}L). ${consumo.aviso}`
+          : consumo.aviso;
 
       return {
         sucesso: true,

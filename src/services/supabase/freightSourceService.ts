@@ -1,5 +1,29 @@
-import type { FreightSourceRow } from "@/lib/supabase/tables";
+import type { FreightSourceRow, FreightOpportunityRow } from "@/lib/supabase/tables";
 import type { SupabaseDbClient } from "./types";
+
+/** Uma fonte privada só atende sua empresa; fonte global exige cadastro explícito. */
+export async function getAuthorizedSourceCompanies(client: SupabaseDbClient, groupExternalId: string): Promise<string[] | null> {
+  const { data, error } = await client.from("freight_sources").select("company_id")
+    .eq("group_external_id", groupExternalId).eq("enabled", true);
+  if (error) throw error;
+  if ((data ?? []).some(row => row.company_id === null)) return null;
+  return (data ?? []).flatMap(row => row.company_id ? [row.company_id] : []);
+}
+
+export async function hasEnabledFreightSource(client: SupabaseDbClient, companyId: string): Promise<boolean> {
+  const { data, error } = await client.from("freight_sources").select("id")
+    .eq("enabled", true).or(`company_id.eq.${companyId},company_id.is.null`).limit(1);
+  if (error) throw error;
+  return Boolean(data?.length);
+}
+
+export async function canReadFreightOpportunity(client: SupabaseDbClient, companyId: string, opportunity: FreightOpportunityRow): Promise<boolean> {
+  if (!opportunity.source_group_id || !["new", "incomplete"].includes(opportunity.status)
+      || !Number.isFinite(Date.parse(opportunity.expires_at))
+      || Date.parse(opportunity.expires_at) <= Date.now()) return false;
+  const companies = await getAuthorizedSourceCompanies(client, opportunity.source_group_id);
+  return companies === null || companies.includes(companyId);
+}
 
 /** Usado pelo webhook (client admin) pra decidir se processa uma mensagem de grupo. */
 export async function isGroupAuthorized(client: SupabaseDbClient, groupExternalId: string): Promise<boolean> {

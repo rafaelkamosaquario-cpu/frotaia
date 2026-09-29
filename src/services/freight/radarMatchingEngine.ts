@@ -1,6 +1,7 @@
 import "server-only";
 import { calcularMatch } from "@/lib/freight/matching";
 import { listAllActiveRadars } from "@/services/supabase/freightRadarService";
+import { getAuthorizedSourceCompanies } from "@/services/supabase/freightSourceService";
 import { createMatch, markMatchNotified, markMatchAnalyzed } from "@/services/supabase/freightMatchService";
 import { getVehicle } from "@/services/supabase/vehicleService";
 import { getActiveCostProfile } from "@/services/supabase/vehicleCostProfileService";
@@ -22,11 +23,21 @@ import type { SupabaseDbClient } from "@/services/supabase/types";
  * `company_id` do radar) e ao notificar (só o WhatsApp da própria empresa).
  */
 export async function processarNovaOportunidade(admin: SupabaseDbClient, opportunity: FreightOpportunityRow): Promise<{ matchesGerados: number; notificacoesEnviadas: number }> {
+  if (!opportunity.source_group_id || !["new", "incomplete"].includes(opportunity.status)
+      || !Number.isFinite(Date.parse(opportunity.expires_at))
+      || Date.parse(opportunity.expires_at) <= Date.now()) {
+    return { matchesGerados: 0, notificacoesEnviadas: 0 };
+  }
+  const empresasAutorizadas = await getAuthorizedSourceCompanies(admin, opportunity.source_group_id);
+  if (empresasAutorizadas !== null && empresasAutorizadas.length === 0) {
+    return { matchesGerados: 0, notificacoesEnviadas: 0 };
+  }
   const radares = await listAllActiveRadars(admin);
   let matchesGerados = 0;
   let notificacoesEnviadas = 0;
 
   for (const radar of radares) {
+    if (empresasAutorizadas !== null && !empresasAutorizadas.includes(radar.company_id)) continue;
     const veiculo = radar.vehicle_id ? await getVehicle(admin, radar.vehicle_id) : null;
     const resultado = calcularMatch(radar, opportunity, veiculo?.body_type ?? null);
     if (resultado.nivel === "SEM_MATCH") continue;

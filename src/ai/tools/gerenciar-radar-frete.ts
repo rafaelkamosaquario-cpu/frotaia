@@ -2,6 +2,7 @@ import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerram
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createRadar, updateRadar, setRadarStatus, listRadarsForCompany, RADAR_DURACAO_PADRAO_DIAS } from "@/services/supabase/freightRadarService";
 import { getVehicle } from "@/services/supabase/vehicleService";
+import { hasEnabledFreightSource } from "@/services/supabase/freightSourceService";
 import type { FreightRadarRow, FreightRadarStatusEnum } from "@/lib/supabase/tables";
 
 /**
@@ -96,6 +97,7 @@ async function executar(entrada: GerenciarRadarFreteEntrada): Promise<GerenciarR
         if (!entrada.origemCidade && !entrada.origemUf) {
           return respostaFalha(modo, ["Preciso saber pelo menos a origem (cidade e/ou estado) pra criar o radar."], ["origemCidade", "origemUf"]);
         }
+        const temFonte = await hasEnabledFreightSource(admin, companyId);
         const radar = await createRadar(admin, companyId, userId, {
           vehicleId: entrada.veiculoId,
           originCity: entrada.origemCidade,
@@ -114,12 +116,15 @@ async function executar(entrada: GerenciarRadarFreteEntrada): Promise<GerenciarR
           premissas: [],
           dadosFaltantes: [],
           radar: mapaRadar(radar),
-          mensagemResumo: "Radar de frete criado — vou avisar quando aparecer uma carga compatível.",
+          mensagemResumo: temFonte
+            ? "Radar de frete criado nas fontes autorizadas disponíveis. As oportunidades dependem das ofertas recebidas; não há garantia de carga."
+            : "Busca salva, mas ainda não há fonte de fretes habilitada para sua empresa. É necessário configurar um grupo autorizado antes de receber oportunidades. Não há monitoramento de ofertas disponível agora.",
         };
       }
 
       case "LISTAR": {
         const radares = (await listRadarsForCompany(admin, companyId)).map(mapaRadar);
+        const temFonte = await hasEnabledFreightSource(admin, companyId);
         return {
           sucesso: true,
           modo,
@@ -127,7 +132,8 @@ async function executar(entrada: GerenciarRadarFreteEntrada): Promise<GerenciarR
           premissas: [],
           dadosFaltantes: [],
           radares,
-          mensagemResumo: radares.length === 0 ? "Nenhum radar de frete cadastrado ainda." : `${radares.length} radar(es) de frete.`,
+          mensagemResumo: radares.length === 0 ? "Nenhum radar de frete cadastrado ainda."
+            : `${radares.length} radar(es) de frete.${temFonte ? "" : " Falta habilitar uma fonte autorizada; nenhuma oferta está sendo monitorada para sua empresa."}`,
         };
       }
 
@@ -152,9 +158,11 @@ async function executar(entrada: GerenciarRadarFreteEntrada): Promise<GerenciarR
       case "CANCELAR": {
         if (!entrada.radarId) return respostaFalha(modo, ["Preciso saber exatamente qual radar (radarId) — use LISTAR antes se houver dúvida."], ["radarId"]);
         const novoStatus: FreightRadarStatusEnum = modo === "PAUSAR" ? "paused" : modo === "ATIVAR" ? "active" : "cancelled";
+        const semFonte = modo === "ATIVAR" && !await hasEnabledFreightSource(admin, companyId);
         const radar = await setRadarStatus(admin, entrada.radarId, companyId, userId, novoStatus);
         const mensagens: Record<typeof modo, string> = { PAUSAR: "Radar pausado.", ATIVAR: "Radar reativado.", CANCELAR: "Radar cancelado." };
-        return { sucesso: true, modo, alertas: [], premissas: [], dadosFaltantes: [], radar: mapaRadar(radar), mensagemResumo: mensagens[modo] };
+        return { sucesso: true, modo, alertas: [], premissas: [], dadosFaltantes: [], radar: mapaRadar(radar),
+          mensagemResumo: semFonte ? "Busca reativada, mas falta habilitar uma fonte autorizada antes de receber oportunidades." : mensagens[modo] };
       }
 
       default: {

@@ -166,11 +166,11 @@ async function executar(entrada: RegistrarDespesaEntrada): Promise<RegistrarDesp
           expenseType: entrada.tipo,
           dateFrom: entrada.dataInicio,
           dateTo: entrada.dataFim,
-          limit: limite,
+          all: true,
         });
 
         const itens = linhas.map(mapaDespesa);
-        const totalGeral = arredondar(itens.reduce((acc, i) => acc + i.valor, 0), 2);
+        const totalGeral = itens.reduce((acc, i) => acc + Math.round(i.valor * 100), 0) / 100;
         const totalPorTipo: Record<string, number> = {};
         for (const item of itens) {
           totalPorTipo[item.tipo] = arredondar((totalPorTipo[item.tipo] ?? 0) + item.valor, 2);
@@ -179,10 +179,10 @@ async function executar(entrada: RegistrarDespesaEntrada): Promise<RegistrarDesp
         return {
           sucesso: true,
           modo,
-          alertas: [],
-          premissas: [],
+          alertas: itens.length > limite ? [`Total completo de ${itens.length} despesas; detalhamento limitado a ${limite} itens. Não some apenas o detalhamento.`] : [],
+          premissas: ["Totais calculados sobre todos os lançamentos que correspondem aos filtros."],
           dadosFaltantes: [],
-          itens,
+          itens: itens.slice(0, limite),
           totalGeral,
           totalPorTipo,
           quantidadeEncontrada: itens.length,

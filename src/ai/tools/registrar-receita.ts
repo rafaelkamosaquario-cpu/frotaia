@@ -1,5 +1,4 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
-import { arredondar } from "./utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordRevenue, listRevenues, updateRevenue, deleteRevenue } from "@/services/supabase/revenueService";
 import type { RevenueRow } from "@/lib/supabase/tables";
@@ -142,19 +141,19 @@ async function executar(entrada: RegistrarReceitaEntrada): Promise<RegistrarRece
           vehicleId: entrada.vehicleId,
           dateFrom: entrada.dataInicio,
           dateTo: entrada.dataFim,
-          limit: limite,
+          all: true,
         });
 
         const itens = linhas.map(mapaReceita);
-        const totalGeral = arredondar(itens.reduce((acc, i) => acc + i.valor, 0), 2);
+        const totalGeral = itens.reduce((acc, i) => acc + Math.round(i.valor * 100), 0) / 100;
 
         return {
           sucesso: true,
           modo,
-          alertas: [],
-          premissas: [],
+          alertas: itens.length > limite ? [`Total completo de ${itens.length} receitas; detalhamento limitado a ${limite} itens. Não some apenas o detalhamento.`] : [],
+          premissas: ["Totais calculados sobre todos os lançamentos que correspondem aos filtros."],
           dadosFaltantes: [],
-          itens,
+          itens: itens.slice(0, limite),
           totalGeral,
           quantidadeEncontrada: itens.length,
           mensagemResumo: itens.length === 0 ? "Nenhuma receita encontrada com esses critérios." : `${itens.length} receita(s) encontrada(s), totalizando R$ ${totalGeral.toFixed(2)}.`,

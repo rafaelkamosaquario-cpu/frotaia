@@ -10,6 +10,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const listAllActiveRadars = vi.fn();
+const getAuthorizedSourceCompanies = vi.fn();
+vi.mock("@/services/supabase/freightSourceService", () => ({
+  getAuthorizedSourceCompanies: (...a: unknown[]) => getAuthorizedSourceCompanies(...a),
+}));
 const createMatch = vi.fn();
 const markMatchNotified = vi.fn();
 const markMatchAnalyzed = vi.fn();
@@ -69,6 +73,9 @@ const RADAR_EMPRESA_1 = {
 };
 
 const OPORTUNIDADE = {
+  source_group_id: "grupo-teste",
+  status: "new",
+  expires_at: "2099-01-01T00:00:00Z",
   id: "oportunidade-1",
   origin_city: "Curitiba",
   origin_state: "PR",
@@ -85,6 +92,7 @@ const VEICULO = { id: "veiculo-1", body_type: null, average_consumption_km_l: 3,
 describe("processarNovaOportunidade", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getAuthorizedSourceCompanies.mockResolvedValue(null);
     getOrCreatePreferences.mockResolvedValue({ freight_radar_analysis_mode: "avisar_primeiro" });
     listChannelsForCompany.mockResolvedValue([{ channel_type: "whatsapp", phone_e164: "+5541999998888", id: "canal-1" }]);
     getOrCreateOpenConversation.mockResolvedValue({ id: "conversa-1" });
@@ -99,6 +107,31 @@ describe("processarNovaOportunidade", () => {
     const resultado = await processarNovaOportunidade({} as never, OPORTUNIDADE as never);
     expect(resultado.matchesGerados).toBe(0);
     expect(createMatch).not.toHaveBeenCalled();
+  });
+
+  it("fonte privada não gera match nem notifica outra empresa", async () => {
+    listAllActiveRadars.mockResolvedValue([RADAR_EMPRESA_1]);
+    getAuthorizedSourceCompanies.mockResolvedValue(["empresa-2"]);
+    const { processarNovaOportunidade } = await import("./radarMatchingEngine");
+    expect(await processarNovaOportunidade({} as never, OPORTUNIDADE as never))
+      .toEqual({ matchesGerados: 0, notificacoesEnviadas: 0 });
+    expect(createMatch).not.toHaveBeenCalled();
+    expect(sendWhatsappText).not.toHaveBeenCalled();
+  });
+
+  it("fonte desabilitada não processa ofertas", async () => {
+    getAuthorizedSourceCompanies.mockResolvedValue([]);
+    const { processarNovaOportunidade } = await import("./radarMatchingEngine");
+    await processarNovaOportunidade({} as never, OPORTUNIDADE as never);
+    expect(listAllActiveRadars).not.toHaveBeenCalled();
+    expect(sendWhatsappText).not.toHaveBeenCalled();
+  });
+
+  it("oferta expirada não gera match ou notificação", async () => {
+    const { processarNovaOportunidade } = await import("./radarMatchingEngine");
+    await processarNovaOportunidade({} as never, { ...OPORTUNIDADE, expires_at: "2020-01-01T00:00:00Z" } as never);
+    expect(listAllActiveRadars).not.toHaveBeenCalled();
+    expect(sendWhatsappText).not.toHaveBeenCalled();
   });
 
   it("match PARCIAL é criado mas não dispara notificação no WhatsApp (anti-spam — só FORTE avisa)", async () => {

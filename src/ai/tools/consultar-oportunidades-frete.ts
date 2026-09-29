@@ -1,4 +1,5 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
+import { canReadFreightOpportunity, hasEnabledFreightSource } from "@/services/supabase/freightSourceService";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listMatchesForCompany, getMatch, updateMatchStatus } from "@/services/supabase/freightMatchService";
 import { getOpportunity } from "@/services/supabase/freightOpportunityService";
@@ -87,7 +88,7 @@ async function executar(entrada: ConsultarOportunidadesFreteEntrada): Promise<Co
         const resumos: OportunidadeMatchResumo[] = [];
         for (const match of matches) {
           const oportunidade = await getOpportunity(admin, match.opportunity_id);
-          if (oportunidade) resumos.push(mapaResumo(match, oportunidade));
+          if (oportunidade && await canReadFreightOpportunity(admin, companyId, oportunidade)) resumos.push(mapaResumo(match, oportunidade));
         }
         return {
           sucesso: true,
@@ -96,7 +97,9 @@ async function executar(entrada: ConsultarOportunidadesFreteEntrada): Promise<Co
           premissas: [],
           dadosFaltantes: [],
           oportunidades: resumos,
-          mensagemResumo: resumos.length === 0 ? "Nenhuma oportunidade encontrada ainda." : `${resumos.length} oportunidade(s) de frete.`,
+          mensagemResumo: resumos.length > 0 ? `${resumos.length} oportunidade(s) de frete.`
+            : await hasEnabledFreightSource(admin, companyId) ? "Nenhuma oportunidade válida encontrada nas fontes autorizadas."
+            : "Ainda não há fonte de fretes habilitada para sua empresa. Configure um grupo autorizado para o Radar receber ofertas.",
         };
       }
 
@@ -105,7 +108,7 @@ async function executar(entrada: ConsultarOportunidadesFreteEntrada): Promise<Co
         const match = await getMatch(admin, entrada.matchId, companyId);
         if (!match) return respostaFalha(modo, ["Não encontrei essa oportunidade para esta empresa."], ["matchId"]);
         const oportunidade = await getOpportunity(admin, match.opportunity_id);
-        if (!oportunidade) return respostaFalha(modo, ["Oportunidade não encontrada."], ["matchId"]);
+        if (!oportunidade || !await canReadFreightOpportunity(admin, companyId, oportunidade)) return respostaFalha(modo, ["Oportunidade expirada ou indisponível para esta empresa."], ["matchId"]);
         if (match.status === "notified") await updateMatchStatus(admin, match.id, companyId, "viewed");
         return { sucesso: true, modo, alertas: [], premissas: [], dadosFaltantes: [], oportunidade: mapaResumo(match, oportunidade), mensagemResumo: "Detalhes da oportunidade." };
       }
@@ -115,7 +118,7 @@ async function executar(entrada: ConsultarOportunidadesFreteEntrada): Promise<Co
         const match = await getMatch(admin, entrada.matchId, companyId);
         if (!match) return respostaFalha(modo, ["Não encontrei essa oportunidade para esta empresa."], ["matchId"]);
         const oportunidade = await getOpportunity(admin, match.opportunity_id);
-        if (!oportunidade) return respostaFalha(modo, ["Oportunidade não encontrada."], ["matchId"]);
+        if (!oportunidade || !await canReadFreightOpportunity(admin, companyId, oportunidade)) return respostaFalha(modo, ["Oportunidade expirada ou indisponível para esta empresa."], ["matchId"]);
         if (!match.vehicle_id) return respostaFalha(modo, ["Este radar não tem veículo associado — associe um veículo ao radar antes de pedir análise."], ["veiculoId"]);
         const veiculo = await getVehicle(admin, match.vehicle_id);
         if (!veiculo || veiculo.company_id !== companyId) return respostaFalha(modo, ["Veículo do radar não encontrado."]);
@@ -151,7 +154,7 @@ async function executar(entrada: ConsultarOportunidadesFreteEntrada): Promise<Co
           alertas: [],
           premissas: [],
           dadosFaltantes: [],
-          oportunidade: oportunidade ? mapaResumo(match, oportunidade) : undefined,
+          oportunidade: oportunidade && await canReadFreightOpportunity(admin, companyId, oportunidade) ? mapaResumo(match, oportunidade) : undefined,
           mensagemResumo: modo === "IGNORAR" ? "Oportunidade ignorada." : "Oportunidade favoritada.",
         };
       }

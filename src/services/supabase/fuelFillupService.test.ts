@@ -3,14 +3,12 @@ import { listFuelFillups, createFuelFillup, updateFuelFillup, deleteFuelFillup, 
 
 /**
  * Abastecimentos (fuel_fillups) — rodada de evolução funcional 09/2026
- * (item 2/5). Regressão principal: `computeAverageFuelConsumption` nunca
- * estima — só soma km/litros entre abastecimentos CONSECUTIVOS que têm
- * odometer_km informado, ignorando qualquer registro sem leitura de km.
+ * Inclui litros intermediários e informa a limitação do método estimado.
  */
 
 function makeChainable(finalResult: { data: unknown; error: unknown }) {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
-  for (const metodo of ["select", "eq", "gte", "lte", "insert", "update", "delete", "limit"]) {
+  for (const metodo of ["select", "eq", "gte", "lte", "insert", "update", "delete", "limit", "range"]) {
     chain[metodo] = vi.fn(() => chain);
   }
   chain.order = vi.fn(() => chain);
@@ -95,6 +93,41 @@ describe("deleteFuelFillup", () => {
 });
 
 describe("computeAverageFuelConsumption", () => {
+  it("não inclui no intervalo litros anteriores à primeira ou posteriores à última leitura", async () => {
+    const q = makeChainable({ data: [
+      {fillup_date:"2026-09-01",odometer_km:null,liters:20,total_amount:100},
+      {fillup_date:"2026-09-02",odometer_km:1000,liters:100,total_amount:500},
+      {fillup_date:"2026-09-03",odometer_km:null,liters:50,total_amount:250},
+      {fillup_date:"2026-09-04",odometer_km:1500,liters:50,total_amount:250},
+      {fillup_date:"2026-09-05",odometer_km:null,liters:80,total_amount:400},
+    ], error:null });
+    const r = await computeAverageFuelConsumption({from:()=>q} as never,"empresa","veiculo");
+    expect(r.consumoMedioKmL).toBe(5);
+    expect(r.litrosConsiderados).toBe(100);
+    expect(r.gastoTotal).toBe(1500);
+  });
+
+  it("não calcula uma média parcial quando um trecho tem odômetro incoerente", async () => {
+    const q = makeChainable({data:[1000,1500,1400,2000].map((km,i)=>({
+      fillup_date:`2026-09-0${i+1}`,odometer_km:km,liters:100,total_amount:500,
+    })),error:null});
+    const r = await computeAverageFuelConsumption({from:()=>q} as never,"empresa","veiculo");
+    expect(r.consumoMedioKmL).toBeNull();
+    expect(r.qualidade).toBe("inconsistente");
+  });
+
+  it("lê todas as páginas, não só os primeiros 500 abastecimentos", async () => {
+    const rows = Array.from({length:1001},(_,i)=>({
+      fillup_date:"2026-09-01",odometer_km:1000+i*100,liters:20,total_amount:100,
+    }));
+    const q = makeChainable({data:null,error:null});
+    q.range.mockImplementation(async (start:number,end:number)=>({data:rows.slice(start,end+1),error:null}));
+    const r = await computeAverageFuelConsumption({from:()=>q} as never,"empresa","veiculo");
+    expect(r.abastecimentosNoPeriodo).toBe(1001);
+    expect(r.litrosConsiderados).toBe(20000);
+    expect(r.consumoMedioKmL).toBe(5);
+    expect(q.range.mock.calls).toEqual([[0,499],[500,999],[1000,1499]]);
+  });
   it("calcula km/l real a partir de abastecimentos consecutivos com km informado", async () => {
     const linhas = [
       { fillup_date: "2026-08-01", liters: 200, total_amount: 1000, odometer_km: 100000 },
@@ -114,10 +147,10 @@ describe("computeAverageFuelConsumption", () => {
     expect(resultado.gastoTotal).toBeCloseTo(2850, 2);
   });
 
-  it("ignora abastecimentos sem odometer_km no cálculo de consumo, mas soma no gasto total", async () => {
+  it("inclui litros intermediários sem odômetro no cálculo e no gasto total", async () => {
     const linhas = [
       { fillup_date: "2026-08-01", liters: 200, total_amount: 1000, odometer_km: 100000 },
-      { fillup_date: "2026-08-05", liters: 50, total_amount: 260, odometer_km: null }, // sem km — ignorado no cálculo
+      { fillup_date: "2026-08-05", liters: 50, total_amount: 260, odometer_km: null }, // litros incluídos no intervalo
       { fillup_date: "2026-08-10", liters: 180, total_amount: 900, odometer_km: 100800 },
     ];
     const consulta = makeChainable({ data: linhas, error: null });
@@ -128,7 +161,10 @@ describe("computeAverageFuelConsumption", () => {
     expect(resultado.abastecimentosNoPeriodo).toBe(3);
     expect(resultado.abastecimentosComKm).toBe(2);
     expect(resultado.kmRodado).toBeCloseTo(800, 1);
-    expect(resultado.litrosConsiderados).toBeCloseTo(180, 2);
+    expect(resultado.litrosConsiderados).toBeCloseTo(230, 2);
+    expect(resultado.consumoMedioKmL).toBeCloseTo(800 / 230, 2);
+    expect(resultado.qualidade).toBe("estimado");
+    expect(resultado.aviso).toContain("não é consumo medido");
     expect(resultado.gastoTotal).toBeCloseTo(2160, 2);
   });
 
