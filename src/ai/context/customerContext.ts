@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { companyScope } from "@/lib/frota/companyScope";
 import { aiMemoryCreateSchema } from "@/lib/validation/schemas";
 import { getProfile } from "@/services/supabase/profileService";
 import { getOrCreatePreferences } from "@/services/supabase/companyPreferencesService";
@@ -61,13 +62,15 @@ export interface CustomerContext {
 export async function loadCustomerContext(client: SupabaseDbClient, userId: string): Promise<CustomerContext> {
   const profile = await getProfile(client, userId);
 
-  const { data: membership, error } = await client
+  const selectedCompany = companyScope(client);
+  const query = client
     .from("company_members")
     .select("role, companies(*)")
     .eq("user_id", userId)
-    .eq("is_default", true)
-    .eq("status", "active")
-    .maybeSingle();
+    .eq("status", "active");
+  // Selection never grants access. Require this user's active membership again.
+  const { data: membership, error } = await (selectedCompany
+    ? query.eq("company_id", selectedCompany) : query.eq("is_default", true)).maybeSingle();
 
   if (error) throw error;
 

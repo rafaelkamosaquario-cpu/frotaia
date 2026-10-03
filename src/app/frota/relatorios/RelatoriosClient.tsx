@@ -81,14 +81,23 @@ export function RelatoriosClient({ todosVeiculos, todosMotoristas, periodo, filt
           <h1 className="text-lg font-semibold text-foreground">Relatórios</h1>
           <p className="text-sm text-muted-foreground">Resumo operacional da frota</p>
         </div>
-        <a
-          href={hrefPdf}
-          download
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const response = await fetch(hrefPdf);
+              if (!response.ok) throw new Error();
+              const url = URL.createObjectURL(await response.blob());
+              const link = document.createElement("a");
+              link.href = url; link.download = "relatorio-frota.pdf"; link.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            } catch { window.alert("Não foi possível baixar o relatório da empresa ativa. Tente novamente."); }
+          }}
           className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-transparent px-3 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-surface-muted"
         >
           <Download className="size-4" aria-hidden />
           Baixar PDF
-        </a>
+        </button>
       </div>
 
       <div className="mb-5 flex flex-wrap items-center gap-2">

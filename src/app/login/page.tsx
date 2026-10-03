@@ -18,13 +18,10 @@ export default function LoginPage() {
 }
 
 /**
- * Destino padrão depois do login: o Painel de Gestão (/frota/dashboard), não
- * mais a raiz "/" (V1, chat de teste restrito a admins) — quem chega em
- * /login sem um `next` explícito é overwhelmingly alguém tentando acessar o
- * Painel, não o admin testando o V1. `next` explícito (ex.: vindo de
- * /frota/layout.tsx) sempre tem prioridade.
+ * Sem destino explícito, mostra empresas e convites do usuário.
+ * Links explícitos de vinculação WhatsApp/painel continuam tendo prioridade.
  */
-const DESTINO_PADRAO_POS_LOGIN = "/frota/dashboard";
+const DESTINO_PADRAO_POS_LOGIN = "/empresas";
 
 function LoginForm() {
   const { user, loading } = useAuth();

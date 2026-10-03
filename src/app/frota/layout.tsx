@@ -29,14 +29,14 @@ export default async function FrotaLayout({ children }: { children: React.ReactN
 
   if (!access.ok) {
     if (access.reason === "unauthenticated") redirect("/login?next=/frota/dashboard");
-    if (access.reason === "no_company") redirect("/onboarding");
+    if (access.reason === "no_company") redirect("/empresas");
     redirect("/frota-indisponivel");
   }
 
   if (!access.company.fleet_onboarding_completed_at) redirect("/frota-ativacao");
 
   return (
-    <FrotaShell companyName={access.company.name} role={access.role}>
+    <FrotaShell companyId={access.company.id} companyName={access.company.name} role={access.role}>
       {children}
     </FrotaShell>
   );

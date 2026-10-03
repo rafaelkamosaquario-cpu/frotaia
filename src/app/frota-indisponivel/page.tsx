@@ -15,6 +15,7 @@ export default function FrotaIndisponivelPage() {
           <LogoMark className="size-12" />
         </div>
         <h1 className="text-lg font-semibold text-foreground">Painel de gestão de frota</h1>
+        <a href="/empresas" className="mt-4 block text-primary underline">Selecionar empresa / gerenciar acessos</a>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Essa área é exclusiva de quem contratou o plano de gestão de frota do Frota IA.
         </p>

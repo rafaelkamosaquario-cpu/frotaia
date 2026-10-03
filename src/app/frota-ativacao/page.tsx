@@ -7,6 +7,7 @@ import { listDriversForPanel } from "@/services/supabase/driverService";
 import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
 import { getOrCreatePreferences } from "@/services/supabase/companyPreferencesService";
 import { AtivacaoFlow } from "./AtivacaoFlow";
+import { CompanyScopeBoundary } from "@/components/frota/CompanyScopeBoundary";
 import { getVehicleLimitForCompany } from "@/lib/frota/vehicleLimit";
 
 /**
@@ -32,12 +33,13 @@ export default async function FrotaAtivacaoPage() {
 
   if (!access.ok) {
     if (access.reason === "unauthenticated") redirect("/login");
-    if (access.reason === "no_company") redirect("/onboarding");
+    if (access.reason === "no_company") redirect("/empresas");
     redirect("/frota-indisponivel");
   }
 
   // Já concluiu antes — nunca mostra o wizard de novo, vai direto pro painel.
   if (access.company.fleet_onboarding_completed_at) redirect("/frota/dashboard");
+  if (!["owner", "admin"].includes(access.role)) redirect("/empresas");
 
   const [veiculos, motoristas, documentos, preferencias, calendarStatus, vehicleLimit] = await Promise.all([
     listVehiclesForPanel(supabase, access.company.id),
@@ -49,6 +51,8 @@ export default async function FrotaAtivacaoPage() {
   ]);
 
   return (
+    <CompanyScopeBoundary companyId={access.company.id}>
+    <div className="bg-background p-4 text-sm text-foreground">Implantação de <strong>{access.company.name}</strong> · <a className="text-primary underline" href="/empresas">Autorizar consultor / trocar empresa</a></div>
     <AtivacaoFlow
       company={access.company}
       vehicleLimit={vehicleLimit}
@@ -58,5 +62,6 @@ export default async function FrotaAtivacaoPage() {
       preferenciasIniciais={preferencias}
       calendarConectado={calendarStatus.connected}
     />
+    </CompanyScopeBoundary>
   );
 }

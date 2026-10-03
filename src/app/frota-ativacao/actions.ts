@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { loadCustomerContext } from "@/ai/context/customerContext";
+import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { updateCompany } from "@/services/supabase/companyService";
 
 export interface AtivacaoActionState {
@@ -25,8 +25,8 @@ export async function updateCompanyNameAction(formData: FormData): Promise<Ativa
   const { data } = await supabase.auth.getUser();
   if (!data.user) redirect("/login");
 
-  const context = await loadCustomerContext(supabase, data.user.id);
-  if (!context.company) redirect("/onboarding");
+  const context = await loadFleetPanelAccess(supabase);
+  if (!context.ok || !["owner", "admin"].includes(context.role)) return { error: "Somente proprietário ou administrador com acesso ao painel pode configurar a empresa." };
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
@@ -56,8 +56,8 @@ export async function finalizarAtivacaoAction(): Promise<void> {
   const { data } = await supabase.auth.getUser();
   if (!data.user) redirect("/login");
 
-  const context = await loadCustomerContext(supabase, data.user.id);
-  if (!context.company) redirect("/onboarding");
+  const context = await loadFleetPanelAccess(supabase);
+  if (!context.ok || !["owner", "admin"].includes(context.role)) redirect("/empresas");
 
   const admin = createAdminClient();
   const { error } = await admin

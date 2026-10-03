@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { attachCompanyScope, requestCompanyScope, COMPANY_COOKIE, COMPANY_HEADER } from "@/lib/frota/companyScope";
 import type { Database } from "./database.types";
 
 /**
@@ -10,7 +11,7 @@ import type { Database } from "./database.types";
 export async function createClient() {
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(
+  const client = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
@@ -32,4 +33,8 @@ export async function createClient() {
       },
     }
   );
+  const requestHeaders = await headers();
+  const path = requestHeaders.get("x-frota-path") ?? "";
+  attachCompanyScope(client, requestCompanyScope(path,requestHeaders.get(COMPANY_HEADER),cookieStore.get(COMPANY_COOKIE)?.value));
+  return client;
 }

@@ -2617,6 +2617,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      list_company_access: { Args: Record<string, never>; Returns: Json }
+      manage_company_access: { Args: { p_company: string; p_action: string; p_id?: string; p_email?: string; p_role?: "admin" | "operator" | "viewer" }; Returns: Json }
+      accept_company_access: { Args: { p_invite: string }; Returns: string }
       fuel_group_step: { Args: { p_company: string; p_user: string; p_group: string; p_sender: string; p_message: string; p_action: string; p_patch: Json; p_revision?: number; p_draft?: string; p_command?: Json; p_dry_run?: boolean }; Returns: Json }
       record_fuel_stock: { Args: { p_company: string; p_user: string; p_command: Json }; Returns: Json }
       confirm_cost_entry: { Args: { p_company: string; p_user: string; p_entry: string }; Returns: string }

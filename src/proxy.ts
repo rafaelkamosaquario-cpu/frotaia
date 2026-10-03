@@ -11,6 +11,8 @@ import { NextResponse, type NextRequest } from "next/server";
  * "proxy" — ver node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md.
  */
 export async function proxy(request: NextRequest) {
+  // Trusted request path: overwrite any client-supplied value.
+  request.headers.set("x-frota-path", request.nextUrl.pathname);
   let response = NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
