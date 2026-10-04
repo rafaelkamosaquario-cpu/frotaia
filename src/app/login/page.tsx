@@ -71,6 +71,7 @@ function LoginForm() {
           Continuar com Google
         </Button>
 
+        <a href="/acesso-cliente" className="mt-5 block text-sm text-primary underline">Recebeu acesso da consultoria? Entrar com e-mail e senha</a>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
         {loading && (

@@ -7,7 +7,7 @@ async function api(path:string,body?:unknown){
  const r=await fetch(path,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{cache:"no-store"});
  const result=await r.json();if(!r.ok)throw new Error(result.error??"Não foi possível concluir. Tente novamente.");return result;
 }
-export function CompanyAccessClient(){
+export function CompanyAccessClient({canProvision=false}:{canProvision?:boolean}){
  const [overview,setOverview]=useState<AccessOverview|null>(null),[email,setEmail]=useState("");
  const [company,setCompany]=useState<AccessibleCompany|null>(null),[team,setTeam]=useState<AccessTeam|null>(null);
  const [inviteEmail,setInviteEmail]=useState(""),[role,setRole]=useState("admin"),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
@@ -18,6 +18,7 @@ export function CompanyAccessClient(){
  async function command(body:unknown){await api("/api/company-access",body);await refresh();if(company)await loadTeam(company);}
  return <main className="min-h-dvh bg-background px-4 py-10 text-foreground"><div className="mx-auto max-w-4xl space-y-6">
   <header><p className="text-sm font-semibold text-primary">Frota IA · Gestão V2</p><h1 className="mt-2 text-3xl font-semibold">Minhas empresas</h1><p className="mt-3 text-muted-foreground">Cada cliente mantém sua conta e assinatura. Entre com seu próprio Google para implantar e acompanhar as empresas que autorizaram você.</p><p className="mt-2 text-sm">Sua conta: {email||"Verificando…"}</p></header>
+  {canProvision&&<a href="/consultoria" className={`${button} inline-block bg-primary text-primary-foreground`}>Cadastrar cliente pela consultoria — sem checkout</a>}
   {error&&<p role="alert" className="rounded-lg border border-red-500 p-4">{error}</p>}{message&&<p role="status" className="rounded-lg border border-emerald-500 p-4">{message}</p>}
   {!overview&&!error&&<p role="status">Carregando empresas…</p>}
   {overview&&<>

@@ -19,6 +19,7 @@ export type Database = {
   }
   public: {
     Tables: {
+      consultancy_onboardings: CostTable<{ company_id: string; request_id: string; consultant_id: string; client_email: string; contact_name: string; phone: string | null; document: string | null; client_user_id: string | null; initial_password_hash: string | null; temporary_expires_at: string | null; delivered_at: string | null; claimed_at: string | null; consultant_until: string | null; created_at: string }>
       freight_customers: CostTable<FreightCustomerRow>
       fuel_group_drafts: CostTable<FuelGroupDraft>
       fuel_stock_balances: CostTable<FuelBalanceRow>
@@ -2617,6 +2618,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consultancy_admin: { Args: { p_action: string; p_payload?: Json }; Returns: Json }
+      consultancy_deliver: { Args: { p_company: string; p_actor: string; p_user: string }; Returns: undefined }
+      consultancy_delivery_account: { Args: { p_company: string; p_actor: string }; Returns: string | null }
+      consultancy_first_access: { Args: { p_complete?: boolean }; Returns: Json }
       list_company_access: { Args: Record<string, never>; Returns: Json }
       manage_company_access: { Args: { p_company: string; p_action: string; p_id?: string; p_email?: string; p_role?: "admin" | "operator" | "viewer" }; Returns: Json }
       accept_company_access: { Args: { p_invite: string }; Returns: string }
