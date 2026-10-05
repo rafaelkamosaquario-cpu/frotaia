@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/Button";
 import type { VehicleRow } from "@/lib/supabase/tables";
 import { goalProgress, type MonthlyProduction, type ProductionInput } from "@/lib/frota/productionGoals";
 import type { ProductionRevenue } from "@/lib/frota/productionRevenue";
+import Link from "next/link";
+import type { MonthlyExpenses } from "@/lib/frota/monthlyExpenses";
 
-type Loaded = { month: string; today: string; rows: MonthlyProduction[]; canEdit: boolean; revenueSummary: ProductionRevenue | null; revenueError: string | null };
+type Loaded = { month: string; today: string; rows: MonthlyProduction[]; canEdit: boolean; revenueSummary: ProductionRevenue | null; revenueError: string | null; expenseSummary: MonthlyExpenses | null; expenseError: string | null };
 const money = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const tonnes = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const field = "mt-1 w-full rounded-lg border border-border bg-surface p-2 text-foreground";
@@ -39,17 +41,20 @@ export function ProductionGoals({ vehicles }: { vehicles: VehicleRow[] }) {
   const renderRow = (r: MonthlyProduction) => {
     const progress = goalProgress(r, loaded!.today);
     const revenue = loaded?.revenueSummary?.byVehicle[r.vehicle_id];
+    const expenses = loaded?.expenseSummary?.byVehicle[r.vehicle_id];
     return <article key={r.vehicle_id} className="rounded-xl border border-border p-4">
       <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="font-semibold">{vehicleName(r.vehicle_id)}</h3><span className={`text-sm font-medium ${tones[progress.tone]}`}>{progress.label}</span></div>
       <p className="mt-3 text-lg font-semibold tabular-nums">{r.actual_tonnes === null ? "Produção não informada" : `${tonnes(r.actual_tonnes)} t`}<span className="text-sm font-normal text-muted-foreground">{r.target_tonnes ? ` / meta ${tonnes(r.target_tonnes)} t` : " · sem meta definida"}</span></p>
       <p className="mt-2 text-sm">Receita registrada no mês: <strong className="tabular-nums text-primary">{loaded?.revenueSummary ? revenue ? money(revenue.amount) : "Sem lançamento" : "Indisponível"}</strong></p>
+      {loaded?.expenseSummary && <p className="mt-2 text-sm">Combustível: <strong>{money(expenses?.fuel ?? 0)}</strong> · Remunerações: <strong>{money(expenses?.payroll ?? 0)}</strong> · Outras despesas: <strong>{money(expenses?.other ?? 0)}</strong></p>}
+      {loaded?.expenseSummary && loaded.revenueSummary && <p className="mt-2 text-sm">Saldo parcial registrado: <strong>{money((Math.round((revenue?.amount ?? 0) * 100) - Math.round((expenses?.total ?? 0) * 100)) / 100)}</strong></p>}
       {progress.percent !== null && <><div role="progressbar" aria-label={`Meta de ${vehicleName(r.vehicle_id)}`} aria-valuenow={Math.min(100, progress.percent)} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${progress.percent.toFixed(1)}% da meta`} className="my-2 h-2 overflow-hidden rounded-full bg-surface-muted"><div className={`${progress.tone === "danger" ? "bg-danger" : progress.tone === "warning" ? "bg-warning" : "bg-success"} h-full`} style={{ width: `${Math.min(100, progress.percent)}%` }} /></div><p className="text-sm tabular-nums">{progress.percent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% da meta · faltam {tonnes(progress.missing ?? 0)} t</p></>}
       <p className="mt-2 text-xs text-muted-foreground">{r.measured_through ? `Apurado até ${r.measured_through.split("-").reverse().join("/")}` : "Aguardando apuração"}{r.diesel_liters !== null ? ` · ${r.diesel_liters.toLocaleString("pt-BR")} L de diesel` : ""}{r.actual_tonnes !== null && r.actual_tonnes > 0 && r.diesel_liters !== null ? ` · ${tonnes(r.diesel_liters / r.actual_tonnes)} L/t` : ""}</p>
       {r.note && <p className="mt-2 text-xs text-muted-foreground">{r.note}</p>}
     </article>;
   };
   return <Card className="mt-5 p-4 sm:p-5" id="metas-producao">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Receitas, produção e metas mensais</h2><p className="mt-1 text-sm text-muted-foreground">Receita e toneladas por veículo · transporte separado de carregamento</p></div><label className="text-sm">Mês de referência<input type="month" min="2000-01" max="2099-12" aria-label="Mês das metas" className={field} value={month || loaded?.month || ""} onChange={e => { if (e.target.value) { setLoading(true); setEditing(false); setMonth(e.target.value); } }} /></label></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Resultado, produção e metas do mês</h2><p className="mt-1 text-sm text-muted-foreground">Receitas, combustível e remunerações no mesmo período</p></div><label className="text-sm">Mês de referência<input type="month" min="2000-01" max="2099-12" aria-label="Mês do resultado e das metas" className={field} value={month || loaded?.month || ""} onChange={e => { if (e.target.value) { setLoading(true); setEditing(false); setMonth(e.target.value); } }} /></label></div>
     {loading ? <p role="status" className="py-5 text-sm">Carregando metas...</p> : error ? <div role="alert" className="py-4"><p>{error}</p><Button onClick={refresh} variant="outline" className="mt-2">Tentar novamente</Button></div> : loaded && <>
       <p className="mt-3 text-xs text-muted-foreground">Ao abrir, exibimos o último mês com produção informada. O ritmo parcial é proporcional aos dias corridos até a data da apuração, não uma previsão de lucro.</p>
       {loaded.revenueError && <div role="alert" className="mt-4 rounded-lg border border-warning p-3 text-sm"><p>{loaded.revenueError}</p><Button variant="outline" onClick={refresh} className="mt-2">Atualizar receitas</Button></div>}
@@ -62,6 +67,17 @@ export function ProductionGoals({ vehicles }: { vehicles: VehicleRow[] }) {
         {loaded.revenueSummary.other !== 0 && <p className="mt-2 text-sm">Outras receitas / veículos sem classificação no mês: <strong>{money(loaded.revenueSummary.other)}</strong>. Incluídas no total.</p>}
         {!loaded.revenueSummary.count && <p className="mt-2 text-sm text-muted-foreground">Nenhuma receita lançada neste mês.</p>}
         <p className="mt-2 text-xs text-muted-foreground">Fonte: lançamentos existentes em Receitas, pela data da receita. Os valores não comprovam recebimento e não representam lucro. A separação por operação segue a classificação mensal do veículo; não é calculada novamente pelas toneladas.</p>
+      </section>}
+      {loaded.expenseError && <div role="alert" className="mt-4 rounded-lg border border-warning p-3 text-sm"><p>{loaded.expenseError}</p><Button variant="outline" onClick={refresh} className="mt-2">Atualizar despesas</Button></div>}
+      {loaded.expenseSummary && <section aria-label="Despesas e saldo do mês" className="mt-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
+          { label: "Combustível / diesel", value: loaded.expenseSummary.fuel, href: "/frota/abastecimentos" },
+          { label: "Salários e remunerações", value: loaded.expenseSummary.payroll, href: "/frota/custos" },
+          { label: "Outras despesas", value: loaded.expenseSummary.other, href: "/frota/despesas" },
+          { label: "Despesas totais", value: loaded.expenseSummary.total, href: "/frota/despesas" },
+        ].map(item => <Link href={item.href} key={item.label} className="rounded-xl border border-border p-4 hover:border-primary"><h3 className="text-sm font-medium">{item.label}</h3><p className="mt-2 text-xl font-bold tabular-nums">{money(item.value)}</p></Link>)}</div>
+        {loaded.revenueSummary && <div className="mt-3 rounded-xl bg-surface-muted p-4"><h3 className="font-semibold">Saldo parcial do mês</h3><p className={`mt-2 text-2xl font-bold tabular-nums ${loaded.revenueSummary.total < loaded.expenseSummary.total ? "text-danger" : "text-success"}`}>{money((Math.round(loaded.revenueSummary.total * 100) - Math.round(loaded.expenseSummary.total * 100)) / 100)}</p><p className="mt-1 text-xs text-muted-foreground">Receitas registradas menos todas as despesas registradas no mês. Não é saldo bancário nem lucro líquido: depende de todos os custos terem sido informados.</p></div>}
+        <p className="mt-2 text-xs text-muted-foreground">Despesas pela data do lançamento, do primeiro ao último dia do mês selecionado. Salários e pró-labore confirmados em Custos e remunerações entram uma única vez pela despesa vinculada, mesmo com pagamento previsto para outro mês. Regras ainda não confirmadas não entram. Os valores não comprovam pagamento.</p>
       </section>}
       {targets.length > 0 && <div className="my-4 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg bg-primary/10 p-3"><p className="text-xs">Transporte com meta</p><p className="text-xl font-semibold">{tonnes(actual)} t</p><p className="text-xs">Meta total: {tonnes(target)} t {absent ? `· dados incompletos (${absent} sem apuração)` : ""}</p></div>

@@ -5,6 +5,7 @@ import { listVehiclesForPanel } from "@/services/supabase/vehicleService";
 import { listDriversForPanel } from "@/services/supabase/driverService";
 import { listVendors } from "@/services/supabase/vendorService";
 import { AbastecimentosClient } from "./AbastecimentosClient";
+import { MonthlyFuelConsolidates } from "./MonthlyFuelConsolidates";
 
 /** O layout de src/app/frota já garante o acesso. Painel e WhatsApp (gerenciar_abastecimento) usam os mesmos services (fuelFillupService.ts), sempre a mesma fonte de dado. */
 export default async function AbastecimentosPage() {
@@ -20,5 +21,5 @@ export default async function AbastecimentosPage() {
     listVendors(supabase, access.company.id),
   ]);
 
-  return <AbastecimentosClient abastecimentosIniciais={abastecimentos} veiculos={veiculos} motoristas={motoristas} fornecedores={fornecedores} internalFuelEnabled={process.env.FUEL_INTERNAL_ENABLED === "true" && ["owner", "admin", "operator"].includes(access.role)} />;
+  return <><MonthlyFuelConsolidates key={access.company.id} vehicles={veiculos} /><AbastecimentosClient abastecimentosIniciais={abastecimentos} veiculos={veiculos} motoristas={motoristas} fornecedores={fornecedores} internalFuelEnabled={process.env.FUEL_INTERNAL_ENABLED === "true" && ["owner", "admin", "operator"].includes(access.role)} /></>;
 }

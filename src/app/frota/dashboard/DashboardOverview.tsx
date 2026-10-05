@@ -35,21 +35,20 @@ function AlertSection({ title, items, href, empty }: { title: string; items: Fle
 }
 
 /** Apresentação apenas: mantém as fontes e as regras dos indicadores anteriores. */
-export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, documentos, despesasRecentes, checklistDispatches, insight }: Props) {
+export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, documentos, checklistDispatches, insight }: Props) {
   const hojeIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ativos = veiculos.filter(v => v.active).length;
   const motoristasAtivos = motoristas.filter(m => m.active).length;
   const pendentes = manutencoes.filter(m => m.status !== "concluido").length;
   const vencidos = documentos.filter(d => d.expiry_date && d.expiry_date < hojeIso).length;
   const vencendo = documentos.filter(d => d.expiry_date && d.expiry_date >= hojeIso && diasAte(d.expiry_date) <= 30).length;
-  const custo = despesasRecentes.length ? despesasRecentes.reduce((sum, d) => sum + d.amount, 0) : null;
   const kpis = [
     { label: "Veículos ativos", value: ativos, context: `${veiculos.length} ${veiculos.length === 1 ? "veículo cadastrado" : "veículos cadastrados"}`, Icon: Truck, href: "/frota/veiculos", tone: "text-primary" },
     { label: "Motoristas ativos", value: motoristasAtivos, context: `${motoristas.length} ${motoristas.length === 1 ? "motorista cadastrado" : "motoristas cadastrados"}`, Icon: Users, href: "/frota/motoristas", tone: "text-primary" },
     { label: "Manutenções pendentes", value: pendentes, context: pendentes ? "Acompanhe os serviços" : "Nenhum serviço pendente", Icon: Wrench, href: "/frota/manutencao", tone: pendentes ? "text-warning" : "text-primary" },
     { label: "Documentos vencidos", value: vencidos, context: vencidos ? "Requer atenção" : "Nenhum vencimento em atraso", Icon: FileText, href: "/frota/documentos", tone: vencidos ? "text-danger" : "text-primary" },
     { label: "Vencendo em 30 dias", value: vencendo, context: "Documentos da frota", Icon: CalendarClock, href: "/frota/documentos", tone: vencendo ? "text-warning" : "text-primary" },
-    { label: "Custo nos últimos 30 dias", value: custo === null ? "—" : custo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }).replace(/\u00a0/g, " "), context: custo === null ? "Sem despesas registradas no período" : "Em despesas registradas", Icon: Wallet, href: "/frota/despesas", tone: "text-primary", currency: true },
+    { label: "Resultado mensal", value: "Ver abaixo", context: "Receitas, diesel e remunerações no mesmo mês", Icon: Wallet, href: "#metas-producao", tone: "text-primary", currency: true },
   ];
   const alertas = useMemo(() => computeFleetAlerts({ veiculos, manutencoes, documentos }), [veiculos, manutencoes, documentos]);
   const hoje = useMemo(() => dispatchesFromToday(checklistDispatches), [checklistDispatches]);
@@ -61,7 +60,7 @@ export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, 
     <div className="flex items-start justify-between gap-3"><div><h1>Dashboard</h1><p className="mt-1 text-sm text-muted-foreground">Visão geral da frota</p></div><ContextualHelp topic="dashboard" /></div>
     <Card data-tour="ia-sugere" className="dashboard-insight flex flex-wrap items-start gap-3 sm:gap-4">
       <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Sparkles className="size-6" aria-hidden /></span>
-      <div className="min-w-0 flex-1 basis-48"><h2 className="text-base font-semibold">Frota IA informa</h2><p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{insight || "O resumo da IA ainda não está disponível. Consulte os indicadores ou pergunte ao Frota IA sobre sua frota."}</p></div>
+      <div className="min-w-0 flex-1 basis-48"><h2 className="text-base font-semibold">Frota IA informa</h2><p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{insight || "O resumo da IA ainda não está disponível. Consulte os indicadores ou pergunte ao Frota IA sobre sua frota."}</p><p className="mt-2 text-xs text-muted-foreground">Resumo operacional periódico, independente do mês selecionado. Para o fechamento financeiro completo do mês, consulte Resultado mensal abaixo.</p></div>
       <Link href="/frota/alertas" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-hover">Ver pendências<ArrowRight className="size-4" aria-hidden /></Link>
     </Card>
     <div data-tour="kpis" className="grid grid-cols-2 gap-3 md:grid-cols-3">

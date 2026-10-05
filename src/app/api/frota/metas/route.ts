@@ -4,6 +4,8 @@ import { brazilToday, productionSchema } from "@/lib/frota/productionGoals";
 import { monthSchema } from "@/lib/frota/costs";
 import { listRevenues } from "@/services/supabase/revenueService";
 import { productionMonthRange, summarizeProductionRevenue } from "@/lib/frota/productionRevenue";
+import { loadMonthlyExpenses } from "@/services/supabase/monthlyExpenseService";
+import { monthlyFuelConsolidates } from "@/lib/frota/monthlyExpenses";
 
 const fail = (error: string, status: number) => Response.json({ error }, { status });
 export async function GET(request: Request) {
@@ -27,7 +29,19 @@ export async function GET(request: Request) {
   } catch {
     revenueError = "Não foi possível carregar as receitas deste mês. Os valores não estão sendo exibidos como zero. Tente atualizar.";
   }
-  return Response.json({ month, today, rows: data, revenueSummary, revenueError, canEdit: ["owner", "admin", "operator"].includes(access.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  let expenseSummary = null;
+  let expenseError: string | null = null;
+  let fuelConsolidates = null;
+  try {
+    // Payroll RLS excludes viewers. Do not misclassify invisible salary links as other/zero payroll.
+    if (!["owner", "admin", "operator"].includes(access.role)) throw new Error("Payroll access required");
+    const financial = await loadMonthlyExpenses(db, access.company.id, month);
+    expenseSummary = financial.summary;
+    fuelConsolidates = monthlyFuelConsolidates(month, data ?? [], financial.expenses);
+  } catch {
+    expenseError = access.role === "viewer" ? "O detalhamento de despesas e remunerações requer acesso de proprietário, administrador ou operador." : "Não foi possível conferir as despesas e remunerações deste mês. Os totais e o saldo ficam indisponíveis até atualizar.";
+  }
+  return Response.json({ month, today, rows: data, revenueSummary, revenueError, expenseSummary, expenseError, fuelConsolidates, canEdit: ["owner", "admin", "operator"].includes(access.role) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
