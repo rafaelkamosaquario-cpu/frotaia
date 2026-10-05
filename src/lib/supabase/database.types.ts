@@ -2,6 +2,7 @@ import type { CostOperation, CostRuleRow, CostEntry } from "@/lib/frota/costs";
 import type { FuelBalanceRow, FuelMovementRow } from "@/lib/frota/fuelStock";
 import type { FuelGroupDraft } from "@/lib/frota/fuelGroup";
 import type { FreightCustomerRow } from "@/lib/frota/freightCustomers";
+import type { MonthlyProduction } from "@/lib/frota/productionGoals";
 type CostTable<T> = { Row: { [K in keyof T]: T[K] }; Insert: Partial<T> & { company_id: string }; Update: Partial<T>; Relationships: [] };
 export type Json =
   | string
@@ -19,6 +20,7 @@ export type Database = {
   }
   public: {
     Tables: {
+      fleet_monthly_production: CostTable<MonthlyProduction>
       consultancy_onboardings: CostTable<{ company_id: string; request_id: string; consultant_id: string; client_email: string; contact_name: string; phone: string | null; document: string | null; client_user_id: string | null; initial_password_hash: string | null; temporary_expires_at: string | null; delivered_at: string | null; claimed_at: string | null; consultant_until: string | null; created_at: string }>
       freight_customers: CostTable<FreightCustomerRow>
       fuel_group_drafts: CostTable<FuelGroupDraft>

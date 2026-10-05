@@ -107,6 +107,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <DashboardClient
+      companyId={access.company.id}
       veiculos={veiculos}
       motoristas={motoristas}
       manutencoes={manutencoes}

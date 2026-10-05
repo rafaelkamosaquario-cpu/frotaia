@@ -10,9 +10,11 @@ import { ContextualHelp } from "@/components/frota/ContextualHelp";
 import type { ChecklistDispatchRow, DriverRow, ExpenseRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
 import { computeFleetAlerts, type FleetAlertItem } from "@/services/supabase/fleetAlertsService";
 import { dispatchesFromToday } from "@/services/supabase/checklistDispatchService";
+import { ProductionGoals } from "./ProductionGoals";
 
 export type CardStyleVariant = "a" | "b";
 interface Props {
+  companyId: string;
   veiculos: VehicleRow[]; motoristas: DriverRow[]; manutencoes: MaintenanceScheduleRow[];
   documentos: VehicleDocumentRow[]; despesasRecentes: ExpenseRow[]; checklistDispatches: ChecklistDispatchRow[];
   insight: string | null; cardStyle: CardStyleVariant;
@@ -33,7 +35,7 @@ function AlertSection({ title, items, href, empty }: { title: string; items: Fle
 }
 
 /** Apresentação apenas: mantém as fontes e as regras dos indicadores anteriores. */
-export function DashboardClient({ veiculos, motoristas, manutencoes, documentos, despesasRecentes, checklistDispatches, insight }: Props) {
+export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, documentos, despesasRecentes, checklistDispatches, insight }: Props) {
   const hojeIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ativos = veiculos.filter(v => v.active).length;
   const motoristasAtivos = motoristas.filter(m => m.active).length;
@@ -68,6 +70,7 @@ export function DashboardClient({ veiculos, motoristas, manutencoes, documentos,
         <p className={cn("dashboard-kpi-value font-bold tracking-tight tabular-nums", currency ? "dashboard-currency" : "text-3xl sm:text-4xl")}>{value}</p><p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">{context}</p>
       </Link>)}
     </div>
+    <ProductionGoals key={companyId} vehicles={veiculos} />
     <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
       <Card className="min-w-0 overflow-hidden p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Veículos da frota</h2><Link href="/frota/veiculos" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary">Ver veículos<ArrowRight className="size-4" aria-hidden /></Link></div>
