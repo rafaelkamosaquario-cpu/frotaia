@@ -2,7 +2,18 @@ import type { ExpenseRow } from "@/lib/supabase/tables";
 import type { MonthlyProduction } from "./productionGoals";
 
 export type ExpenseSource = Pick<ExpenseRow, "id" | "vehicle_id" | "amount" | "expense_type" | "description" | "fuel_fillup_id">;
-export type PayrollLink = { expense_id: string | null; snapshot: { category?: string } };
+export type PayrollLink = { expense_id: string | null; amount?: number; due_date?: string; paid_on?: string | null; snapshot: { category?: string; advances?: { amount: number }[] } };
+export function pendingMonthlyPayroll(costs: PayrollLink[]) {
+  const seen = new Set<string>();
+  const dates = new Map<string, number>();
+  for (const c of costs) {
+    if (!c.expense_id || seen.has(c.expense_id) || c.paid_on || !c.due_date || c.amount === undefined || !["salario","pro_labore"].includes(c.snapshot.category ?? "")) continue;
+    seen.add(c.expense_id);
+    const remaining = Math.max(0,Math.round(c.amount*100)-(c.snapshot.advances??[]).reduce((s,a)=>s+Math.round(a.amount*100),0));
+    if(remaining) dates.set(c.due_date,(dates.get(c.due_date)??0)+remaining);
+  }
+  return [...dates].sort(([a],[b])=>a.localeCompare(b)).map(([date,cents])=>({date,amount:cents/100}));
+}
 export type MonthlyExpenses = ReturnType<typeof summarizeMonthlyExpenses>;
 
 /** Expenses are the money source. Cost entries only classify existing expense IDs. */

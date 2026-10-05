@@ -32,16 +32,18 @@ export async function GET(request: Request) {
   let expenseSummary = null;
   let expenseError: string | null = null;
   let fuelConsolidates = null;
+  let payrollDue = null;
   try {
     // Payroll RLS excludes viewers. Do not misclassify invisible salary links as other/zero payroll.
     if (!["owner", "admin", "operator"].includes(access.role)) throw new Error("Payroll access required");
     const financial = await loadMonthlyExpenses(db, access.company.id, month);
     expenseSummary = financial.summary;
+    payrollDue = financial.payrollDue;
     fuelConsolidates = monthlyFuelConsolidates(month, data ?? [], financial.expenses);
   } catch {
     expenseError = access.role === "viewer" ? "O detalhamento de despesas e remunerações requer acesso de proprietário, administrador ou operador." : "Não foi possível conferir as despesas e remunerações deste mês. Os totais e o saldo ficam indisponíveis até atualizar.";
   }
-  return Response.json({ month, today, rows: data, revenueSummary, revenueError, expenseSummary, expenseError, fuelConsolidates, canEdit: ["owner", "admin", "operator"].includes(access.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  return Response.json({ month, today, checkedAt: new Date().toISOString(), rows: data, revenueSummary, revenueError, expenseSummary, expenseError, fuelConsolidates, payrollDue, canEdit: ["owner", "admin", "operator"].includes(access.role) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");

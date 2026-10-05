@@ -10,6 +10,7 @@ import { computeFleetAlerts } from "@/services/supabase/fleetAlertsService";
 import { getOrCreatePreferences, saveDashboardInsight } from "@/services/supabase/companyPreferencesService";
 import { gerarInsightDashboard } from "@/services/dashboard/dashboardInsightService";
 import { DashboardClient, type CardStyleVariant } from "./DashboardOverview";
+import { monthlyMonitoringEnabled } from "@/lib/frota/monthlyMonitoring";
 
 /** Insight regenerado no máximo 1x a cada 20h por empresa — mesmo espírito do daily_news_last_sent_at, evita custo de IA a cada carregamento de página. */
 const INSIGHT_CACHE_HORAS = 20;
@@ -77,7 +78,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   let insight = preferences.dashboard_insight_text;
 
-  if (precisaGerarInsight(preferences.dashboard_insight_generated_at)) {
+  if (!monthlyMonitoringEnabled(access.company.id) && precisaGerarInsight(preferences.dashboard_insight_generated_at)) {
     const hojeIso = new Date().toISOString().slice(0, 10);
     const alertas = computeFleetAlerts({ veiculos, manutencoes, documentos }).slice(0, 5);
     const checklistsHoje = dispatchesFromToday(checklistDispatches);
@@ -107,6 +108,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <DashboardClient
+      key={access.company.id}
       companyId={access.company.id}
       veiculos={veiculos}
       motoristas={motoristas}

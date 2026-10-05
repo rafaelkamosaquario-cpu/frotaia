@@ -7,14 +7,16 @@ import { goalProgress, type MonthlyProduction, type ProductionInput } from "@/li
 import type { ProductionRevenue } from "@/lib/frota/productionRevenue";
 import Link from "next/link";
 import type { MonthlyExpenses } from "@/lib/frota/monthlyExpenses";
+import type { MonthlySnapshot } from "@/lib/frota/monthlyMonitoring";
 
-type Loaded = { month: string; today: string; rows: MonthlyProduction[]; canEdit: boolean; revenueSummary: ProductionRevenue | null; revenueError: string | null; expenseSummary: MonthlyExpenses | null; expenseError: string | null };
+type Loaded = { month: string; today: string; rows: MonthlyProduction[]; canEdit: boolean; revenueSummary: ProductionRevenue | null; revenueError: string | null; expenseSummary: MonthlyExpenses | null; expenseError: string | null; checkedAt?: string; payrollDue?: {date:string;amount:number}[] | null };
+export type MonitoringState = { data: MonthlySnapshot | null; loading: boolean; error: string };
 const money = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const tonnes = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const field = "mt-1 w-full rounded-lg border border-border bg-surface p-2 text-foreground";
 const tones = { neutral: "text-muted-foreground", success: "text-success", danger: "text-danger", warning: "text-warning" };
 
-export function ProductionGoals({ vehicles }: { vehicles: VehicleRow[] }) {
+export function ProductionGoals({ vehicles, onSnapshot }: { vehicles: VehicleRow[]; onSnapshot?: (state: MonitoringState) => void }) {
   const [month, setMonth] = useState("");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
@@ -29,6 +31,7 @@ export function ProductionGoals({ vehicles }: { vehicles: VehicleRow[] }) {
       .catch(e => { if (!abort.signal.aborted) { setError(e instanceof Error ? e.message : "Não foi possível carregar."); setLoading(false); } });
     return () => abort.abort();
   }, [month, reload]);
+  useEffect(() => { onSnapshot?.({ data: loaded, loading, error }); }, [loaded, loading, error, onSnapshot]);
   const refresh = () => { setLoading(true); setEditing(false); setReload(r => r + 1); };
   const rows = loaded?.rows ?? [];
   const transport = rows.filter(r => r.operation === "transporte");
@@ -54,7 +57,7 @@ export function ProductionGoals({ vehicles }: { vehicles: VehicleRow[] }) {
     </article>;
   };
   return <Card className="mt-5 p-4 sm:p-5" id="metas-producao">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Resultado, produção e metas do mês</h2><p className="mt-1 text-sm text-muted-foreground">Receitas, combustível e remunerações no mesmo período</p></div><label className="text-sm">Mês de referência<input type="month" min="2000-01" max="2099-12" aria-label="Mês do resultado e das metas" className={field} value={month || loaded?.month || ""} onChange={e => { if (e.target.value) { setLoading(true); setEditing(false); setMonth(e.target.value); } }} /></label></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Resultado, produção e metas do mês</h2><p className="mt-1 text-sm text-muted-foreground">Receitas, combustível e remunerações no mesmo período</p></div><label className="text-sm">Mês de referência<input type="month" min="2000-01" max="2099-12" aria-label="Mês do resultado e das metas" className={field} value={month || loaded?.month || ""} onChange={e => { if (e.target.value) { setLoading(true); setEditing(false); setMonth(e.target.value); } }} /></label><Button variant="outline" onClick={refresh} disabled={loading}>Atualizar acompanhamento</Button></div>
     {loading ? <p role="status" className="py-5 text-sm">Carregando metas...</p> : error ? <div role="alert" className="py-4"><p>{error}</p><Button onClick={refresh} variant="outline" className="mt-2">Tentar novamente</Button></div> : loaded && <>
       <p className="mt-3 text-xs text-muted-foreground">Ao abrir, exibimos o último mês com produção informada. O ritmo parcial é proporcional aos dias corridos até a data da apuração, não uma previsão de lucro.</p>
       {loaded.revenueError && <div role="alert" className="mt-4 rounded-lg border border-warning p-3 text-sm"><p>{loaded.revenueError}</p><Button variant="outline" onClick={refresh} className="mt-2">Atualizar receitas</Button></div>}
