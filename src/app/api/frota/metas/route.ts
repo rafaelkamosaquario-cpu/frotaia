@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { brazilToday, productionSchema } from "@/lib/frota/productionGoals";
 import { monthSchema } from "@/lib/frota/costs";
+import { listRevenues } from "@/services/supabase/revenueService";
+import { productionMonthRange, summarizeProductionRevenue } from "@/lib/frota/productionRevenue";
 
 const fail = (error: string, status: number) => Response.json({ error }, { status });
 export async function GET(request: Request) {
@@ -17,7 +19,15 @@ export async function GET(request: Request) {
   if (!monthSchema.safeParse(month).success) return fail("Mês inválido.", 400);
   const { data, error } = await db.from("fleet_monthly_production").select("*").eq("company_id", access.company.id).eq("month", month).order("vehicle_id");
   if (error) return fail("Não foi possível carregar as metas. Tente novamente.", 503);
-  return Response.json({ month, today, rows: data, canEdit: ["owner", "admin", "operator"].includes(access.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  let revenueSummary = null;
+  let revenueError: string | null = null;
+  try {
+    const revenues = await listRevenues(db, { companyId: access.company.id, ...productionMonthRange(month), all: true });
+    revenueSummary = summarizeProductionRevenue(data ?? [], revenues);
+  } catch {
+    revenueError = "Não foi possível carregar as receitas deste mês. Os valores não estão sendo exibidos como zero. Tente atualizar.";
+  }
+  return Response.json({ month, today, rows: data, revenueSummary, revenueError, canEdit: ["owner", "admin", "operator"].includes(access.role) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
