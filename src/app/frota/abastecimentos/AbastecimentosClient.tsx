@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Fuel, SquarePen, Trash2, Plus, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -17,6 +17,7 @@ interface AbastecimentosClientProps {
   motoristas: DriverRow[];
   fornecedores: VendorRow[];
   internalFuelEnabled?: boolean;
+  monthlyConsolidates?: ReactNode;
 }
 
 interface ConsumoMedio {
@@ -36,7 +37,7 @@ function formatBRL(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoristas, fornecedores, internalFuelEnabled = false }: AbastecimentosClientProps) {
+export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoristas, fornecedores, internalFuelEnabled = false, monthlyConsolidates }: AbastecimentosClientProps) {
   const { showToast } = useToast();
   const [abastecimentos, setAbastecimentos] = useState(abastecimentosIniciais);
   const [formTarget, setFormTarget] = useState<FuelFillupRow | null | undefined>(undefined);
@@ -105,7 +106,7 @@ export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoris
         <div>
           <h1 className="text-lg font-semibold text-foreground">Abastecimentos</h1>
           <p className="text-sm text-muted-foreground">
-            {abastecimentosFiltrados.length} abastecimento(s) · total {formatBRL(gastoFiltrado)}
+            {abastecimentosFiltrados.length} abastecimento(s) individual(is) · total individual {formatBRL(gastoFiltrado)}
           </p>
         </div>
         <Button onClick={() => setFormTarget(null)} className="gap-1.5">
@@ -114,6 +115,8 @@ export function AbastecimentosClient({ abastecimentosIniciais, veiculos, motoris
         </Button>
       </div>
 
+      {monthlyConsolidates}
+      <h2 className="mb-3 text-base font-semibold">Abastecimentos individuais</h2>
       {internalFuelEnabled && <InternalFuelStock vehicles={veiculos} drivers={motoristas} onRecorded={async () => {
         const response = await fetch("/api/frota/abastecimentos");
         if (!response.ok) throw new Error("Registro salvo. Recarregue a página para atualizar a lista.");

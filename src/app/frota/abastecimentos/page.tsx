@@ -21,5 +21,5 @@ export default async function AbastecimentosPage() {
     listVendors(supabase, access.company.id),
   ]);
 
-  return <><MonthlyFuelConsolidates key={access.company.id} vehicles={veiculos} /><AbastecimentosClient abastecimentosIniciais={abastecimentos} veiculos={veiculos} motoristas={motoristas} fornecedores={fornecedores} internalFuelEnabled={process.env.FUEL_INTERNAL_ENABLED === "true" && ["owner", "admin", "operator"].includes(access.role)} /></>;
+  return <AbastecimentosClient key={access.company.id} monthlyConsolidates={<MonthlyFuelConsolidates vehicles={veiculos} />} abastecimentosIniciais={abastecimentos} veiculos={veiculos} motoristas={motoristas} fornecedores={fornecedores} internalFuelEnabled={process.env.FUEL_INTERNAL_ENABLED === "true" && ["owner", "admin", "operator"].includes(access.role)} />;
 }
