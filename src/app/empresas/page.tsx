@@ -8,6 +8,7 @@ export default async function EmpresasPage(){
  if(user.app_metadata?.consultancy_company){
   const state=await db.rpc("consultancy_first_access",{p_complete:false});
   if(state.error||(state.data as {pending?:boolean}|null)?.pending)redirect("/acesso-cliente");
+  if(!isConsultant(user))redirect("/acesso-cliente");
  }
  return <CompanyAccessClient canProvision={isConsultant(user)} />;
 }

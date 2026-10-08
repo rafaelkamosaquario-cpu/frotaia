@@ -6,6 +6,23 @@ const id="10000000-0000-4000-8000-000000000001";
 const req=(body:unknown,origin="https://frota.test")=>new Request("https://frota.test/api/company-access",{method:"POST",headers:{origin},body:JSON.stringify(body)});
 beforeEach(()=>{vi.clearAllMocks();m.user.mockResolvedValue({data:{user:{id:"user",email:"a@example.com"}}});m.rpc.mockResolvedValue({data:{companies:[],invites:[]},error:null});const chain={select:m.select,eq:m.eq,maybeSingle:m.single};[m.from,m.select,m.eq].forEach(f=>f.mockReturnValue(chain));m.single.mockResolvedValue({data:{id},error:null});});
 describe("company access API",()=>{
+ it("blocks managed client listing and all access commands before database operations",async()=>{
+  m.user.mockResolvedValue({data:{user:{id:"client",email:"client@example.com",app_metadata:{consultancy_company:id}}}});
+  expect((await GET(new Request("https://frota.test/api/company-access"))).status).toBe(403);
+  for(const body of [{action:"select",company_id:"20000000-0000-4000-8000-000000000002"},{action:"invite",company_id:id,email:"other@example.com",role:"admin"},{action:"accept",invite_id:id},{action:"revoke_member",company_id:id,id},{action:"revoke_invite",company_id:id,id}])expect((await POST(req(body))).status).toBe(403);
+  expect(m.rpc).not.toHaveBeenCalled();expect(m.from).not.toHaveBeenCalled();
+ });
+ it("allows managed first access to its assigned company only with active membership",async()=>{
+  m.user.mockResolvedValue({data:{user:{id:"client",email:"client@example.com",app_metadata:{consultancy_company:id}}}});
+  expect((await POST(req({action:"select",company_id:id}))).status).toBe(200);
+  m.single.mockResolvedValue({data:null,error:null});
+  expect((await POST(req({action:"select",company_id:id}))).status).toBe(403);
+ });
+ it("preserves verified consultant access",async()=>{
+  m.user.mockResolvedValue({data:{user:{id:"consultant",email:"rafaelkamosaquario@gmail.com",email_confirmed_at:"2026-01-01",app_metadata:{consultancy_company:id}}}});
+  expect((await GET(new Request("https://frota.test/api/company-access"))).status).toBe(200);
+  expect((await POST(req({action:"select",company_id:id}))).status).toBe(200);
+ });
  it("requires authentication",async()=>{m.user.mockResolvedValue({data:{user:null}});expect((await GET(req(null))).status).toBe(401);expect((await POST(req({action:"select",company_id:id}))).status).toBe(401);expect(m.rpc).not.toHaveBeenCalled();});
  it.each(["", "null", "https://attacker.test"])("rejects origin %s",async origin=>{expect((await POST(req({action:"select",company_id:id},origin))).status).toBe(403);expect(m.from).not.toHaveBeenCalled();});
  it("supports forwarded host behind the production proxy",async()=>{const r=req({action:"select",company_id:id},"https://public.test");r.headers.set("x-forwarded-host","public.test");expect((await POST(r)).status).toBe(200);});

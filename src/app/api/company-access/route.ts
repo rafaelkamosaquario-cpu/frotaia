@@ -3,6 +3,13 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { accessCommand } from "@/lib/frota/companyAccess";
 import { COMPANY_COOKIE } from "@/lib/frota/companyScope";
+import { isConsultant } from "@/lib/frota/consultancy";
+function managedClient(user: { email?: string; email_confirmed_at?: string; app_metadata?: Record<string, unknown> }) {
+ return !!user.app_metadata?.consultancy_company && !isConsultant(user);
+}
+function restricted() {
+ return NextResponse.json({error:"Esta conta acessa somente o painel da sua empresa. A gestão de acessos é feita pela consultoria."},{status:403});
+}
 function failure(code?:string) {
  const status=code==="42501"?403:code==="23505"?409:code==="23514"?422:503;
  return NextResponse.json({error:status===403?"Acesso não autorizado para esta conta. Somente o proprietário gerencia a equipe.":status===409?"Registro já existente ou alterado. Atualize a lista.":status===422?"Convite expirado, revogado ou ação não permitida. Confira com o proprietário.":"Gestão de acessos indisponível. Nenhuma alteração foi confirmada."},{status});
@@ -10,6 +17,7 @@ function failure(code?:string) {
 export async function GET(request:Request) {
  const db=await createClient(); const {data:{user}}=await db.auth.getUser();
  if(!user)return NextResponse.json({error:"Entre com sua conta Google."},{status:401});
+ if(managedClient(user))return restricted();
  const company=new URL(request.url).searchParams.get("company_id");
  if(company&&!z.string().uuid().safeParse(company).success)return NextResponse.json({error:"Empresa inválida."},{status:400});
  const result=company?await db.rpc("manage_company_access",{p_company:company,p_action:"list"}):await db.rpc("list_company_access",{});
@@ -27,6 +35,8 @@ export async function POST(request:Request) {
  const parsed=accessCommand.safeParse(await request.json().catch(()=>null));
  if(!parsed.success)return NextResponse.json({error:"Confira os dados informados."},{status:400});
  const c=parsed.data;
+ // First access still needs to select the assigned company; this never grants membership.
+ if(managedClient(user) && (c.action!=="select" || c.company_id!==user.app_metadata.consultancy_company))return restricted();
  if(c.action==="select") {
   const {data,error}=await db.from("company_members").select("id").eq("company_id",c.company_id).eq("user_id",user.id).eq("status","active").maybeSingle();
   if(error)return failure();if(!data)return failure("42501");
