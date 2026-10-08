@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarClock, ClipboardCheck, FileText, Sparkles, Truck, Users, Wallet, Wrench } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -13,9 +13,16 @@ import { dispatchesFromToday } from "@/services/supabase/checklistDispatchServic
 import { ProductionGoals, type MonitoringState } from "./ProductionGoals";
 import { monthlyMonitoringBrief, monthlyMonitoringEnabled, monthlyMonitoringMessages } from "@/lib/frota/monthlyMonitoring";
 
+import { GroupsOverview } from "./GroupsOverview";
+import type { OperationalGroup } from "@/lib/frota/operationalGroups";
+import { askFrotaAiWidget } from "@/components/frota/frotaAiWidgetBus";
+import { useAssistantNotices } from "@/components/frota/AssistantNotices";
+import { buildAssistantNotices } from "@/lib/frota/assistantNotices";
+
 export type CardStyleVariant = "a" | "b";
 interface Props {
   companyId: string;
+  groups: OperationalGroup[]; groupsError: boolean; canManageGroups: boolean;
   veiculos: VehicleRow[]; motoristas: DriverRow[]; manutencoes: MaintenanceScheduleRow[];
   documentos: VehicleDocumentRow[]; despesasRecentes: ExpenseRow[]; checklistDispatches: ChecklistDispatchRow[];
   insight: string | null; cardStyle: CardStyleVariant;
@@ -36,7 +43,7 @@ function AlertSection({ title, items, href, empty }: { title: string; items: Fle
 }
 
 /** Apresentação apenas: mantém as fontes e as regras dos indicadores anteriores. */
-export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, documentos, checklistDispatches, insight }: Props) {
+export function DashboardClient({ groups, groupsError, canManageGroups, companyId, veiculos, motoristas, manutencoes, documentos, checklistDispatches, insight }: Props) {
   const monthlyMonitoring = monthlyMonitoringEnabled(companyId);
   const [monitoring, setMonitoring] = useState<MonitoringState>({data:null,loading:true,error:""});
   const hojeIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -54,6 +61,17 @@ export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, 
     { label: "Resultado mensal", value: "Ver abaixo", context: "Receitas, diesel e remunerações no mesmo mês", Icon: Wallet, href: "#metas-producao", tone: "text-primary", currency: true },
   ];
   const alertas = useMemo(() => computeFleetAlerts({ veiculos, manutencoes, documentos }), [veiculos, manutencoes, documentos]);
+  const publishNotices = useAssistantNotices()?.publish;
+  useEffect(() => {
+    if (!publishNotices) return;
+    publishNotices({
+      label: monthlyMonitoring && monitoring.data && !monitoring.loading && !monitoring.error
+        ? `Fechamento ${monitoring.data.month.split("-").reverse().join("/")} · alertas operacionais atuais`
+        : "Alertas operacionais · fechamento mensal não disponível",
+      notices: buildAssistantNotices(monthlyMonitoring && !monitoring.loading && !monitoring.error ? monitoring.data : null, alertas),
+    });
+    return () => publishNotices(null);
+  }, [publishNotices, monthlyMonitoring, monitoring, alertas]);
   const hoje = useMemo(() => dispatchesFromToday(checklistDispatches), [checklistDispatches]);
   const respondidos = hoje.filter(d => d.response_status !== "pendente").length;
   const drivers = new Map(motoristas.map(m => [m.id, m.name]));
@@ -61,9 +79,16 @@ export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, 
 
   return <div className="frota-dashboard flex flex-1 flex-col">
     <div className="flex items-start justify-between gap-3"><div><h1>Dashboard</h1><p className="mt-1 text-sm text-muted-foreground">Visão geral da frota</p></div><ContextualHelp topic="dashboard" /></div>
-    <Card data-tour="ia-sugere" className="dashboard-insight flex flex-wrap items-start gap-3 sm:gap-4">
+    <GroupsOverview groups={groups} error={groupsError} allowed={canManageGroups} />
+    <div data-tour="kpis" className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      {kpis.map(({ label, value, context, Icon, href, tone, currency }) => <Link key={label} href={href} className="dashboard-kpi ui-card min-w-0 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/60 sm:p-5">
+        <div className="mb-3 flex items-start gap-2.5"><Icon className={cn("size-6 shrink-0 sm:size-7", tone)} aria-hidden /><h2 className="text-sm font-medium leading-snug">{label}</h2></div>
+        <p className={cn("dashboard-kpi-value font-bold tracking-tight tabular-nums", currency ? "dashboard-currency" : "text-3xl sm:text-4xl")}>{value}</p><p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">{context}</p>
+      </Link>)}
+    </div>
+    <Card data-tour="ia-sugere" id="assistente-frota" className="dashboard-insight flex flex-wrap items-start gap-3 sm:gap-4">
       <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Sparkles className="size-6" aria-hidden /></span>
-      <div className="min-w-0 flex-1 basis-48"><h2 className="text-base font-semibold">Frota IA informa</h2>{monthlyMonitoring ? <>
+      <div className="min-w-0 flex-1 basis-48"><h2 className="text-base font-semibold">Assistente Frota IA</h2><p className="mt-1 text-sm text-muted-foreground">Frota IA informa · avisos breves e perguntas sobre sua operação.</p>{monthlyMonitoring ? <>
         {monitoring.loading ? <p role="status">Conferindo o mês selecionado...</p> : monitoring.error || !monitoring.data ? <p role="alert">Não foi possível atualizar o acompanhamento. Use Atualizar acompanhamento no fechamento mensal; não exibimos uma análise antiga como atual.</p> : <>
           <p className="mt-2 text-sm font-semibold">Acompanhamento de {monitoring.data.month.split("-").reverse().join("/")}</p>
           <ul className="mt-3 space-y-2 text-sm leading-relaxed">{monthlyMonitoringBrief(monitoring.data).map((message,i)=><li key={i}>{message}</li>)}</ul>
@@ -74,14 +99,9 @@ export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, 
         </>}
         <p className="mt-3 text-sm">Situação operacional atual: {ativos} veículos e {motoristasAtivos} motoristas ativos; {alertas.length} alerta(s) de manutenção/documentos. <Link href="#metas-producao" className="text-primary underline">Escolher mês / atualizar acompanhamento</Link></p>
       </> : <><p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{insight || "O resumo da IA ainda não está disponível. Consulte os indicadores ou pergunte ao Frota IA sobre sua frota."}</p><p className="mt-2 text-xs text-muted-foreground">Resumo operacional periódico, independente do mês selecionado. Para o fechamento financeiro completo do mês, consulte Resultado mensal abaixo.</p></>}</div>
+      <button type="button" onClick={() => askFrotaAiWidget(monitoring.data ? `Explique o acompanhamento de ${monitoring.data.month} da minha empresa, incluindo metas, combustível e remunerações. Consulte os registros e avise se faltarem dados.` : "Quais pendências da minha frota precisam de atenção? Consulte os registros atuais.")} className="min-h-11 rounded-lg border border-primary px-4 text-sm font-semibold text-primary">Pergunte ao Frota IA</button>
       <Link href="/frota/alertas" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-hover">Ver pendências<ArrowRight className="size-4" aria-hidden /></Link>
     </Card>
-    <div data-tour="kpis" className="grid grid-cols-2 gap-3 md:grid-cols-3">
-      {kpis.map(({ label, value, context, Icon, href, tone, currency }) => <Link key={label} href={href} className="dashboard-kpi ui-card min-w-0 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/60 sm:p-5">
-        <div className="mb-3 flex items-start gap-2.5"><Icon className={cn("size-6 shrink-0 sm:size-7", tone)} aria-hidden /><h2 className="text-sm font-medium leading-snug">{label}</h2></div>
-        <p className={cn("dashboard-kpi-value font-bold tracking-tight tabular-nums", currency ? "dashboard-currency" : "text-3xl sm:text-4xl")}>{value}</p><p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">{context}</p>
-      </Link>)}
-    </div>
     <ProductionGoals key={companyId} vehicles={veiculos} onSnapshot={monthlyMonitoring ? setMonitoring : undefined} />
     <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
       <Card className="min-w-0 overflow-hidden p-4 sm:p-5">

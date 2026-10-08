@@ -11,6 +11,7 @@ import { getOrCreatePreferences, saveDashboardInsight } from "@/services/supabas
 import { gerarInsightDashboard } from "@/services/dashboard/dashboardInsightService";
 import { DashboardClient, type CardStyleVariant } from "./DashboardOverview";
 import { monthlyMonitoringEnabled } from "@/lib/frota/monthlyMonitoring";
+import type { OperationalGroup } from "@/lib/frota/operationalGroups";
 
 /** Insight regenerado no máximo 1x a cada 20h por empresa — mesmo espírito do daily_news_last_sent_at, evita custo de IA a cada carregamento de página. */
 const INSIGHT_CACHE_HORAS = 20;
@@ -63,6 +64,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   if (!access.ok) return null;
 
+  const canManageGroups = ["owner", "admin"].includes(access.role);
+  const groupResult = canManageGroups
+    ? await supabase.rpc("manage_operational_groups", { p_company: access.company.id, p_action: "list" })
+    : null;
+  const groups = Array.isArray(groupResult?.data) ? groupResult.data as OperationalGroup[] : [];
+
   const trintaDiasAtras = new Date();
   trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
 
@@ -110,6 +117,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <DashboardClient
       key={access.company.id}
       companyId={access.company.id}
+      groups={groups}
+      groupsError={!!groupResult?.error}
+      canManageGroups={canManageGroups}
       veiculos={veiculos}
       motoristas={motoristas}
       manutencoes={manutencoes}

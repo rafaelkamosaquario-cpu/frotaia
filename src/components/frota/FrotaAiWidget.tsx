@@ -2,7 +2,9 @@
 
 import { useRef, useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Sparkles, X, Send, Paperclip } from "lucide-react";
+import { Sparkles, X, Send, Paperclip, Bell } from "lucide-react";
+import Link from "next/link";
+import { useAssistantNotices } from "./AssistantNotices";
 import { Button } from "@/components/ui/Button";
 import { TypingDots } from "@/components/ui/Loading";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,9 @@ export function FrotaAiWidget() {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"chat" | "notices">("chat");
+  const notices = useAssistantNotices();
+  const unread = notices?.snapshot?.notices.filter(item => !notices.read.includes(item.id)).length ?? 0;
   const [mensagens, setMensagens] = useState<WidgetMessage[]>([]);
   const [texto, setTexto] = useState("");
   const [imagemAnexada, setImagemAnexada] = useState<File | null>(null);
@@ -71,6 +76,7 @@ export function FrotaAiWidget() {
       const detalhe = (event as CustomEvent<FrotaAiWidgetAskDetail>).detail;
       if (!detalhe?.pergunta) return;
       setTexto(detalhe.pergunta);
+      setTab("chat");
       setOpen(true);
     }
     window.addEventListener(FROTA_AI_WIDGET_ASK_EVENT, aoReceberPergunta);
@@ -151,16 +157,35 @@ export function FrotaAiWidget() {
         className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-4 text-primary-foreground shadow-lg transition-colors hover:bg-primary-hover sm:right-5 lg:bottom-5"
       >
         {open ? <X className="size-5" aria-hidden /> : <Sparkles className="size-5" aria-hidden />}
-        <span className="text-sm font-semibold">{open ? "Fechar conversa" : "Pergunte ao Frota IA"}</span>
+        <span className="text-sm font-semibold">{open ? "Fechar assistente" : "Assistente Frota IA"}</span>
+        {!open && unread > 0 && <span aria-label={`${unread} avisos não lidos`} className="inline-flex items-center gap-1 rounded-full bg-background px-2 py-1 text-xs text-foreground"><Bell className="size-3" aria-hidden />{unread}</span>}
       </button>
 
       {open && (
         <div id="frota-ai-conversation" role="region" aria-label="Conversa com Frota IA" className="fixed bottom-[calc(8.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-[min(560px,calc(100dvh-13rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl sm:right-5 lg:bottom-22">
           <div className="flex items-center gap-2 border-b border-border px-4 py-3">
             <Sparkles className="size-4 text-primary" aria-hidden />
-            <span className="text-sm font-semibold text-foreground">Pergunte ao Frota IA</span>
+            <span className="text-sm font-semibold text-foreground">Assistente Frota IA</span>
           </div>
-
+          <div className="flex gap-2 border-b border-border px-3 py-1">
+            <button type="button" aria-pressed={tab === "chat"} onClick={() => setTab("chat")} className={cn("min-h-11 flex-1 rounded-md text-sm", tab === "chat" && "bg-primary/10 text-primary")}>Pergunte ao Frota IA</button>
+            <button type="button" aria-pressed={tab === "notices"} onClick={() => setTab("notices")} className={cn("min-h-11 flex-1 rounded-md text-sm", tab === "notices" && "bg-primary/10 text-primary")}>Avisos {unread > 0 ? `(${unread})` : ""}</button>
+          </div>
+          {tab === "notices" ? <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            <p className="text-xs text-muted-foreground">{notices?.snapshot?.label ?? "Abra o dashboard para consultar os avisos da empresa."}</p>
+            {notices?.snapshot && !notices.snapshot.notices.length && <p className="text-sm">Nenhum aviso disponível nesta consulta.</p>}
+            {notices?.snapshot?.notices.map(item => <article key={item.id} className="rounded-lg border border-border p-3">
+              <p className="text-xs font-semibold text-primary">Frota IA informa · {notices.read.includes(item.id) ? "Lido" : "Não lido"}</p>
+              <p className="mt-2 text-sm">{item.text}</p>
+              <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                <Link href={item.href} onClick={() => notices.markRead(item.id)} className="inline-flex min-h-11 items-center text-primary">Ver registros</Link>
+                <button type="button" onClick={() => { notices.markRead(item.id); setTexto(item.question); setTab("chat"); }} className="min-h-11 text-primary">Perguntar sobre isso</button>
+                {!notices.read.includes(item.id) && <button type="button" onClick={() => notices.markRead(item.id)} className="min-h-11 text-muted-foreground">Marcar como lido</button>}
+              </div>
+            </article>)}
+            <p className="text-xs text-muted-foreground">Avisos internos do dashboard. A leitura vale nesta sessão e não dá baixa em contas ou pendências. Não são notificações push nem mensagens enviadas ao WhatsApp.</p>
+            {!notices?.snapshot && <Link href="/frota/dashboard" className="inline-flex min-h-11 items-center text-sm text-primary">Ir ao dashboard</Link>}
+          </div> : <>
           <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
             {mensagens.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -230,6 +255,7 @@ export function FrotaAiWidget() {
               <Send className="size-4" aria-hidden />
             </Button>
           </form>
+          </>}
         </div>
       )}
     </>

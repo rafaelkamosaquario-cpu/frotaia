@@ -6,6 +6,7 @@ import { FrotaSidebar } from "./FrotaSidebar";
 import { FrotaMobileSidebar } from "./FrotaMobileSidebar";
 import { FrotaBottomNav } from "./FrotaBottomNav";
 import { FrotaAiWidget } from "./FrotaAiWidget";
+import { AssistantNoticesProvider } from "./AssistantNotices";
 import { PanelTour } from "./PanelTour";
 import { CompanyScopeBoundary } from "./CompanyScopeBoundary";
 import type { CompanyMemberRole } from "@/lib/supabase/tables";
@@ -22,6 +23,7 @@ export function FrotaShell({ companyId, companyName, role, children }: FrotaShel
 
   return (
     <CompanyScopeBoundary companyId={companyId}>
+    <AssistantNoticesProvider key={companyId}>
     <div className="frota-panel frota-refined flex h-dvh flex-col bg-background">
       <FrotaHeader companyName={companyName} role={role} />
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-2 text-sm">
@@ -39,6 +41,7 @@ export function FrotaShell({ companyId, companyName, role, children }: FrotaShel
       <FrotaAiWidget />
       <PanelTour />
     </div>
+    </AssistantNoticesProvider>
     </CompanyScopeBoundary>
   );
 }
