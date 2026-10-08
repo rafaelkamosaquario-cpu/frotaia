@@ -1,5 +1,8 @@
 // Request-local client identity, never a process-global selected tenant.
 const scopes = new WeakMap<object, string>();
+const paths = new WeakMap<object, string>();
+export function attachPanelPath(client: object, path: string) { paths.set(client, path); }
+export function panelPath(client: object) { return paths.get(client) ?? ""; }
 export const COMPANY_COOKIE = "frota_company";
 export const COMPANY_HEADER = "x-frota-company";
 export function attachCompanyScope(client: object, value: string | undefined | null) {

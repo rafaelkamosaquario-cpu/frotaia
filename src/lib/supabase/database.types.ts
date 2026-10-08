@@ -20,6 +20,7 @@ export type Database = {
   }
   public: {
     Tables: {
+      company_panel_modules: CostTable<import("@/lib/frota/companyModules").CompanyModuleConfig>
       fleet_monthly_production: CostTable<MonthlyProduction>
       consultancy_onboardings: CostTable<{ company_id: string; request_id: string; consultant_id: string; client_email: string; contact_name: string; phone: string | null; document: string | null; client_user_id: string | null; initial_password_hash: string | null; temporary_expires_at: string | null; delivered_at: string | null; claimed_at: string | null; consultant_until: string | null; created_at: string }>
       freight_customers: CostTable<FreightCustomerRow>

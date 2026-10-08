@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const m = vi.hoisted(() => ({ context: vi.fn(), subscription: vi.fn(), ai: vi.fn(), user: vi.fn() }));
+const m = vi.hoisted(() => ({ context: vi.fn(), subscription: vi.fn(), ai: vi.fn(), user: vi.fn(), modules: vi.fn() }));
+vi.mock("@/services/supabase/companyModulesService", () => ({ readCompanyModules: m.modules }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: m.user } }) }));
 vi.mock("@/ai/context/customerContext", () => ({ loadCustomerContext: m.context, loadVehicleContext: async () => ({}) }));
@@ -11,6 +12,7 @@ const request = () => new Request("https://test.local/api/chat", { method: "POST
 describe("web AI entitlement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    m.modules.mockResolvedValue(null);
     m.user.mockResolvedValue({ data: { user: { id: "u" } } });
     m.context.mockResolvedValue({ company: { id: "company", fleet_panel_enabled: false }, profile: { is_admin: false } });
     m.ai.mockResolvedValue({ message: "ok" });
@@ -35,5 +37,19 @@ describe("web AI entitlement", () => {
     m.user.mockResolvedValue({ data: { user: null } });
     expect((await POST(request())).status).toBe(401);
     expect(m.ai).not.toHaveBeenCalled();
+  });
+  it("blocks a disabled assistant even when the company header is omitted", async () => {
+    m.modules.mockResolvedValue({ enabled: ["frota"] });
+    expect((await POST(request())).status).toBe(403);
+    expect(m.ai).not.toHaveBeenCalled();
+  });
+  it("passes a restricted tool list to the web assistant", async () => {
+    m.context.mockResolvedValue({ company: { id: "company", fleet_panel_enabled: true } });
+    m.modules.mockResolvedValue({ enabled: ["frota", "assistente"] });
+    expect((await POST(request())).status).toBe(200);
+    const tools = m.ai.mock.calls[0][0].ferramentasPermitidas;
+    expect(tools).toContain("gerenciar_veiculo");
+    expect(tools).not.toContain("gerenciar_radar_frete");
+    expect(tools).not.toContain("registrar_despesa");
   });
 });

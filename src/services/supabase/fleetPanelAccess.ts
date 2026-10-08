@@ -2,9 +2,14 @@ import { loadCustomerContext } from "@/ai/context/customerContext";
 import { getSubscription, isFleetPanelAccessAllowed } from "./subscriptionService";
 import type { CompanyMemberRole, CompanyRow } from "@/lib/supabase/tables";
 import type { SupabaseDbClient } from "./types";
+import { panelPath } from "@/lib/frota/companyScope";
+import { isConsultant } from "@/lib/frota/consultancy";
+import { modulePathAllowed, type CompanyModuleConfig } from "@/lib/frota/companyModules";
+import { readCompanyModules } from "./companyModulesService";
+import { redirect } from "next/navigation";
 
 export type FleetPanelAccessResult =
-  | { ok: true; userId: string; company: CompanyRow; role: CompanyMemberRole }
+  | { ok: true; userId: string; company: CompanyRow; role: CompanyMemberRole; moduleConfig?: CompanyModuleConfig | null; moduleBypass?: boolean }
   | { ok: false; reason: "unauthenticated" | "no_company" | "not_entitled" };
 
 /**
@@ -33,5 +38,11 @@ export async function loadFleetPanelAccess(client: SupabaseDbClient): Promise<Fl
   const entitled = context.company.fleet_panel_enabled || isFleetPanelAccessAllowed(subscription);
   if (!entitled) return { ok: false, reason: "not_entitled" };
 
-  return { ok: true, userId: data.user.id, company: context.company, role: context.role! };
+  const moduleConfig = await readCompanyModules(context.company.id);
+  const path = panelPath(client);
+  if (!isConsultant(data.user) && !modulePathAllowed(moduleConfig?.enabled ?? null, path)) {
+    if (path.startsWith("/frota/")) redirect("/frota/dashboard?modulo=indisponivel");
+    return { ok: false, reason: "not_entitled" };
+  }
+  return { ok: true, userId: data.user.id, company: context.company, role: context.role!, ...(moduleConfig ? { moduleConfig, moduleBypass: isConsultant(data.user) } : {}) };
 }

@@ -7,6 +7,10 @@ import { getConversationById, getOrCreateOpenConversation } from "@/services/sup
 import { gerarRespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
 import { captureError } from "@/lib/observability/logger";
 import { getSubscription, isFleetPanelAccessAllowed } from "@/services/supabase/subscriptionService";
+import { isConsultant } from "@/lib/frota/consultancy";
+import { readCompanyModules } from "@/services/supabase/companyModulesService";
+import { moduleToolAllowed } from "@/lib/frota/companyModules";
+import { FERRAMENTAS_FROTA_IA } from "@/ai/tools";
 
 const ROTA = "/api/chat";
 
@@ -50,6 +54,14 @@ export async function POST(request: Request) {
   }
 
   const companyId = customerContext.company.id;
+  let ferramentasPermitidas: Parameters<typeof gerarRespostaAssistente>[0]["ferramentasPermitidas"];
+  if (!isConsultant(authData.user)) {
+    try {
+      const config = await readCompanyModules(companyId);
+      if (config && !config.enabled.includes("assistente")) return NextResponse.json({ error: "Assistente não liberado para esta empresa." }, { status: 403 });
+      if (config) ferramentasPermitidas = FERRAMENTAS_FROTA_IA.filter(tool => moduleToolAllowed(config.enabled, tool.nome)).map(tool => tool.nome) as NonNullable<typeof ferramentasPermitidas>;
+    } catch { return NextResponse.json({ error: "Não foi possível verificar os módulos da empresa." }, { status: 503 }); }
+  }
   // Preserve explicit administrative grants and the internal admin test chat.
   // A browser session alone does not grant access to the paid AI endpoint.
   if (!customerContext.profile?.is_admin && !customerContext.company.fleet_panel_enabled) {
@@ -92,6 +104,7 @@ export async function POST(request: Request) {
       customerContext,
       vehicleContext,
       mensagemUsuario,
+      ferramentasPermitidas,
       conteudoMultimodal: conteudoMultimodal.length > 0 ? conteudoMultimodal : undefined,
     });
 

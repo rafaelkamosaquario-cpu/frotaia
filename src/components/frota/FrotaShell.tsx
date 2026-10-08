@@ -17,15 +17,16 @@ interface FrotaShellProps {
   companyName: string;
   role: CompanyMemberRole;
   canExpandNavigation?: boolean;
+  enabledModules?: string[] | null;
   children: React.ReactNode;
 }
 
-export function FrotaShell({ companyId, companyName, role, canExpandNavigation = false, children }: FrotaShellProps) {
+export function FrotaShell({ companyId, companyName, role, canExpandNavigation = false, enabledModules = null, children }: FrotaShellProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   return (
     <CompanyScopeBoundary companyId={companyId}>
-    <FrotaNavigationProvider key={companyId} companyId={companyId} canExpand={canExpandNavigation}>
+    <FrotaNavigationProvider key={`${companyId}:${enabledModules?.join(",")}`} companyId={companyId} canExpand={canExpandNavigation} enabledModules={enabledModules}>
     <AssistantNoticesProvider key={companyId}>
     <div className="frota-panel frota-refined flex h-dvh flex-col bg-background">
       <FrotaHeader companyName={companyName} role={role} />
@@ -41,8 +42,8 @@ export function FrotaShell({ companyId, companyName, role, canExpandNavigation =
         </main>
       </div>
       <FrotaBottomNav onOpenMore={() => setIsMoreOpen(true)} />
-      <FrotaAiWidget />
-      <PanelTour />
+      {(canExpandNavigation || enabledModules === null || enabledModules.includes("assistente")) && <FrotaAiWidget />}
+      {enabledModules === null && <PanelTour />}
     </div>
     </AssistantNoticesProvider>
     </FrotaNavigationProvider>

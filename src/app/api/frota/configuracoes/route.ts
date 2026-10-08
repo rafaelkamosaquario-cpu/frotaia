@@ -19,6 +19,13 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
+  if (access.moduleConfig && !access.moduleBypass) {
+    const enabled = access.moduleConfig.enabled;
+    if ((!enabled.includes("checklists") && ["checklistEnabled", "checklistSendHour", "checklistItemKeys"].some(key => body[key] !== undefined)) ||
+        (!enabled.includes("noticias") && body.dailyNewsEnabled !== undefined)) {
+      return NextResponse.json({ error: "Este módulo não está liberado para a empresa." }, { status: 403 });
+    }
+  }
 
   if (body.preferredResponseStyle !== undefined && !ESTILOS_VALIDOS.includes(body.preferredResponseStyle)) {
     return NextResponse.json({ error: `preferredResponseStyle precisa ser um de: ${ESTILOS_VALIDOS.join(", ")}.` }, { status: 400 });

@@ -12,6 +12,7 @@ import { gerarInsightDashboard } from "@/services/dashboard/dashboardInsightServ
 import { DashboardClient, type CardStyleVariant } from "./DashboardOverview";
 import { monthlyMonitoringEnabled } from "@/lib/frota/monthlyMonitoring";
 import type { OperationalGroup } from "@/lib/frota/operationalGroups";
+import { ConfiguredDashboard } from "./ConfiguredDashboard";
 
 /** Insight regenerado no máximo 1x a cada 20h por empresa — mesmo espírito do daily_news_last_sent_at, evita custo de IA a cada carregamento de página. */
 const INSIGHT_CACHE_HORAS = 20;
@@ -63,6 +64,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const access = await loadFleetPanelAccess(supabase);
 
   if (!access.ok) return null;
+
+  if (access.moduleConfig && !access.moduleBypass) {
+    const enabled = access.moduleConfig.enabled;
+    const canManageGroups = ["owner", "admin"].includes(access.role);
+    const [vehicles, drivers, groupResult] = await Promise.all([
+      enabled.includes("frota") || enabled.includes("financeiro") ? listVehiclesForPanel(supabase, access.company.id) : Promise.resolve([]),
+      enabled.includes("frota") || enabled.includes("financeiro") ? listDriversForPanel(supabase, access.company.id) : Promise.resolve([]),
+      enabled.includes("grupos") && canManageGroups ? supabase.rpc("manage_operational_groups", { p_company: access.company.id, p_action: "list" }) : Promise.resolve(null),
+    ]);
+    return <ConfiguredDashboard companyId={access.company.id} enabled={enabled} vehicles={vehicles} drivers={drivers} groups={Array.isArray(groupResult?.data) ? groupResult.data as OperationalGroup[] : []} groupsError={!!groupResult?.error} canManageGroups={canManageGroups} />;
+  }
 
   const canManageGroups = ["owner", "admin"].includes(access.role);
   const groupResult = canManageGroups

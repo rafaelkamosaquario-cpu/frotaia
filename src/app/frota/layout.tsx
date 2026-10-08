@@ -38,7 +38,7 @@ export default async function FrotaLayout({ children }: { children: React.ReactN
   const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <FrotaShell companyId={access.company.id} companyName={access.company.name} role={access.role} canExpandNavigation={isConsultant(user)}>
+    <FrotaShell companyId={access.company.id} companyName={access.company.name} role={access.role} canExpandNavigation={isConsultant(user)} enabledModules={access.moduleConfig?.enabled ?? null}>
       {children}
     </FrotaShell>
   );

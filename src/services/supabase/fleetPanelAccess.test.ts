@@ -3,6 +3,7 @@ import type { CompanyRow, SubscriptionRow } from "@/lib/supabase/tables";
 
 const loadCustomerContext = vi.fn();
 const getSubscription = vi.fn();
+vi.mock("./companyModulesService", () => ({ readCompanyModules: vi.fn().mockResolvedValue(null) }));
 
 vi.mock("@/ai/context/customerContext", () => ({
   loadCustomerContext: (...args: unknown[]) => loadCustomerContext(...args),

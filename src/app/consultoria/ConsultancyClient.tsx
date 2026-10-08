@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { ConsultancyCompany } from "@/lib/frota/consultancy";
+import { CompanyModulesEditor } from "./CompanyModulesEditor";
 const input = "mt-1 block w-full rounded-lg border border-border bg-background p-3";
 const button = "rounded-lg border border-border px-4 py-3 font-medium disabled:opacity-50";
 async function api(path: string, body?: unknown) {
@@ -14,6 +15,7 @@ export function ConsultancyClient() {
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [message, setMessage] = useState("");
   const [target, setTarget] = useState<ConsultancyCompany | null>(null), [password, setPassword] = useState("");
   const [share, setShare] = useState("");
+  const [moduleTarget, setModuleTarget] = useState<ConsultancyCompany | null>(null);
   const requestId = useRef<string | null>(null);
   async function refresh() { const data = await api("/api/consultoria"); setCompanies(data.companies); }
   useEffect(() => { api("/api/consultoria").then(data => setCompanies(data.companies)).catch(e => setError(e.message)); }, []);
@@ -46,7 +48,9 @@ export function ConsultancyClient() {
       <p className="text-sm">{company.claimed_at ? "Cliente ativou sua senha pessoal" : company.delivered_at ? "Aguardando primeiro acesso e troca de senha (validade: 7 dias)" : "Em preparação — acesso ainda não entregue"}</p>
       {company.consultant_until && <p className="text-sm">Acompanhamento até {new Date(company.consultant_until).toLocaleDateString("pt-BR")}. Depois, solicite nova autorização ao cliente.</p>}
       <div className="flex flex-wrap gap-3"><button className={button} disabled={busy || (!!company.consultant_until && new Date(company.consultant_until) <= new Date())} onClick={() => run(async () => { await api("/api/company-access", { action: "select", company_id: company.company_id }); window.location.assign("/frota/dashboard"); })}>Abrir painel para configurar</button>
+        <button className={button} disabled={busy || (!!company.consultant_until && new Date(company.consultant_until) <= new Date())} onClick={() => setModuleTarget(company)}>Personalizar módulos</button>
         {!company.delivered_at && <button className={button} disabled={busy} onClick={() => { setTarget(company); setPassword(""); setShare(""); }}>Preparar acesso do cliente</button>}</div>
+        {moduleTarget?.company_id === company.company_id && <CompanyModulesEditor key={company.company_id} company={company} onClose={() => setModuleTarget(null)} />}
     </article>)}</section>
     {target && <form className="space-y-4 rounded-xl border border-primary p-5" onSubmit={event => { event.preventDefault(); run(async () => {
       const result = await api("/api/consultoria", { action: "deliver", companyId: target.company_id, password });

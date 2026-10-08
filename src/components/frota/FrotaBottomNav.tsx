@@ -29,7 +29,7 @@ const DESTINOS = [
 
 export function FrotaBottomNav({ onOpenMore }: FrotaBottomNavProps) {
   const pathname = usePathname();
-  const { compact } = useFrotaNavigation();
+  const { compact, allows } = useFrotaNavigation();
   const destinations = compact ? [DESTINOS[0], DESTINOS[1], { href: "/frota/resultados", label: "Resultados", icon: ChartNoAxesCombined }, { ...DESTINOS[3], label: "Avisos" }] : DESTINOS;
 
   return (
@@ -38,7 +38,7 @@ export function FrotaBottomNav({ onOpenMore }: FrotaBottomNavProps) {
       className="frota-safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 backdrop-blur-md lg:hidden"
     >
       <ul className="flex items-stretch justify-between">
-        {destinations.map((item) => {
+        {destinations.filter(item => allows(item.href)).map((item) => {
           const isActive = pathname?.startsWith(item.href);
           const Icon = item.icon;
           return (
