@@ -9,7 +9,7 @@ export function GroupObservations({groups}:{groups:OperationalGroup[]}) {
  async function refresh() {
   const r=await fetch('/api/frota/grupos/observacao',{cache:'no-store'}),d=await r.json();
   if(!r.ok) throw new Error(d.error??'Não foi possível atualizar.');
-  setBindings(d.bindings);setEvents(d.events);setCanActivate(d.canActivate);setError('');
+  setBindings(d.bindings);setEvents(d.events);setCanActivate(d.canActivate);
  }
  useEffect(()=>{let stopped=false; const update=()=>{if(!stopped && document.visibilityState==='visible') refresh().catch(e=>{if(!stopped)setError(e.message);});};update();const timer=setInterval(update,20000);return()=>{stopped=true;clearInterval(timer);};},[]);
  async function change(registryId:string,action:'activate'|'pause') {

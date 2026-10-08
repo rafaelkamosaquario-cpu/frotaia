@@ -6,7 +6,7 @@ export async function findExactOperationalGroup(name:string): Promise<string> {
  const c=getWhatsappConfig(); const matches=new Set<string>();
  for(let page=1;page<=20;page++) {
   const r=await fetch(`https://api.z-api.io/instances/${c.ZAPI_INSTANCE_ID}/token/${c.ZAPI_INSTANCE_TOKEN}/groups?page=${page}&pageSize=100`,{headers:{'Client-Token':c.ZAPI_CLIENT_TOKEN},cache:'no-store',signal:AbortSignal.timeout(15000)});
-  if(!r.ok) throw new Error('Não foi possível consultar os grupos na Z-API. Nenhum grupo ativado.');
+  if(!r.ok) throw new Error(`Não foi possível consultar os grupos na Z-API (HTTP ${r.status}). Nenhum grupo ativado.`);
   const rows:unknown=await r.json();
   if(!Array.isArray(rows)) throw new Error('Formato inesperado da lista de grupos. Nenhum grupo ativado.');
   for(const row of rows) if(row && row.isGroup===true && typeof row.name==='string' && typeof row.phone==='string' && /^\d+-group$/.test(row.phone) && normalizedGroupName(row.name)===normalizedGroupName(name)) matches.add(row.phone);
