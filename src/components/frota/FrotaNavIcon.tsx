@@ -5,7 +5,7 @@ const icons = {
   oportunidades: Radar, manutencao: Wrench, documentos: FileText, despesas: Wallet,
   jornadas: Clock3, rotas: MapPinned, checklists: ClipboardCheck, fornecedores: Building2,
   abastecimentos: Fuel, pneus: CircleDot, receitas: TrendingUp, agenda: CalendarDays,
-  alertas: Bell, relatorios: ChartNoAxesCombined, "documentos-gerados": FileStack,
+  alertas: Bell, relatorios: ChartNoAxesCombined, resultados: ChartNoAxesCombined, "documentos-gerados": FileStack,
   noticias: Newspaper, empresa: Building2, configuracoes: Settings,
 };
 export function FrotaNavIcon({ href }: { href: string }) {

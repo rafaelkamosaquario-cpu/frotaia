@@ -2,7 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, Truck, Zap, Bell, Menu } from "lucide-react";
+import { Home, Truck, Zap, Bell, Menu, ChartNoAxesCombined } from "lucide-react";
+import { useFrotaNavigation } from "./FrotaNavigationContext";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,6 +29,8 @@ const DESTINOS = [
 
 export function FrotaBottomNav({ onOpenMore }: FrotaBottomNavProps) {
   const pathname = usePathname();
+  const { compact } = useFrotaNavigation();
+  const destinations = compact ? [DESTINOS[0], DESTINOS[1], { href: "/frota/resultados", label: "Resultados", icon: ChartNoAxesCombined }, { ...DESTINOS[3], label: "Avisos" }] : DESTINOS;
 
   return (
     <nav
@@ -35,7 +38,7 @@ export function FrotaBottomNav({ onOpenMore }: FrotaBottomNavProps) {
       className="frota-safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 backdrop-blur-md lg:hidden"
     >
       <ul className="flex items-stretch justify-between">
-        {DESTINOS.map((item) => {
+        {destinations.map((item) => {
           const isActive = pathname?.startsWith(item.href);
           const Icon = item.icon;
           return (

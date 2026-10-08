@@ -9,20 +9,23 @@ import { FrotaAiWidget } from "./FrotaAiWidget";
 import { AssistantNoticesProvider } from "./AssistantNotices";
 import { PanelTour } from "./PanelTour";
 import { CompanyScopeBoundary } from "./CompanyScopeBoundary";
+import { FrotaNavigationProvider } from "./FrotaNavigationContext";
 import type { CompanyMemberRole } from "@/lib/supabase/tables";
 
 interface FrotaShellProps {
   companyId: string;
   companyName: string;
   role: CompanyMemberRole;
+  canExpandNavigation?: boolean;
   children: React.ReactNode;
 }
 
-export function FrotaShell({ companyId, companyName, role, children }: FrotaShellProps) {
+export function FrotaShell({ companyId, companyName, role, canExpandNavigation = false, children }: FrotaShellProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   return (
     <CompanyScopeBoundary companyId={companyId}>
+    <FrotaNavigationProvider key={companyId} companyId={companyId} canExpand={canExpandNavigation}>
     <AssistantNoticesProvider key={companyId}>
     <div className="frota-panel frota-refined flex h-dvh flex-col bg-background">
       <FrotaHeader companyName={companyName} role={role} />
@@ -42,6 +45,7 @@ export function FrotaShell({ companyId, companyName, role, children }: FrotaShel
       <PanelTour />
     </div>
     </AssistantNoticesProvider>
+    </FrotaNavigationProvider>
     </CompanyScopeBoundary>
   );
 }

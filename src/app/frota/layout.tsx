@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { FrotaShell } from "@/components/frota/FrotaShell";
+import { isConsultant } from "@/lib/frota/consultancy";
 
 /**
  * Painel de gestão de frota (V2) — área totalmente separada do painel V1
@@ -34,9 +35,10 @@ export default async function FrotaLayout({ children }: { children: React.ReactN
   }
 
   if (!access.company.fleet_onboarding_completed_at) redirect("/frota-ativacao");
+  const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <FrotaShell companyId={access.company.id} companyName={access.company.name} role={access.role}>
+    <FrotaShell companyId={access.company.id} companyName={access.company.name} role={access.role} canExpandNavigation={isConsultant(user)}>
       {children}
     </FrotaShell>
   );
