@@ -8,8 +8,8 @@ describe("dashboard operational groups",()=>{
   it("shows real pending registrations without claiming live intake",()=>{
     const html=renderToStaticMarkup(React.createElement(GroupsOverview,{groups:[group],error:false,allowed:true}));
     expect(html).toContain("Pesagens João");
-    expect(html).toContain("Aguardando vinculação");
-    expect(html).toContain("Recebimento ainda não ativado");
+    expect(html).toContain("Confira a leitura em Gerenciar grupos");
+    expect(html).toContain("Conferência no painel");
   });
   it("does not display group names or admin links to non-admins",()=>{
     const html=renderToStaticMarkup(React.createElement(GroupsOverview,{groups:[group],error:false,allowed:false}));

@@ -25,6 +25,7 @@ import { isUniqueViolation } from "@/lib/supabase/errors";
 import { findPendingChecklistDispatchByPhone, recordChecklistResponse } from "@/services/supabase/checklistDispatchService";
 import { processarMensagemDeGrupo } from "@/services/freight/groupMessageIntake";
 import { processGroupFuel } from "@/services/fuel/groupFuelIntake";
+import { processOperationalObservation } from "@/services/whatsapp/groupObservationIntake";
 import { resolverIntencaoComercialLanding, mensagemConfirmacaoOferta, MENSAGEM_INTERESSE_EMPRESAS } from "@/lib/mercadopago/landingIntent";
 import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
 import { isOfertaPlano, type OfertaPlano } from "@/lib/mercadopago/catalog";
@@ -334,6 +335,13 @@ export async function POST(request: Request) {
   // responde somente nos grupos e remetentes explicitamente configurados;
   // os demais continuam no Radar, que não responde no grupo.
   if (body.isGroup) {
+    // Silent operation bindings have absolute priority over the replying pilot/radar.
+    // Fail closed on database errors: never fall through to a group reply.
+    try {
+      if (await processOperationalObservation(createAdminClient(), body)) return NextResponse.json({ ok: true });
+    } catch {
+      return NextResponse.json({ error: "Falha temporária no recebimento silencioso." }, { status: 503 });
+    }
     if (process.env.FUEL_GROUP_ENABLED === "true") {
       try {
         if (await processGroupFuel(createAdminClient(), body)) return NextResponse.json({ ok: true });

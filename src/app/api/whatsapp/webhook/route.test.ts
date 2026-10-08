@@ -86,6 +86,10 @@ vi.mock("@/services/supabase/checklistDispatchService", () => ({
 }));
 
 vi.mock("@/services/freight/groupMessageIntake", () => ({ processarMensagemDeGrupo: vi.fn().mockResolvedValue(undefined) }));
+const observation=vi.hoisted(()=>vi.fn().mockResolvedValue(true));
+const fuelGroup=vi.hoisted(()=>vi.fn());
+vi.mock('@/services/whatsapp/groupObservationIntake',()=>({processOperationalObservation:observation}));
+vi.mock('@/services/fuel/groupFuelIntake',()=>({processGroupFuel:fuelGroup}));
 
 const getGuideState = vi.fn();
 const saveGuideState = vi.fn();
@@ -122,6 +126,16 @@ function mensagemLista(selectedRowId: string) {
 }
 
 describe("Guia de Primeiros Passos V1 — dispatch no webhook do WhatsApp (08/2026)", () => {
+  it('silent groups never reach the replying pilot or onboarding',async()=>{
+    vi.clearAllMocks();vi.stubEnv('FUEL_GROUP_ENABLED','true');observation.mockResolvedValueOnce(true);
+    const response=await chamarWebhook({isGroup:true,phone:'123-group',messageId:'silent',text:{message:'dados'}})();
+    expect(response.status).toBe(200);expect(fuelGroup).not.toHaveBeenCalled();expect(sendWhatsappText).not.toHaveBeenCalled();expect(resolveOrCreateUserByPhone).not.toHaveBeenCalled();vi.unstubAllEnvs();
+  });
+  it('observation errors never fall through to group replies',async()=>{
+    vi.clearAllMocks();vi.stubEnv('FUEL_GROUP_ENABLED','true');observation.mockRejectedValueOnce(new Error('db'));
+    const response=await chamarWebhook({isGroup:true,phone:'123-group',messageId:'silent'})();
+    expect(response.status).toBe(503);expect(fuelGroup).not.toHaveBeenCalled();expect(sendWhatsappText).not.toHaveBeenCalled();vi.unstubAllEnvs();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     prepararEntradaDemo.mockImplementation(async (body) => ({ ok: true, texto: body.text?.message ?? "dados da mídia", extra: { content_type: "text" } }));

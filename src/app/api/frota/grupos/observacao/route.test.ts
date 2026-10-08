@@ -1,0 +1,20 @@
+import {beforeEach,it,expect,vi} from 'vitest';
+vi.mock('server-only',()=>({}));
+const h=vi.hoisted(()=>({access:vi.fn(),user:vi.fn(),from:vi.fn(),lookup:vi.fn()}));
+vi.mock('@/lib/supabase/server',()=>({createClient:async()=>({auth:{getUser:h.user}})}));
+vi.mock('@/lib/supabase/admin',()=>({createAdminClient:()=>({from:h.from})}));
+vi.mock('@/services/supabase/fleetPanelAccess',()=>({loadFleetPanelAccess:h.access}));
+vi.mock('@/services/whatsapp/groupDiscovery',()=>({findExactOperationalGroup:h.lookup}));
+import {GET,POST} from './route';
+const id='00000000-0000-4000-8000-000000000001';
+const post=(body:unknown,origin='https://example.com')=>POST(new Request('https://example.com/api/frota/grupos/observacao',{method:'POST',headers:{origin},body:JSON.stringify(body)}));
+beforeEach(()=>{vi.clearAllMocks();h.access.mockResolvedValue({ok:true,role:'owner',company:{id:'company-a'}});h.user.mockResolvedValue({data:{user:{id:'user-a',email:'rafaelkamosaquario@gmail.com',email_confirmed_at:'2026-01-01'}}});});
+it('rejects foreign origin before reads',async()=>{expect((await post({registryId:id,action:'activate'},'https://evil.test')).status).toBe(403);expect(h.from).not.toHaveBeenCalled();});
+it('denies unauthenticated and read-only users',async()=>{h.access.mockResolvedValue({ok:false});expect((await GET()).status).toBe(403);h.access.mockResolvedValue({ok:true,role:'viewer',company:{id:'company-a'}});expect((await post({registryId:id,action:'activate'})).status).toBe(403);});
+it('rejects tenant and provider-id overrides',async()=>{expect((await post({registryId:id,action:'activate',companyId:'foreign'})).status).toBe(400);expect(h.lookup).not.toHaveBeenCalled();});
+it('only consultant can bind a group of the shared instance',async()=>{h.user.mockResolvedValue({data:{user:{id:'client',email:'client@example.com'}}});expect((await post({registryId:id,action:'activate'})).status).toBe(403);expect(h.lookup).not.toHaveBeenCalled();});
+it('does not search provider when registry belongs to another tenant',async()=>{
+ const eq=vi.fn(); const make=(result:unknown)=>{const q={select:()=>q,eq:(...args:unknown[])=>{eq(...args);return q;},maybeSingle:async()=>result};return q;};
+ h.from.mockImplementationOnce(()=>make({data:null})).mockImplementationOnce(()=>make({data:null}));
+ expect((await post({registryId:id,action:'activate'})).status).toBe(404);expect(eq).toHaveBeenCalledWith('company_id','company-a');expect(h.lookup).not.toHaveBeenCalled();
+});

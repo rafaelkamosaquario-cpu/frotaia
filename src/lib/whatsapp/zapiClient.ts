@@ -1,5 +1,12 @@
 import "server-only";
 import { getWhatsappConfig } from "./config";
+import { createAdminClient } from '@/lib/supabase/admin';
+
+/** Defense in depth, including an older pilot already processing during activation. */
+async function assertGroupMayReceiveReplies(groupId:string) {
+  const binding=await createAdminClient().from('operational_group_bindings').select('registry_id').eq('external_id',groupId).maybeSingle();
+  if(binding.error || binding.data) throw new Error('Envio bloqueado: grupo em observação ou proteção indisponível.');
+}
 
 /**
  * Cliente mínimo para a API REST do Z-API — só o envio de texto, sem
@@ -45,6 +52,7 @@ export async function sendWhatsappText(phoneE164: string, message: string): Prom
 
 /** Explicit group destination, never strip its suffix or treat it as a person's phone. */
 export async function sendWhatsappGroupText(groupId: string, message: string): Promise<void> {
+  await assertGroupMayReceiveReplies(groupId);
   if (!/^\d+-group$/.test(groupId)) throw new Error("Identificador de grupo inválido.");
   const { ZAPI_INSTANCE_ID, ZAPI_INSTANCE_TOKEN, ZAPI_CLIENT_TOKEN } = getWhatsappConfig();
   const response = await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_INSTANCE_TOKEN}/send-text`, {
@@ -104,6 +112,7 @@ export interface BotaoRespostaWhatsapp {
 
 /** Group REPLY buttons. Never normalize away the -group suffix. */
 export async function sendWhatsappGroupButtons(groupId: string, message: string, buttons: BotaoRespostaWhatsapp[]): Promise<void> {
+  await assertGroupMayReceiveReplies(groupId);
   if (!/^\d+-group$/.test(groupId) || buttons.length < 1 || buttons.length > 3) throw new Error("Botões de grupo inválidos.");
   const { ZAPI_INSTANCE_ID, ZAPI_INSTANCE_TOKEN, ZAPI_CLIENT_TOKEN } = getWhatsappConfig();
   const response = await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_INSTANCE_TOKEN}/send-button-actions`, {
