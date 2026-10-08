@@ -2620,6 +2620,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      manage_operational_groups: { Args: { p_company: string; p_action: string; p_payload?: Json }; Returns: Json }
       consultancy_admin: { Args: { p_action: string; p_payload?: Json }; Returns: Json }
       consultancy_deliver: { Args: { p_company: string; p_actor: string; p_user: string }; Returns: undefined }
       consultancy_delivery_account: { Args: { p_company: string; p_actor: string }; Returns: string | null }

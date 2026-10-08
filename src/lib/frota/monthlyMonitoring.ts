@@ -7,6 +7,23 @@ import type { MonthlyExpenses } from "./monthlyExpenses";
 export const monthlyMonitoringEnabled = (companyId: string) => companyId === "0fba8f5d-ee49-4b94-bbe5-5b34a33e88ac";
 export type MonthlySnapshot = { month: string; today: string; rows: MonthlyProduction[]; revenueSummary: ProductionRevenue | null; expenseSummary: MonthlyExpenses | null; checkedAt?: string; payrollDue?: {date:string;amount:number}[] | null };
 const money = (n: number) => n.toLocaleString("pt-BR", {style:"currency",currency:"BRL"});
+export function monthlyMonitoringBrief(data: MonthlySnapshot) {
+  const messages: string[] = [];
+  if (data.revenueSummary && data.expenseSummary) {
+    const balance = (Math.round(data.revenueSummary.total * 100) - Math.round(data.expenseSummary.total * 100)) / 100;
+    messages.push(`Saldo parcial registrado: ${money(balance)}. Não é lucro líquido.`);
+  } else messages.push("Resumo financeiro indisponível. Atualize o acompanhamento.");
+  const targets = data.rows.filter(r => r.operation === "transporte" && r.target_tonnes !== null);
+  const below = targets.filter(r => ["Abaixo da meta", "Abaixo do ritmo"].includes(goalProgress(r, data.today).label));
+  if (below.length) messages.push(`${below.length} caminhão(ões) abaixo da meta ou do ritmo. Confira a produção.`);
+  const missing = targets.filter(r => r.actual_tonnes === null).length;
+  if (missing) messages.push(`${missing} caminhão(ões) sem apuração informada.`);
+  if (data.expenseSummary && data.payrollDue?.length) {
+    const total = data.payrollDue.reduce((sum, p) => sum + Math.round(p.amount * 100), 0) / 100;
+    messages.push(`Remunerações sem baixa integral: ${money(total)}. Confira pagamentos e vencimentos.`);
+  }
+  return messages;
+}
 export function monthlyMonitoringMessages(data: MonthlySnapshot, names: Record<string,string>) {
   const messages: string[] = [];
   if (data.revenueSummary && data.expenseSummary) {

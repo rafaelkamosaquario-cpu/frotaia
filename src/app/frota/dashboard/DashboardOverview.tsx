@@ -11,7 +11,7 @@ import type { ChecklistDispatchRow, DriverRow, ExpenseRow, MaintenanceScheduleRo
 import { computeFleetAlerts, type FleetAlertItem } from "@/services/supabase/fleetAlertsService";
 import { dispatchesFromToday } from "@/services/supabase/checklistDispatchService";
 import { ProductionGoals, type MonitoringState } from "./ProductionGoals";
-import { monthlyMonitoringEnabled, monthlyMonitoringMessages } from "@/lib/frota/monthlyMonitoring";
+import { monthlyMonitoringBrief, monthlyMonitoringEnabled, monthlyMonitoringMessages } from "@/lib/frota/monthlyMonitoring";
 
 export type CardStyleVariant = "a" | "b";
 interface Props {
@@ -66,8 +66,11 @@ export function DashboardClient({ companyId, veiculos, motoristas, manutencoes, 
       <div className="min-w-0 flex-1 basis-48"><h2 className="text-base font-semibold">Frota IA informa</h2>{monthlyMonitoring ? <>
         {monitoring.loading ? <p role="status">Conferindo o mês selecionado...</p> : monitoring.error || !monitoring.data ? <p role="alert">Não foi possível atualizar o acompanhamento. Use Atualizar acompanhamento no fechamento mensal; não exibimos uma análise antiga como atual.</p> : <>
           <p className="mt-2 text-sm font-semibold">Acompanhamento de {monitoring.data.month.split("-").reverse().join("/")}</p>
+          <ul className="mt-3 space-y-2 text-sm leading-relaxed">{monthlyMonitoringBrief(monitoring.data).map((message,i)=><li key={i}>{message}</li>)}</ul>
+          <details className="mt-3 text-sm"><summary className="cursor-pointer text-primary">Ver detalhes do acompanhamento</summary>
           <ul className="mt-3 space-y-3 text-sm leading-relaxed">{monthlyMonitoringMessages(monitoring.data,Object.fromEntries(veiculos.map(v=>[v.id,v.plate||v.name||"Veículo"]))).map((message,i)=><li key={i}>{message}</li>)}</ul>
           <p className="mt-3 text-xs text-muted-foreground">Consulta em {monitoring.data.checkedAt ? new Date(monitoring.data.checkedAt).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"}) : "horário indisponível"} (Brasília). Análise automática por regras, com os mesmos registros do fechamento mensal. Não é saldo bancário nem lucro líquido; não altera lançamentos nem envia WhatsApp.</p>
+          </details>
         </>}
         <p className="mt-3 text-sm">Situação operacional atual: {ativos} veículos e {motoristasAtivos} motoristas ativos; {alertas.length} alerta(s) de manutenção/documentos. <Link href="#metas-producao" className="text-primary underline">Escolher mês / atualizar acompanhamento</Link></p>
       </> : <><p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{insight || "O resumo da IA ainda não está disponível. Consulte os indicadores ou pergunte ao Frota IA sobre sua frota."}</p><p className="mt-2 text-xs text-muted-foreground">Resumo operacional periódico, independente do mês selecionado. Para o fechamento financeiro completo do mês, consulte Resultado mensal abaixo.</p></>}</div>

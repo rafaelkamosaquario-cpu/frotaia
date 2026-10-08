@@ -74,6 +74,7 @@ export const FROTA_NAV_ITEMS: FrotaNavItem[] = [
   { href: "/frota/noticias", label: "Notícias", icon: SIDEBAR_ICONS.noticias, group: "Acompanhamento", disponivel: true },
 
   { href: "/frota/empresa", label: "Empresa", icon: SIDEBAR_ICONS.empresa, group: "Administração", disponivel: true },
+  { href: "/frota/grupos", label: "Grupos do WhatsApp", icon: SIDEBAR_ICONS.documentos, group: "Administração", disponivel: true },
   { href: "/frota/configuracoes", label: "Configurações", icon: SIDEBAR_ICONS.configuracoes, group: "Administração", disponivel: true },
 ];
 
