@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import type { ConsultancyCompany } from "@/lib/frota/consultancy";
 import { CompanyModulesEditor } from "./CompanyModulesEditor";
 const input = "mt-1 block w-full rounded-lg border border-border bg-background p-3";
@@ -14,6 +15,7 @@ export function ConsultancyClient() {
   const [companies, setCompanies] = useState<ConsultancyCompany[]>([]);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [message, setMessage] = useState("");
   const [target, setTarget] = useState<ConsultancyCompany | null>(null), [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [share, setShare] = useState("");
   const [moduleTarget, setModuleTarget] = useState<ConsultancyCompany | null>(null);
   const requestId = useRef<string | null>(null);
@@ -49,7 +51,7 @@ export function ConsultancyClient() {
       {company.consultant_until && <p className="text-sm">Acompanhamento até {new Date(company.consultant_until).toLocaleDateString("pt-BR")}. Depois, solicite nova autorização ao cliente.</p>}
       <div className="flex flex-wrap gap-3"><button className={button} disabled={busy || (!!company.consultant_until && new Date(company.consultant_until) <= new Date())} onClick={() => run(async () => { await api("/api/company-access", { action: "select", company_id: company.company_id }); window.location.assign("/frota/dashboard"); })}>Abrir painel para configurar</button>
         <button className={button} disabled={busy || (!!company.consultant_until && new Date(company.consultant_until) <= new Date())} onClick={() => setModuleTarget(company)}>Personalizar módulos</button>
-        {!company.delivered_at && <button className={button} disabled={busy} onClick={() => { setTarget(company); setPassword(""); setShare(""); }}>Preparar acesso do cliente</button>}</div>
+        {!company.delivered_at && <button className={button} disabled={busy} onClick={() => { setTarget(company); setPassword(""); setShowPassword(false); setShare(""); }}>Preparar acesso do cliente</button>}</div>
         {moduleTarget?.company_id === company.company_id && <CompanyModulesEditor key={company.company_id} company={company} onClose={() => setModuleTarget(null)} />}
     </article>)}</section>
     {target && <form className="space-y-4 rounded-xl border border-primary p-5" onSubmit={event => { event.preventDefault(); run(async () => {
@@ -58,7 +60,15 @@ export function ConsultancyClient() {
       setPassword(""); setTarget(null); await refresh(); setMessage(result.recovered ? "Entrega anterior recuperada. A senha é a da PRIMEIRA tentativa, não a digitada agora. Não compartilhe se não guardou a senha original; solicite recuperação segura." : "Acesso preparado. Compartilhe o link e o e-mail abaixo; a senha temporária não pode ser consultada depois.");
     }); }}><h2 className="text-xl font-semibold">Entregar acesso · {target.name}</h2>
       <p>Confira o e-mail: <strong>{target.client_email}</strong>. Você é responsável por entregar as credenciais à pessoa correta.</p>
-      <label>Senha temporária (12 ou mais caracteres, letras e números)<input autoComplete="new-password" className={input} type="password" minLength={12} maxLength={128} required value={password} onChange={e => setPassword(e.target.value)} /></label>
+      <div>
+        <label htmlFor="temporary-client-password">Senha temporária (12 ou mais caracteres, letras e números)</label>
+        <div className="relative">
+          <input id="temporary-client-password" autoComplete="new-password" spellCheck={false} autoCapitalize="none" className={`${input} pr-14`} type={showPassword ? "text" : "password"} minLength={12} maxLength={128} required value={password} onChange={e => setPassword(e.target.value)} />
+          <button type="button" aria-label={showPassword ? "Ocultar senha temporária" : "Mostrar senha temporária"} aria-controls="temporary-client-password" aria-pressed={showPassword} title={showPassword ? "Ocultar senha" : "Mostrar senha"} className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-lg text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary" onClick={() => setShowPassword(visible => !visible)}>
+            {showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
+          </button>
+        </div>
+      </div>
       <p className="text-sm">Não reutilize senhas. Guarde esta senha apenas para a entrega; após a troca, você continuará entrando com a sua conta. O cliente será proprietário da empresa.</p>
       <button className={button} disabled={busy}>Confirmar entrega e iniciar 90 dias</button>
     </form>}
