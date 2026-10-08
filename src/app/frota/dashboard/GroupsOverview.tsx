@@ -10,7 +10,7 @@ export function GroupsOverview({ groups, error, allowed }: { groups: Operational
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const active = groups.filter(group => !group.archived);
-  return <Card className="dashboard-insight space-y-3" aria-labelledby="groups-overview-title">
+  return <Card className="dashboard-insight space-y-3 p-4 sm:p-5" aria-labelledby="groups-overview-title">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 id="groups-overview-title" className="flex items-center gap-2 text-base font-semibold"><MessageSquare className="size-5 text-primary" aria-hidden />Grupos do WhatsApp</h2>
       {allowed && <Link href="/frota/grupos" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">Gerenciar grupos</Link>}

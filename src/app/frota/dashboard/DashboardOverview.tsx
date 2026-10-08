@@ -86,7 +86,7 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
         <p className={cn("dashboard-kpi-value font-bold tracking-tight tabular-nums", currency ? "dashboard-currency" : "text-3xl sm:text-4xl")}>{value}</p><p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">{context}</p>
       </Link>)}
     </div>
-    <Card data-tour="ia-sugere" id="assistente-frota" className="dashboard-insight flex flex-wrap items-start gap-3 sm:gap-4">
+    <Card data-tour="ia-sugere" id="assistente-frota" className="dashboard-insight flex flex-wrap items-start gap-3 p-4 sm:gap-4 sm:p-5">
       <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Sparkles className="size-6" aria-hidden /></span>
       <div className="min-w-0 flex-1 basis-48"><h2 className="text-base font-semibold">Assistente Frota IA</h2><p className="mt-1 text-sm text-muted-foreground">Frota IA informa · avisos breves e perguntas sobre sua operação.</p>{monthlyMonitoring ? <>
         {monitoring.loading ? <p role="status">Conferindo o mês selecionado...</p> : monitoring.error || !monitoring.data ? <p role="alert">Não foi possível atualizar o acompanhamento. Use Atualizar acompanhamento no fechamento mensal; não exibimos uma análise antiga como atual.</p> : <>
