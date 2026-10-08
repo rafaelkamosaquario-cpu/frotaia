@@ -2,8 +2,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import type { VehicleRow } from "@/lib/supabase/tables";
-import { goalProgress, type MonthlyProduction, type ProductionInput } from "@/lib/frota/productionGoals";
+import { FleetVehicleCards } from "./FleetVehicleCards";
+import type { DriverRow, VehicleRow } from "@/lib/supabase/tables";
+import { type MonthlyProduction, type ProductionInput } from "@/lib/frota/productionGoals";
 import type { ProductionRevenue } from "@/lib/frota/productionRevenue";
 import Link from "next/link";
 import type { MonthlyExpenses } from "@/lib/frota/monthlyExpenses";
@@ -14,9 +15,9 @@ export type MonitoringState = { data: MonthlySnapshot | null; loading: boolean; 
 const money = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const tonnes = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const field = "mt-1 w-full rounded-lg border border-border bg-surface p-2 text-foreground";
-const tones = { neutral: "text-muted-foreground", success: "text-success", danger: "text-danger", warning: "text-warning" };
 
-export function ProductionGoals({ vehicles, onSnapshot }: { vehicles: VehicleRow[]; onSnapshot?: (state: MonitoringState) => void }) {
+
+export function ProductionGoals({ companyId, vehicles, drivers, onSnapshot }: { companyId: string; vehicles: VehicleRow[]; drivers: DriverRow[]; onSnapshot?: (state: MonitoringState) => void }) {
   const [month, setMonth] = useState("");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
@@ -40,26 +41,12 @@ export function ProductionGoals({ vehicles, onSnapshot }: { vehicles: VehicleRow
   const actual = targets.reduce((s, r) => s + (r.actual_tonnes ?? 0), 0);
   const absent = targets.filter(r => r.actual_tonnes === null).length;
   const reached = targets.filter(r => r.actual_tonnes !== null && r.actual_tonnes >= r.target_tonnes!).length;
-  const vehicleName = (id: string) => { const v = vehicles.find(v => v.id === id); return v ? `${v.plate} · ${v.name || [v.brand, v.model].filter(Boolean).join(" ")}` : "Veículo indisponível"; };
-  const renderRow = (r: MonthlyProduction) => {
-    const progress = goalProgress(r, loaded!.today);
-    const revenue = loaded?.revenueSummary?.byVehicle[r.vehicle_id];
-    const expenses = loaded?.expenseSummary?.byVehicle[r.vehicle_id];
-    return <article key={r.vehicle_id} className="rounded-xl border border-border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="font-semibold">{vehicleName(r.vehicle_id)}</h3><span className={`text-sm font-medium ${tones[progress.tone]}`}>{progress.label}</span></div>
-      <p className="mt-3 text-lg font-semibold tabular-nums">{r.actual_tonnes === null ? "Produção não informada" : `${tonnes(r.actual_tonnes)} t`}<span className="text-sm font-normal text-muted-foreground">{r.target_tonnes ? ` / meta ${tonnes(r.target_tonnes)} t` : " · sem meta definida"}</span></p>
-      <p className="mt-2 text-sm">Receita registrada no mês: <strong className="tabular-nums text-primary">{loaded?.revenueSummary ? revenue ? money(revenue.amount) : "Sem lançamento" : "Indisponível"}</strong></p>
-      {loaded?.expenseSummary && <p className="mt-2 text-sm">Combustível: <strong>{money(expenses?.fuel ?? 0)}</strong> · Remunerações: <strong>{money(expenses?.payroll ?? 0)}</strong> · Outras despesas: <strong>{money(expenses?.other ?? 0)}</strong></p>}
-      {loaded?.expenseSummary && loaded.revenueSummary && <p className="mt-2 text-sm">Saldo parcial registrado: <strong>{money((Math.round((revenue?.amount ?? 0) * 100) - Math.round((expenses?.total ?? 0) * 100)) / 100)}</strong></p>}
-      {progress.percent !== null && <><div role="progressbar" aria-label={`Meta de ${vehicleName(r.vehicle_id)}`} aria-valuenow={Math.min(100, progress.percent)} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${progress.percent.toFixed(1)}% da meta`} className="my-2 h-2 overflow-hidden rounded-full bg-surface-muted"><div className={`${progress.tone === "danger" ? "bg-danger" : progress.tone === "warning" ? "bg-warning" : "bg-success"} h-full`} style={{ width: `${Math.min(100, progress.percent)}%` }} /></div><p className="text-sm tabular-nums">{progress.percent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% da meta · faltam {tonnes(progress.missing ?? 0)} t</p></>}
-      <p className="mt-2 text-xs text-muted-foreground">{r.measured_through ? `Apurado até ${r.measured_through.split("-").reverse().join("/")}` : "Aguardando apuração"}{r.diesel_liters !== null ? ` · ${r.diesel_liters.toLocaleString("pt-BR")} L de diesel` : ""}{r.actual_tonnes !== null && r.actual_tonnes > 0 && r.diesel_liters !== null ? ` · ${tonnes(r.diesel_liters / r.actual_tonnes)} L/t` : ""}</p>
-      {r.note && <p className="mt-2 text-xs text-muted-foreground">{r.note}</p>}
-    </article>;
-  };
   return <Card className="mt-5 p-4 sm:p-5" id="metas-producao">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Resultado, produção e metas do mês</h2><p className="mt-1 text-sm text-muted-foreground">Receitas, combustível e remunerações no mesmo período</p></div><label className="text-sm">Mês de referência<input type="month" min="2000-01" max="2099-12" aria-label="Mês do resultado e das metas" className={field} value={month || loaded?.month || ""} onChange={e => { if (e.target.value) { setLoading(true); setEditing(false); setMonth(e.target.value); } }} /></label><Button variant="outline" onClick={refresh} disabled={loading}>Atualizar acompanhamento</Button></div>
     {loading ? <p role="status" className="py-5 text-sm">Carregando metas...</p> : error ? <div role="alert" className="py-4"><p>{error}</p><Button onClick={refresh} variant="outline" className="mt-2">Tentar novamente</Button></div> : loaded && <>
       <p className="mt-3 text-xs text-muted-foreground">Ao abrir, exibimos o último mês com produção informada. O ritmo parcial é proporcional aos dias corridos até a data da apuração, não uma previsão de lucro.</p>
+      <FleetVehicleCards companyId={companyId} vehicles={vehicles} drivers={drivers} data={loaded} />
+      <details className="fleet-financial-details"><summary>Ver fechamento financeiro e totais de produção</summary>
       {loaded.revenueError && <div role="alert" className="mt-4 rounded-lg border border-warning p-3 text-sm"><p>{loaded.revenueError}</p><Button variant="outline" onClick={refresh} className="mt-2">Atualizar receitas</Button></div>}
       {loaded.revenueSummary && <section aria-label="Receitas registradas no mês" className="mt-4">
         <div className="grid gap-3 sm:grid-cols-3">{[
@@ -87,9 +74,7 @@ export function ProductionGoals({ vehicles, onSnapshot }: { vehicles: VehicleRow
         <div className="rounded-lg bg-surface-muted p-3"><p className="text-xs">Realização{absent ? " parcial" : ""}</p><p className="text-xl font-semibold">{(actual / target * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</p><p className="text-xs">Dos totais registrados nos veículos com meta</p></div>
         <div className="rounded-lg bg-surface-muted p-3"><p className="text-xs">Meta atingida</p><p className="text-xl font-semibold">{reached} de {targets.length}</p><p className="text-xs">Sem informação não significa produção zero</p></div>
       </div>}
-      {transport.length > 0 && <><h3 className="my-3 font-semibold">Transporte</h3><div className="grid gap-3 lg:grid-cols-2">{transport.map(renderRow)}</div></>}
-      {rows.some(r => r.operation === "carregamento") && <><h3 className="mb-3 mt-5 font-semibold">Carregamento — tratores</h3><div className="grid gap-3 lg:grid-cols-2">{rows.filter(r => r.operation === "carregamento").map(renderRow)}</div></>}
-      {!rows.length && <p className="py-5 text-sm text-muted-foreground">Nenhuma meta ou apuração cadastrada neste mês.</p>}
+      </details>
       <p className="mt-4 text-xs text-muted-foreground">São totais mensais informados, não soma automática de tickets. Atualizar esta área não cria receitas, despesas nem salários. Metas são definidas por mês e não alteram meses anteriores.</p>
       {loaded.canEdit && <Button variant="outline" className="mt-4" onClick={() => setEditing(v => !v)}>{editing ? "Fechar edição" : "Definir meta / informar produção"}</Button>}
       {editing && <ProductionEditor key={loaded.month} loaded={loaded} vehicles={vehicles} onSaved={refresh} />}

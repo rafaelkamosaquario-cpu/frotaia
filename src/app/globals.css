@@ -255,12 +255,12 @@ body {
 }
 
 .dark .frota-panel.frota-refined {
-  --background: #060911;
-  --foreground: #f1f4fa;
-  --surface: #0d1420;
-  --surface-muted: #151f2f;
-  --border: #28354a;
-  --muted-foreground: #aab4c6;
+  --background: #081629;
+  --foreground: #edf5ff;
+  --surface: #102640;
+  --surface-muted: #15304e;
+  --border: #28425f;
+  --muted-foreground: #a4b7cf;
   --primary: #62aaff;
   --primary-hover: #8bbfff;
   --primary-foreground: #061326;

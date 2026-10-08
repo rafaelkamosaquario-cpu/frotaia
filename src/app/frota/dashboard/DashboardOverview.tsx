@@ -1,5 +1,7 @@
 "use client";
 
+import "./fleet-cards.css";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarClock, ClipboardCheck, FileText, Sparkles, Truck, Users, Wallet, Wrench } from "lucide-react";
@@ -78,8 +80,16 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
   const recentes = [...veiculos].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5);
 
   return <div className="frota-dashboard flex flex-1 flex-col">
-    <div className="flex items-start justify-between gap-3"><div><h1>Dashboard</h1><p className="mt-1 text-sm text-muted-foreground">Visão geral da frota</p></div><ContextualHelp topic="dashboard" /></div>
+    <div className="flex items-start justify-between gap-3"><div><p className="fleet-eyebrow">PAINEL DA OPERAÇÃO</p><h1>Sua frota, de perto.</h1><p className="mt-2 text-sm text-muted-foreground">Produção, despesas e acompanhamento em um só lugar.</p></div><ContextualHelp topic="dashboard" /></div>
+    <div className="fleet-summary-grid" aria-label="Resumo do mês">
+      <Link href="/frota/veiculos"><span>Veículos ativos<Truck size={19} aria-hidden /></span><strong>{ativos}</strong><small>{motoristasAtivos} motoristas ativos · {veiculos.length} veículos cadastrados</small></Link>
+      <Link href="/frota/receitas"><span>Receita registrada<Wallet size={19} aria-hidden /></span><strong>{!monitoring.loading && !monitoring.error && monitoring.data?.revenueSummary ? monitoring.data.revenueSummary.total.toLocaleString("pt-BR", {style:"currency",currency:"BRL"}) : "—"}</strong><small>{monitoring.loading ? "Carregando mês…" : monitoring.data?.month ? `Referência: ${monitoring.data.month.split("-").reverse().join("/")}` : "Dados indisponíveis"}</small></Link>
+      <Link href="/frota/despesas"><span>Despesas registradas<Wallet size={19} aria-hidden /></span><strong>{!monitoring.loading && !monitoring.error && monitoring.data?.expenseSummary ? monitoring.data.expenseSummary.total.toLocaleString("pt-BR", {style:"currency",currency:"BRL"}) : "—"}</strong><small>Inclui diesel, remunerações e outros custos</small></Link>
+      <a href="#metas-producao" className="fleet-summary-result"><span>Saldo parcial<Wallet size={19} aria-hidden /></span><strong className={monitoring.data?.revenueSummary && monitoring.data?.expenseSummary && monitoring.data.revenueSummary.total < monitoring.data.expenseSummary.total ? "text-danger" : ""}>{!monitoring.loading && !monitoring.error && monitoring.data?.revenueSummary && monitoring.data.expenseSummary ? ((Math.round(monitoring.data.revenueSummary.total*100)-Math.round(monitoring.data.expenseSummary.total*100))/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "—"}</strong><small>Receitas menos despesas · não é lucro líquido</small></a>
+    </div>
     <GroupsOverview groups={groups} error={groupsError} allowed={canManageGroups} />
+    <ProductionGoals key={companyId} companyId={companyId} vehicles={veiculos} drivers={motoristas} onSnapshot={setMonitoring} />
+    <details className="fleet-operational-details"><summary>Indicadores e acompanhamento operacional</summary>
     <div data-tour="kpis" className="grid grid-cols-2 gap-3 md:grid-cols-3">
       {kpis.map(({ label, value, context, Icon, href, tone, currency }) => <Link key={label} href={href} className="dashboard-kpi ui-card min-w-0 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/60 sm:p-5">
         <div className="mb-3 flex items-start gap-2.5"><Icon className={cn("size-6 shrink-0 sm:size-7", tone)} aria-hidden /><h2 className="text-sm font-medium leading-snug">{label}</h2></div>
@@ -102,7 +112,7 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
       <button type="button" onClick={() => askFrotaAiWidget(monitoring.data ? `Explique o acompanhamento de ${monitoring.data.month} da minha empresa, incluindo metas, combustível e remunerações. Consulte os registros e avise se faltarem dados.` : "Quais pendências da minha frota precisam de atenção? Consulte os registros atuais.")} className="min-h-11 rounded-lg border border-primary px-4 text-sm font-semibold text-primary">Pergunte ao Frota IA</button>
       <Link href="/frota/alertas" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-hover">Ver pendências<ArrowRight className="size-4" aria-hidden /></Link>
     </Card>
-    <ProductionGoals key={companyId} vehicles={veiculos} onSnapshot={monthlyMonitoring ? setMonitoring : undefined} />
+    </details>
     <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
       <Card className="min-w-0 overflow-hidden p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Veículos da frota</h2><Link href="/frota/veiculos" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary">Ver veículos<ArrowRight className="size-4" aria-hidden /></Link></div>

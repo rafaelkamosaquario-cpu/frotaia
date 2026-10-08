@@ -1,0 +1,70 @@
+.frota-refined .fleet-eyebrow{font-size:10px;letter-spacing:.15em;font-weight:700;color:var(--success);margin-bottom:9px}
+.frota-refined .fleet-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.frota-refined .fleet-summary-grid>a{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:20px;min-width:0}
+.frota-refined .fleet-summary-grid>a>span{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted-foreground)}
+.frota-refined .fleet-summary-grid svg{color:var(--success);flex-shrink:0}
+.frota-refined .fleet-summary-grid strong{display:block;font-size:clamp(19px,1.8vw,27px);font-weight:650;letter-spacing:-.04em;margin:13px 0 7px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.frota-refined .fleet-summary-grid small{font-size:11px;line-height:1.5;color:var(--muted-foreground);display:block}
+.frota-refined .fleet-summary-grid .fleet-summary-result{background:color-mix(in srgb,var(--success) 9%,var(--surface));border-color:color-mix(in srgb,var(--success) 35%,var(--border))}
+.frota-refined .fleet-summary-result strong{color:var(--success)}
+.frota-refined .fleet-summary-result strong.text-danger{color:var(--danger)}
+.frota-refined #metas-producao{border:0;padding:0;background:transparent;box-shadow:none;margin-top:0}
+.frota-refined .fleet-cards-section{margin-top:26px}
+.frota-refined .fleet-section-heading{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.frota-refined .fleet-section-heading h3{font-size:20px;font-weight:650;letter-spacing:-.025em}
+.frota-refined .fleet-section-heading h3 span{font-size:12px;background:var(--surface-muted);padding:3px 8px;border-radius:5px;margin-left:6px}
+.frota-refined .fleet-section-heading p{font-size:12px;color:var(--muted-foreground);margin-top:5px}
+.frota-refined .fleet-search{display:flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0 12px;color:var(--muted-foreground);min-height:44px;width:300px;max-width:100%}
+.frota-refined .fleet-search input{background:transparent;border:0;width:100%;min-width:0;color:var(--foreground);font-size:12px;min-height:42px}
+.frota-refined .fleet-filter-row{display:flex;flex-wrap:wrap;gap:7px;margin:17px 0}
+.frota-refined .fleet-filter-row button{font-size:11px;min-height:38px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:7px;cursor:pointer}
+.frota-refined .fleet-filter-row button[aria-pressed=true]{color:var(--success);border-color:var(--success);background:color-mix(in srgb,var(--success) 8%,var(--surface))}
+.frota-refined .fleet-vehicle-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;align-items:start}
+.frota-refined .fleet-vehicle-card{border:1px solid var(--border);background:var(--surface);border-radius:12px;overflow:hidden;min-width:0}
+.frota-refined .fleet-card-title{display:flex;justify-content:space-between;align-items:start;gap:7px;padding:17px 16px 0}
+.frota-refined .fleet-card-title h4{font-size:16px;font-weight:700;letter-spacing:.03em}
+.frota-refined .fleet-card-title p{font-size:11px;color:var(--muted-foreground);margin-top:4px}
+.frota-refined .fleet-card-title small{display:block;font-size:10px;color:var(--success);margin-top:5px}
+.frota-refined .fleet-status{font-size:9px;line-height:1.4;padding:5px 7px;background:var(--surface-muted);border-radius:5px;max-width:98px;color:var(--muted-foreground)}
+.frota-refined .fleet-status.danger{color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,var(--surface))}
+.frota-refined .fleet-status.warning{color:var(--warning);background:color-mix(in srgb,var(--warning) 10%,var(--surface))}
+.frota-refined .fleet-status.success{color:var(--success);background:color-mix(in srgb,var(--success) 10%,var(--surface))}
+.frota-refined .fleet-vehicle-picture{height:106px;margin:10px 12px 0;border-radius:8px;position:relative;display:flex;justify-content:center;align-items:center;color:var(--muted-foreground)}
+.dark .frota-refined .fleet-vehicle-picture{background:var(--surface-muted)}
+.frota-refined .fleet-vehicle-picture img{width:100%;height:100%;max-width:310px;object-fit:contain;padding:4px 10px}
+.frota-refined .fleet-vehicle-picture>span{position:absolute;bottom:5px;right:6px;font-size:8px}
+.frota-refined .fleet-driver{display:flex;align-items:center;gap:7px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:11px;min-height:40px}
+.frota-refined .fleet-driver svg{flex-shrink:0;color:var(--muted-foreground)}
+.frota-refined .fleet-production-mini{display:flex;align-items:center;gap:10px;padding:12px;margin:0;min-height:152px}
+.frota-refined .fleet-mini-bars{display:flex;gap:10px;width:130px;flex-shrink:0;justify-content:center;text-align:center;font-variant-numeric:tabular-nums}
+.frota-refined .fleet-mini-bars>div{width:55px;min-width:0}
+.frota-refined .fleet-mini-bars b{font-size:10px;display:block;font-weight:600;line-height:18px}
+.frota-refined .fleet-bar-track{height:66px;display:flex;align-items:end;justify-content:center;border-bottom:1px solid var(--border)}
+.frota-refined .fleet-bar-track i{width:30px;display:block;border-radius:4px 4px 0 0;background:var(--warning)}
+.frota-refined .fleet-bar-track i.below{background:#ed7774}
+.frota-refined .fleet-bar-track i.target,.frota-refined .fleet-bar-track i.reached{background:#37b88a}
+.frota-refined .fleet-mini-bars small,.frota-refined .fleet-mini-bars em{display:block;font-size:9px;line-height:15px;font-style:normal;color:var(--muted-foreground)}
+.frota-refined .fleet-production-mini figcaption{min-width:0;display:flex;flex-direction:column;gap:3px;line-height:1.4}
+.frota-refined .fleet-production-mini figcaption strong{font-size:12px;font-weight:600}
+.frota-refined .fleet-production-mini figcaption>span{font-size:10px;color:var(--muted-foreground)}
+.frota-refined .fleet-production-mini figcaption>b{font-size:14px}
+.frota-refined .fleet-production-mini figcaption small{font-size:9px}
+.frota-refined .fleet-money{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 16px;padding:13px 0;border-block:1px solid var(--border)}
+.frota-refined .fleet-money span{display:block;font-size:10px;color:var(--muted-foreground);margin-bottom:5px}
+.frota-refined .fleet-money strong{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.frota-refined .fleet-card-result{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:13px 16px;font-size:11px}
+.frota-refined .fleet-card-result small{display:block;font-size:9px;color:var(--muted-foreground);margin-top:3px;max-width:140px}
+.frota-refined .fleet-card-result strong{font-size:14px;flex-shrink:0}
+.frota-refined .fleet-card-details{border-top:1px solid var(--border);font-size:11px}
+.frota-refined .fleet-card-details summary{padding:13px 16px;cursor:pointer;min-height:44px}
+.frota-refined .fleet-card-details>div{padding:0 16px 15px;line-height:1.7;color:var(--muted-foreground)}
+.frota-refined .fleet-card-details a{display:block;color:var(--primary);margin-top:9px;min-height:30px}
+.frota-refined .fleet-ask{width:100%;display:flex;justify-content:center;align-items:center;gap:7px;min-height:44px;border-top:1px solid var(--border);font-size:11px;font-weight:600;color:var(--success);cursor:pointer}
+.frota-refined .fleet-ask:hover{background:var(--surface-muted)}
+.frota-refined .fleet-financial-details,.frota-refined .fleet-operational-details{margin-top:24px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.frota-refined .fleet-financial-details>summary,.frota-refined .fleet-operational-details>summary{font-size:14px;font-weight:600;cursor:pointer;padding:5px 0;min-height:32px}
+.frota-refined .fleet-operational-details[open]>summary{margin-bottom:20px}
+.frota-refined .fleet-operational-details .dashboard-insight{margin-top:20px}
+@media(min-width:1024px){.frota-refined>div>aside{width:248px}.frota-refined .frota-menu{background:#091d35;color:#c7d4d6}.frota-refined .frota-menu p,.frota-refined .frota-menu a{color:#b9c9dd}.frota-refined .frota-menu a[aria-current=page]{background:#123d59;color:#91efd0;border-color:#327363}}
+@media(max-width:1190px){.frota-refined .fleet-vehicle-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.frota-refined .fleet-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.frota-refined .fleet-vehicle-grid{grid-template-columns:minmax(0,1fr)}.frota-refined .fleet-section-heading{align-items:stretch;flex-direction:column}.frota-refined .fleet-search{width:100%}.frota-refined .fleet-summary-grid{gap:9px}.frota-refined .fleet-summary-grid>a{padding:14px 12px}.frota-refined .fleet-summary-grid>a>span{font-size:10px}.frota-refined .fleet-summary-grid strong{font-size:20px}.frota-refined .fleet-summary-grid small{font-size:10px}.frota-refined .fleet-production-mini{padding:12px 16px;gap:15px}.frota-refined .fleet-production-mini figcaption small{font-size:10px}.frota-refined .fleet-vehicle-picture{height:108px}.frota-refined .fleet-filter-row button{min-height:42px}}
