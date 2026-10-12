@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { CATALOGO_OFERTAS, formatarReais } from "@/lib/mercadopago/catalog";
 import { DIRECT_PLANS, type DirectPlan } from "@/lib/mercadopago/directSales";
+import { PreparedPix } from "./PreparedPix";
 type Company={id:string;name:string;fleet_panel_enabled:boolean;subscription:{plan:string;status:string;valido_ate:string|null;hasProviderLink:boolean}|null};
 type Receipt={id:string;reference:string;plan:string;amount_cents:number;access_until:string};
 const field="block w-full rounded-lg border border-border bg-background p-3 mt-1";
@@ -16,7 +17,9 @@ export function DirectSalesClient(){
  async function run(fn:()=>Promise<void>){setBusy(true);setError("");try{await fn();}catch(e){setError(e instanceof Error?e.message:"Falha de conexão. Repita com os mesmos dados.");}finally{setBusy(false);}}
  async function api(url:string,body?:unknown){const r=await fetch(url,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{cache:"no-store"});const d=await r.json();if(!r.ok)throw new Error(d.error);return d;}
  return <main className="min-h-dvh bg-background p-4 text-foreground sm:p-8"><div className="mx-auto max-w-3xl space-y-6">
- <header><a href="/empresas" className="underline">Voltar às empresas</a><h1 className="mt-4 text-3xl font-semibold">Contratações diretas / Pix</h1><p className="mt-3">Confira o recebimento no Mercado Pago antes de liberar. Este caminho não gera cobrança, não valida comprovantes e não renova automaticamente.</p></header>
+ <header><a href="/empresas" className="underline">Voltar às empresas</a><h1 className="mt-4 text-3xl font-semibold">Contratações diretas / Pix</h1><p className="mt-3">Copie a mensagem de pagamento. Depois confira o recebimento no Mercado Pago antes de liberar. Sem validação automática de comprovantes ou renovação automática.</p></header>
+ <PreparedPix plan={plan} onPlanChange={p=>{setPlan(p);}}/>
+ <h2 className="text-xl font-semibold">2. Conferir recebimento e liberar acesso</h2>
  <p className="rounded-lg border p-4">Novo cliente: peça que envie “Olá” ao <a className="underline" href="https://wa.me/5541997454382" target="_blank" rel="noopener noreferrer">WhatsApp do Frota IA</a> usando o número que utilizará no sistema. Depois localize esse número abaixo. Não crie uma empresa de consultoria para vender este plano.</p>
  {error&&<p role="alert" className="border border-red-500 rounded-lg p-4">{error}</p>}
  <form className="space-y-3" onSubmit={e=>{e.preventDefault();run(async()=>{setShare("");setCompanyId("");setCompanies([]);setHistory([]);const d=await api(`/api/contratacoes-diretas?phone=${encodeURIComponent(phone)}`);setMatchedPhone(d.phone);setCompanies(d.companies);setHistory(d.history??[]);if(!d.companies.length)throw new Error("Número ainda não vinculado a uma empresa. Peça o primeiro contato no Frota IA e tente novamente.");});}}>
