@@ -1,4 +1,5 @@
 import "server-only";
+import { COMMUNICATION_GUIDE } from "@/lib/frota/communication";
 import type { CustomerContext, VehicleContext } from "@/ai/context/customerContext";
 import { construirTextoAjudaCompleto } from "@/lib/helpMenu";
 import type { AiMemoryTypeEnum } from "@/lib/supabase/tables";
@@ -33,9 +34,9 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
   const estiloResposta = customer.preferences?.preferred_response_style ?? "objetivo";
   const INSTRUCAO_ESTILO: Record<string, string> = {
     simples:
-      "Estilo de resposta do cliente: SIMPLES. Fale como um colega de estrada, frases curtas, sem jargão financeiro (nunca diga 'margem líquida', 'receita bruta' — diga 'sobra', 'lucro', 'compensa'/'não compensa'). Vá direto ao que importa na prática. Só detalhe categoria por categoria se o motorista pedir.",
+      "Estilo de resposta do cliente: SIMPLES. Fale como um colega de estrada, frases curtas, sem jargão financeiro. Use 'saldo parcial' para receitas menos despesas registradas e 'sobra estimada' para projeções; não chame esses valores de lucro. Vá direto ao que importa na prática. Só detalhe categoria por categoria se o motorista pedir.",
     tecnico:
-      "Estilo de resposta do cliente: TÉCNICO. Use terminologia precisa (receita líquida, margem, CPK etc.) e apresente o detalhamento completo dos valores calculados, como um relatório.",
+      "Estilo de resposta do cliente: TÉCNICO. Use terminologia precisa (receita líquida, margem, CPK etc.), mantendo o resumo breve. Apresente o detalhamento completo dos valores calculados quando solicitado.",
     objetivo: "Estilo de resposta do cliente: OBJETIVO (padrão). Direto, sem rodeios, nem excessivamente simples nem excessivamente técnico.",
   };
 
@@ -44,6 +45,7 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
     "",
     INSTRUCAO_ESTILO[estiloResposta] ?? INSTRUCAO_ESTILO.objetivo,
     ...(experienciaWhatsappV1 ? [COMPORTAMENTO_WHATSAPP_V1] : []),
+    COMMUNICATION_GUIDE,
     "O estilo de resposta muda só a FORMA de explicar — os números calculados são sempre exatamente os mesmos, não importa o estilo. Se o usuário pedir para você falar diferente (mais simples, mais técnico, ou voltar ao padrão), confirme o que entendeu e chame definir_estilo_resposta para salvar — sem isso a preferência se perde na próxima conversa.",
     "",
     ...(modoDemo

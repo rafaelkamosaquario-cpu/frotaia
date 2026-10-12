@@ -10,5 +10,5 @@ export default async function ResultsPage() {
   const access = await loadFleetPanelAccess(db);
   if (!access.ok) return null;
   const [vehicles, drivers] = await Promise.all([listVehiclesForPanel(db, access.company.id), listDriversForPanel(db, access.company.id)]);
-  return <div className="space-y-6 p-4 md:p-6"><header><h1 className="text-2xl font-semibold">Resultado mensal</h1><p className="text-sm text-muted-foreground">Produção, metas, receitas e custos registrados da sua operação.</p></header><ProductionGoals companyId={access.company.id} vehicles={vehicles} drivers={drivers} /></div>;
+  return <div className="space-y-6 p-4 md:p-6"><header><h1 className="text-2xl font-semibold">Resultado mensal</h1><p className="text-sm text-muted-foreground">Produção, metas, receitas e custos registrados da sua operação.</p></header><ProductionGoals companyId={access.company.id} companyName={access.company.name} assistantEnabled={!access.moduleConfig || access.moduleConfig.enabled.includes("assistente")} vehicles={vehicles} drivers={drivers} /></div>;
 }

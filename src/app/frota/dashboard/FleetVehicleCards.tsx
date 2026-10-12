@@ -10,12 +10,14 @@ import { type MonthlyProduction } from "@/lib/frota/productionGoals";
 import { fleetCardStatus } from "@/lib/frota/fleetCardStatus";
 import { fleetIllustration, followingMonth, monthLabel, partialBalance } from "@/lib/frota/fleetPresentation";
 import { askFrotaAiWidget } from "@/components/frota/frotaAiWidgetBus";
+import { operationalReport } from "@/lib/frota/communication";
+import { ShareOperationalReport } from "@/components/frota/ShareOperationalReport";
 
 const money = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const tonnes = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 const filters = ["Todos", "Caminhões", "Tratores", "Meta atingida", "Abaixo da meta", "Apuração parcial", "Sem apuração", "Saldo negativo"] as const;
 
-export function FleetVehicleCards({ companyId, vehicles, drivers, data }: { companyId: string; vehicles: VehicleRow[]; drivers: DriverRow[]; data: MonthlySnapshot }) {
+export function FleetVehicleCards({ companyId, companyName = "", assistantEnabled = true, vehicles, drivers, data }: { companyId: string; companyName?: string; assistantEnabled?: boolean; vehicles: VehicleRow[]; drivers: DriverRow[]; data: MonthlySnapshot }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string>("Todos");
   const [comparison, setComparison] = useState<{ month: string; rows: MonthlyProduction[] } | null>(null);
@@ -71,7 +73,8 @@ export function FleetVehicleCards({ companyId, vehicles, drivers, data }: { comp
         <div className="fleet-money"><div><span>Receita registrada</span><strong>{data.revenueSummary ? money(revenue?.amount ?? 0) : "Indisponível"}</strong></div><div><span>Combustível / diesel</span><strong>{data.expenseSummary ? money(expense?.fuel ?? 0) : "Indisponível"}</strong></div></div>
         <div className="fleet-card-result"><span>Saldo parcial<small>Inclui remunerações e demais despesas</small></span><strong className={balance != null && balance < 0 ? "text-danger" : "text-success"}>{balance == null ? "Indisponível" : money(balance)}</strong></div>
         <details className="fleet-card-details"><summary>Ver detalhes</summary><div><p>Remunerações: {data.expenseSummary ? money(expense?.payroll ?? 0) : "Indisponível"}</p><p>Outras despesas: {data.expenseSummary ? money(expense?.other ?? 0) : "Indisponível"}</p><p>Diesel informado: {r?.diesel_liters == null ? "Não informado" : `${tonnes(r.diesel_liters)} L`}</p>{r?.actual_tonnes != null && r.actual_tonnes > 0 && r.diesel_liters != null && <p>Índice: {tonnes(r.diesel_liters / r.actual_tonnes)} L/t</p>}<p>{r?.measured_through ? `Apurado até ${r.measured_through.split("-").reverse().join("/")}` : "Sem data de apuração"}</p>{r?.note && <p>{r.note}</p>}<p>Vínculo de motorista não identifica quem operou em cada viagem. Saldo parcial não é lucro líquido.</p><Link href="/frota/veiculos">Abrir cadastro de veículos →</Link></div></details>
-        <button className="fleet-ask" type="button" onClick={() => askFrotaAiWidget(`Analise o veículo ${v.plate || v.name} em ${data.month}: produção, meta, combustível, remunerações e saldo parcial. Consulte os registros da minha empresa e indique dados faltantes.`)}><Sparkles size={15} aria-hidden /> Pergunte ao Frota IA</button>
+        <ShareOperationalReport report={operationalReport(data, companyName, { id: v.id, label: [v.plate, v.name || v.model].filter(Boolean).join(" · "), active: v.active })} />
+        {assistantEnabled && <button className="fleet-ask" type="button" onClick={() => askFrotaAiWidget(`Analise o veículo ${v.plate || v.name} em ${data.month}: produção, meta, combustível, remunerações e saldo parcial. Consulte os registros da minha empresa e indique dados faltantes.`)}><Sparkles size={15} aria-hidden /> Pergunte ao Frota IA</button>}
       </article>;
     })}</div>
     {!visible.length && <p className="py-8 text-center text-muted-foreground">Nenhum veículo encontrado para este filtro.</p>}

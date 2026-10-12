@@ -9,11 +9,12 @@ import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 import { VehiclePlate } from "@/components/frota/VehiclePlate";
 import { ContextualHelp } from "@/components/frota/ContextualHelp";
-import type { ChecklistDispatchRow, DriverRow, ExpenseRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
+import type { ChecklistDispatchRow, DriverRow, MaintenanceScheduleRow, VehicleDocumentRow, VehicleRow } from "@/lib/supabase/tables";
 import { computeFleetAlerts, type FleetAlertItem } from "@/services/supabase/fleetAlertsService";
 import { dispatchesFromToday } from "@/services/supabase/checklistDispatchService";
 import { ProductionGoals, type MonitoringState } from "./ProductionGoals";
-import { monthlyMonitoringBrief, monthlyMonitoringEnabled, monthlyMonitoringMessages } from "@/lib/frota/monthlyMonitoring";
+import { monthlyMonitoringBrief, monthlyMonitoringMessages } from "@/lib/frota/monthlyMonitoring";
+import { modulePathAllowed } from "@/lib/frota/companyModules";
 
 import { GroupsOverview } from "./GroupsOverview";
 import type { OperationalGroup } from "@/lib/frota/operationalGroups";
@@ -21,13 +22,13 @@ import { askFrotaAiWidget } from "@/components/frota/frotaAiWidgetBus";
 import { useAssistantNotices } from "@/components/frota/AssistantNotices";
 import { buildAssistantNotices } from "@/lib/frota/assistantNotices";
 
-export type CardStyleVariant = "a" | "b";
 interface Props {
   companyId: string;
+  companyName?: string;
+  enabledModules?: string[] | null;
   groups: OperationalGroup[]; groupsError: boolean; canManageGroups: boolean;
   veiculos: VehicleRow[]; motoristas: DriverRow[]; manutencoes: MaintenanceScheduleRow[];
-  documentos: VehicleDocumentRow[]; despesasRecentes: ExpenseRow[]; checklistDispatches: ChecklistDispatchRow[];
-  insight: string | null; cardStyle: CardStyleVariant;
+  documentos: VehicleDocumentRow[]; checklistDispatches: ChecklistDispatchRow[];
 }
 function diasAte(iso: string) {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
@@ -45,8 +46,10 @@ function AlertSection({ title, items, href, empty }: { title: string; items: Fle
 }
 
 /** Apresentação apenas: mantém as fontes e as regras dos indicadores anteriores. */
-export function DashboardClient({ groups, groupsError, canManageGroups, companyId, veiculos, motoristas, manutencoes, documentos, checklistDispatches, insight }: Props) {
-  const monthlyMonitoring = monthlyMonitoringEnabled(companyId);
+export function DashboardClient({ groups, groupsError, canManageGroups, companyId, companyName = "", enabledModules = null, veiculos, motoristas, manutencoes, documentos, checklistDispatches }: Props) {
+  const allows = (path: string) => modulePathAllowed(enabledModules, path);
+  const monthlyMonitoring = allows("/frota/metas");
+  const assistantEnabled = enabledModules === null || enabledModules.includes("assistente");
   const [monitoring, setMonitoring] = useState<MonitoringState>({data:null,loading:true,error:""});
   const hojeIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ativos = veiculos.filter(v => v.active).length;
@@ -62,10 +65,10 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
     { label: "Vencendo em 30 dias", value: vencendo, context: "Documentos da frota", Icon: CalendarClock, href: "/frota/documentos", tone: vencendo ? "text-warning" : "text-primary" },
     { label: "Resultado mensal", value: "Ver abaixo", context: "Receitas, diesel e remunerações no mesmo mês", Icon: Wallet, href: "#metas-producao", tone: "text-primary", currency: true },
   ];
-  const alertas = useMemo(() => computeFleetAlerts({ veiculos, manutencoes, documentos }), [veiculos, manutencoes, documentos]);
+  const alertas = useMemo(() => computeFleetAlerts({ veiculos, manutencoes, documentos }).filter(alert => modulePathAllowed(enabledModules, alert.href)), [veiculos, manutencoes, documentos, enabledModules]);
   const publishNotices = useAssistantNotices()?.publish;
   useEffect(() => {
-    if (!publishNotices) return;
+    if (!publishNotices || !assistantEnabled) return;
     publishNotices({
       label: monthlyMonitoring && monitoring.data && !monitoring.loading && !monitoring.error
         ? `Fechamento ${monitoring.data.month.split("-").reverse().join("/")} · alertas operacionais atuais`
@@ -73,7 +76,7 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
       notices: buildAssistantNotices(monthlyMonitoring && !monitoring.loading && !monitoring.error ? monitoring.data : null, alertas),
     });
     return () => publishNotices(null);
-  }, [publishNotices, monthlyMonitoring, monitoring, alertas]);
+  }, [publishNotices, monthlyMonitoring, monitoring, alertas, assistantEnabled]);
   const hoje = useMemo(() => dispatchesFromToday(checklistDispatches), [checklistDispatches]);
   const respondidos = hoje.filter(d => d.response_status !== "pendente").length;
   const drivers = new Map(motoristas.map(m => [m.id, m.name]));
@@ -82,21 +85,23 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
   return <div className="frota-dashboard flex flex-1 flex-col">
     <div className="flex items-start justify-between gap-3"><div><p className="fleet-eyebrow">PAINEL DA OPERAÇÃO</p><h1>Sua frota, de perto.</h1><p className="mt-2 text-sm text-muted-foreground">Produção, despesas e acompanhamento em um só lugar.</p></div><ContextualHelp topic="dashboard" /></div>
     <div className="fleet-summary-grid" aria-label="Resumo do mês">
-      <Link href="/frota/veiculos"><span>Veículos ativos<Truck size={19} aria-hidden /></span><strong>{ativos}</strong><small>{motoristasAtivos} motoristas ativos · {veiculos.length} veículos cadastrados</small></Link>
+      {allows("/frota/veiculos") && <Link href="/frota/veiculos"><span>Veículos ativos<Truck size={19} aria-hidden /></span><strong>{ativos}</strong><small>{motoristasAtivos} motoristas ativos · {veiculos.length} veículos cadastrados</small></Link>}
+      {monthlyMonitoring && <>
       <Link href="/frota/receitas"><span>Receita registrada<Wallet size={19} aria-hidden /></span><strong>{!monitoring.loading && !monitoring.error && monitoring.data?.revenueSummary ? monitoring.data.revenueSummary.total.toLocaleString("pt-BR", {style:"currency",currency:"BRL"}) : "—"}</strong><small>{monitoring.loading ? "Carregando mês…" : monitoring.data?.month ? `Referência: ${monitoring.data.month.split("-").reverse().join("/")}` : "Dados indisponíveis"}</small></Link>
       <Link href="/frota/despesas"><span>Despesas registradas<Wallet size={19} aria-hidden /></span><strong>{!monitoring.loading && !monitoring.error && monitoring.data?.expenseSummary ? monitoring.data.expenseSummary.total.toLocaleString("pt-BR", {style:"currency",currency:"BRL"}) : "—"}</strong><small>Inclui diesel, remunerações e outros custos</small></Link>
       <a href="#metas-producao" className="fleet-summary-result"><span>Saldo parcial<Wallet size={19} aria-hidden /></span><strong className={monitoring.data?.revenueSummary && monitoring.data?.expenseSummary && monitoring.data.revenueSummary.total < monitoring.data.expenseSummary.total ? "text-danger" : ""}>{!monitoring.loading && !monitoring.error && monitoring.data?.revenueSummary && monitoring.data.expenseSummary ? ((Math.round(monitoring.data.revenueSummary.total*100)-Math.round(monitoring.data.expenseSummary.total*100))/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "—"}</strong><small>Receitas menos despesas · não é lucro líquido</small></a>
+      </>}
     </div>
-    <GroupsOverview groups={groups} error={groupsError} allowed={canManageGroups} />
-    <ProductionGoals key={companyId} companyId={companyId} vehicles={veiculos} drivers={motoristas} onSnapshot={setMonitoring} />
+    {allows("/frota/grupos") && <GroupsOverview groups={groups} error={groupsError} allowed={canManageGroups} />}
+    {monthlyMonitoring && <ProductionGoals key={companyId} companyId={companyId} companyName={companyName} vehicles={veiculos} drivers={motoristas} onSnapshot={setMonitoring} assistantEnabled={assistantEnabled} />}
     <details className="fleet-operational-details"><summary>Indicadores e acompanhamento operacional</summary>
     <div data-tour="kpis" className="grid grid-cols-2 gap-3 md:grid-cols-3">
-      {kpis.map(({ label, value, context, Icon, href, tone, currency }) => <Link key={label} href={href} className="dashboard-kpi ui-card min-w-0 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/60 sm:p-5">
+      {kpis.filter(item => item.href.startsWith("#") ? monthlyMonitoring : allows(item.href)).map(({ label, value, context, Icon, href, tone, currency }) => <Link key={label} href={href} className="dashboard-kpi ui-card min-w-0 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-primary/60 sm:p-5">
         <div className="mb-3 flex items-start gap-2.5"><Icon className={cn("size-6 shrink-0 sm:size-7", tone)} aria-hidden /><h2 className="text-sm font-medium leading-snug">{label}</h2></div>
         <p className={cn("dashboard-kpi-value font-bold tracking-tight tabular-nums", currency ? "dashboard-currency" : "text-3xl sm:text-4xl")}>{value}</p><p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">{context}</p>
       </Link>)}
     </div>
-    <Card data-tour="ia-sugere" id="assistente-frota" className="dashboard-insight flex flex-wrap items-start gap-3 p-4 sm:gap-4 sm:p-5">
+    {assistantEnabled && <Card data-tour="ia-sugere" id="assistente-frota" className="dashboard-insight flex flex-wrap items-start gap-3 p-4 sm:gap-4 sm:p-5">
       <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Sparkles className="size-6" aria-hidden /></span>
       <div className="min-w-0 flex-1 basis-48"><h2 className="text-base font-semibold">Assistente Frota IA</h2><p className="mt-1 text-sm text-muted-foreground">Frota IA informa · avisos breves e perguntas sobre sua operação.</p>{monthlyMonitoring ? <>
         {monitoring.loading ? <p role="status">Conferindo o mês selecionado...</p> : monitoring.error || !monitoring.data ? <p role="alert">Não foi possível atualizar o acompanhamento. Use Atualizar acompanhamento no fechamento mensal; não exibimos uma análise antiga como atual.</p> : <>
@@ -108,13 +113,13 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
           </details>
         </>}
         <p className="mt-3 text-sm">Situação operacional atual: {ativos} veículos e {motoristasAtivos} motoristas ativos; {alertas.length} alerta(s) de manutenção/documentos. <Link href="#metas-producao" className="text-primary underline">Escolher mês / atualizar acompanhamento</Link></p>
-      </> : <><p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{insight || "O resumo da IA ainda não está disponível. Consulte os indicadores ou pergunte ao Frota IA sobre sua frota."}</p><p className="mt-2 text-xs text-muted-foreground">Resumo operacional periódico, independente do mês selecionado. Para o fechamento financeiro completo do mês, consulte Resultado mensal abaixo.</p></>}</div>
+      </> : <p className="mt-2 text-sm">{alertas.length ? `${alertas.length} pendência(s) nos módulos da sua empresa. Confira os avisos ou pergunte ao Frota IA.` : "Nenhuma pendência encontrada nos módulos consultados. Pergunte ao Frota IA para conferir os registros."}</p>}</div>
       <button type="button" onClick={() => askFrotaAiWidget(monitoring.data ? `Explique o acompanhamento de ${monitoring.data.month} da minha empresa, incluindo metas, combustível e remunerações. Consulte os registros e avise se faltarem dados.` : "Quais pendências da minha frota precisam de atenção? Consulte os registros atuais.")} className="min-h-11 rounded-lg border border-primary px-4 text-sm font-semibold text-primary">Pergunte ao Frota IA</button>
-      <Link href="/frota/alertas" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-hover">Ver pendências<ArrowRight className="size-4" aria-hidden /></Link>
-    </Card>
+      {allows("/frota/alertas") && <Link href="/frota/alertas" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-hover">Ver pendências<ArrowRight className="size-4" aria-hidden /></Link>}
+    </Card>}
     </details>
     <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-      <Card className="min-w-0 overflow-hidden p-4 sm:p-5">
+      {allows("/frota/veiculos") && <Card className="min-w-0 overflow-hidden p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-semibold">Veículos da frota</h2><Link href="/frota/veiculos" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary">Ver veículos<ArrowRight className="size-4" aria-hidden /></Link></div>
         {!recentes.length ? <p className="py-6 text-sm text-muted-foreground">Nenhum veículo cadastrado. Acesse Veículos para adicionar o primeiro.</p> : <table className="dashboard-vehicles w-full text-left text-sm">
           <thead><tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground"><th className="pb-3 font-medium">Placa</th><th className="pb-3 font-medium">Veículo</th><th className="pb-3 font-medium">Status</th><th className="pb-3 text-right font-medium">KM informado</th></tr></thead>
@@ -125,13 +130,13 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
             <td className="py-4 text-right tabular-nums text-muted-foreground">{v.current_odometer_km === null ? "Não informado" : `${v.current_odometer_km.toLocaleString("pt-BR")} km`}</td>
           </tr>)}</tbody>
         </table>}
-      </Card>
+      </Card>}
       <div className="grid gap-5">
-        <AlertSection title="Documentos — atenção" href="/frota/documentos" items={alertas.filter(a => a.id.startsWith("doc-"))} empty="Nenhum documento vencido ou vencendo nos próximos 30 dias." />
-        <AlertSection title="Manutenções — atenção" href="/frota/manutencao" items={alertas.filter(a => a.id.startsWith("man-"))} empty="Nenhum alerta de manutenção por data nos próximos 30 dias." />
-        <Card className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-base font-semibold"><ClipboardCheck className="size-5 text-primary" aria-hidden />Checklists hoje</h2><Link href="/frota/checklists" className="py-2 text-sm text-primary">Ver todos</Link></div>
+        {allows("/frota/documentos") && <AlertSection title="Documentos — atenção" href="/frota/documentos" items={alertas.filter(a => a.id.startsWith("doc-"))} empty="Nenhum documento vencido ou vencendo nos próximos 30 dias." />}
+        {allows("/frota/manutencao") && <AlertSection title="Manutenções — atenção" href="/frota/manutencao" items={alertas.filter(a => a.id.startsWith("man-"))} empty="Nenhum alerta de manutenção por data nos próximos 30 dias." />}
+        {allows("/frota/checklists") && <Card className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-base font-semibold"><ClipboardCheck className="size-5 text-primary" aria-hidden />Checklists hoje</h2><Link href="/frota/checklists" className="py-2 text-sm text-primary">Ver todos</Link></div>
           {!hoje.length ? <p className="text-sm text-muted-foreground">Nenhum checklist enviado hoje.</p> : <><p className="mb-3 text-sm text-muted-foreground">{respondidos} de {hoje.length} respondidos</p><ul className="space-y-2">{hoje.map(d => <li key={d.id} className="flex items-center justify-between gap-3 text-sm"><span className="truncate">{drivers.get(d.driver_id) ?? "Motorista não identificado"}</span><span className={cn("shrink-0", d.response_status === "ok" ? "text-success" : d.response_status === "atencao" ? "text-danger" : "text-muted-foreground")}>{d.response_status === "ok" ? "OK" : d.response_status === "atencao" ? "Atenção" : "Pendente"}</span></li>)}</ul></>}
-        </Card>
+        </Card>}
       </div>
     </div>
   </div>;

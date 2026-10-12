@@ -1,10 +1,8 @@
 import type { MonthlyProduction } from "./productionGoals";
-import { goalProgress } from "./productionGoals";
+import { fleetCardStatus } from "./fleetCardStatus";
 import type { ProductionRevenue } from "./productionRevenue";
 import type { MonthlyExpenses } from "./monthlyExpenses";
 
-// Explicit pilot: no behavior change for other customers and no authorization bypass.
-export const monthlyMonitoringEnabled = (companyId: string) => companyId === "0fba8f5d-ee49-4b94-bbe5-5b34a33e88ac";
 export type MonthlySnapshot = { month: string; today: string; rows: MonthlyProduction[]; revenueSummary: ProductionRevenue | null; expenseSummary: MonthlyExpenses | null; checkedAt?: string; payrollDue?: {date:string;amount:number}[] | null };
 const money = (n: number) => n.toLocaleString("pt-BR", {style:"currency",currency:"BRL"});
 export function monthlyMonitoringBrief(data: MonthlySnapshot) {
@@ -14,8 +12,8 @@ export function monthlyMonitoringBrief(data: MonthlySnapshot) {
     messages.push(`Saldo parcial registrado: ${money(balance)}. Não é lucro líquido.`);
   } else messages.push("Resumo financeiro indisponível. Atualize o acompanhamento.");
   const targets = data.rows.filter(r => r.operation === "transporte" && r.target_tonnes !== null);
-  const below = targets.filter(r => ["Abaixo da meta", "Abaixo do ritmo"].includes(goalProgress(r, data.today).label));
-  if (below.length) messages.push(`${below.length} caminhão(ões) abaixo da meta ou do ritmo. Confira a produção.`);
+  const below = targets.filter(r => fleetCardStatus(r, data.today).label === "Abaixo da meta");
+  if (below.length) messages.push(`${below.length} caminhão(ões) abaixo da meta no período encerrado. Confira a produção.`);
   const missing = targets.filter(r => r.actual_tonnes === null).length;
   if (missing) messages.push(`${missing} caminhão(ões) sem apuração informada.`);
   if (data.expenseSummary && data.payrollDue?.length) {
@@ -40,8 +38,8 @@ export function monthlyMonitoringMessages(data: MonthlySnapshot, names: Record<s
     const target = targets.reduce((s,r)=>s+Math.round(r.target_tonnes!*1000),0)/1000;
     const reached = reported.filter(r=>r.actual_tonnes!>=r.target_tonnes!).length;
     messages.push(`Transporte: ${actual.toLocaleString("pt-BR",{minimumFractionDigits:3})} t informadas de ${target.toLocaleString("pt-BR",{minimumFractionDigits:3})} t de meta; ${reached} de ${targets.length} caminhões atingiram a meta.${reported.length<targets.length?` Há ${targets.length-reported.length} veículo(s) sem apuração: ausência de informação não significa produção zero.`:""}`);
-    const below = targets.filter(r=>["Abaixo da meta","Abaixo do ritmo"].includes(goalProgress(r,data.today).label));
-    if(below.length) messages.push(`Acompanhe a produção: ${below.map(r=>`${names[r.vehicle_id]??"Veículo"} — ${goalProgress(r,data.today).label.toLowerCase()}`).join("; ")}.`);
+    const below = targets.filter(r=>fleetCardStatus(r,data.today).label === "Abaixo da meta");
+    if(below.length) messages.push(`Acompanhe a produção: ${below.map(r=>`${names[r.vehicle_id]??"Veículo"} — abaixo da meta no período encerrado`).join("; ")}.`);
   }
   if (data.rows.some(r=>r.diesel_liters!==null)) messages.push("Combustível: os consolidados permitem acompanhar litros por tonelada. Sem hodômetros suficientes, não conclua consumo em km/L. Compare veículos e operações equivalentes; carregamento dos tratores é separado do transporte.");
   if (data.expenseSummary && data.payrollDue?.length) messages.push(`Remunerações confirmadas deste fechamento, ainda sem baixa integral: ${data.payrollDue.map(p=>`${money(p.amount)} — ${p.date<data.today?"vencimento passado em":p.date===data.today?"vence hoje,":"previsto para"} ${p.date.split("-").reverse().join("/")}`).join("; ")}. Confira os pagamentos em Custos e remunerações. A ausência de baixa não comprova falta de pagamento.`);

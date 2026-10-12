@@ -6,6 +6,7 @@ import { isWhatsappConfigured } from "@/lib/whatsapp/config";
 import { listDueAlerts, markAlertSent, markAlertFailed } from "@/services/supabase/alertService";
 import { listChannelsForUser } from "@/services/supabase/channelIdentityService";
 import { logDispatchStart, logDispatchEnd, captureError } from "@/lib/observability/logger";
+import { alertText } from "@/lib/frota/communication";
 
 const ROTA = "/api/alerts/dispatch";
 
@@ -60,9 +61,19 @@ export async function GET(request: Request) {
     }
 
     try {
-      const partes = [`🔔 ${alerta.title}`];
-      if (alerta.notes) partes.push(alerta.notes);
-      await sendWhatsappText(canalWhatsapp.phone_e164, partes.join("\n\n"));
+      const company = alerta.company_id
+        ? await admin.from("companies").select("name").eq("id", alerta.company_id).maybeSingle()
+        : null;
+      const vehicle = alerta.company_id && alerta.vehicle_id
+        ? await admin.from("vehicles").select("plate,name").eq("company_id", alerta.company_id).eq("id", alerta.vehicle_id).maybeSingle()
+        : null;
+      // Missing display metadata must not suppress a previously scheduled notice.
+      // Vehicle lookup is always scoped to the notice's company.
+      await sendWhatsappText(canalWhatsapp.phone_e164, alertText({
+        title: alerta.title, notes: alerta.notes, scheduledFor: alerta.scheduled_for,
+        company: company?.data?.name,
+        vehicle: vehicle?.data ? [vehicle.data.plate, vehicle.data.name].filter(Boolean).join(" · ") : null,
+      }));
       await markAlertSent(admin, alerta.id);
       enviados += 1;
     } catch (erro) {

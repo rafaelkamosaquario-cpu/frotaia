@@ -15,8 +15,9 @@ const markAlertFailed = vi.fn();
 const listChannelsForUser = vi.fn();
 const sendWhatsappText = vi.fn();
 const isWhatsappConfigured = vi.fn();
+const from = vi.fn();
 
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from }) }));
 vi.mock("@/lib/whatsapp/zapiClient", () => ({ sendWhatsappText: (...args: unknown[]) => sendWhatsappText(...args) }));
 vi.mock("@/lib/whatsapp/config", () => ({ isWhatsappConfigured: () => isWhatsappConfigured() }));
 vi.mock("@/services/supabase/alertService", () => ({
@@ -98,6 +99,24 @@ describe("GET /api/alerts/dispatch", () => {
     expect(sendWhatsappText).not.toHaveBeenCalled();
     expect(markAlertFailed).toHaveBeenCalledWith(expect.anything(), "alert-1", expect.any(String));
     expect(corpo).toEqual({ ok: true, verificados: 1, enviados: 0, falhas: 1 });
+  });
+
+  it("adds identity and scopes vehicle metadata to the alert company without changing the recipient", async () => {
+    const companyEq = vi.fn(), vehicleEq = vi.fn();
+    const companyQuery = { eq: companyEq, maybeSingle: async () => ({ data: { name: "Company A" }, error: null }) };
+    const vehicleQuery = { eq: vehicleEq, maybeSingle: async () => ({ data: { plate: "ABC1234", name: "Truck" }, error: null }) };
+    companyEq.mockReturnValue(companyQuery); vehicleEq.mockReturnValue(vehicleQuery);
+    from.mockImplementation((table: string) => ({ select: () => table === "companies" ? companyQuery : vehicleQuery }));
+    listDueAlerts.mockResolvedValue([fakeAlert({ company_id: "company-a", vehicle_id: "truck", scheduled_for: "2026-10-05T12:00:00Z", notes: "Referência 09/2026" })]);
+    listChannelsForUser.mockResolvedValue([fakeChannel()]);
+    sendWhatsappText.mockResolvedValue(undefined);
+    await chamarRota();
+    expect(vehicleEq).toHaveBeenCalledWith("company_id", "company-a");
+    expect(vehicleEq).toHaveBeenCalledWith("id", "truck");
+    expect(sendWhatsappText).toHaveBeenCalledTimes(1);
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Company A\nVeículo: ABC1234 · Truck"));
+    expect(sendWhatsappText.mock.calls[0][1]).toMatch(/^Frota IA informa/);
+    expect(sendWhatsappText.mock.calls[0][1]).toContain("Referência 09/2026");
   });
 
   it("marca como failed quando o envio pelo WhatsApp lança erro", async () => {

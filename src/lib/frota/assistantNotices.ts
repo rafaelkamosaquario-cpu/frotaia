@@ -4,7 +4,7 @@ import type { FleetAlertItem } from "@/services/supabase/fleetAlertsService";
 
 export function buildAssistantNotices(month: MonthlySnapshot | null, alerts: FleetAlertItem[]): AssistantNotice[] {
   const monthly = month ? monthlyMonitoringBrief(month).map(text => ({
-    id: JSON.stringify(["month", month.month, text]), text,
+    id: JSON.stringify(["month", month.month, text]), text: `${month.month.split("-").reverse().join("/")}: ${text}`,
     href: "/frota/dashboard#metas-producao",
     question: `Explique este aviso do fechamento de ${month.month}: ${text} Consulte os registros da empresa e informe se faltarem dados.`,
   })) : [];

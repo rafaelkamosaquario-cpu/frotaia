@@ -9,6 +9,8 @@ import type { ProductionRevenue } from "@/lib/frota/productionRevenue";
 import Link from "next/link";
 import type { MonthlyExpenses } from "@/lib/frota/monthlyExpenses";
 import type { MonthlySnapshot } from "@/lib/frota/monthlyMonitoring";
+import { operationalReport } from "@/lib/frota/communication";
+import { ShareOperationalReport } from "@/components/frota/ShareOperationalReport";
 
 type Loaded = { month: string; today: string; rows: MonthlyProduction[]; canEdit: boolean; revenueSummary: ProductionRevenue | null; revenueError: string | null; expenseSummary: MonthlyExpenses | null; expenseError: string | null; checkedAt?: string; payrollDue?: {date:string;amount:number}[] | null };
 export type MonitoringState = { data: MonthlySnapshot | null; loading: boolean; error: string };
@@ -17,7 +19,7 @@ const tonnes = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits:
 const field = "mt-1 w-full rounded-lg border border-border bg-surface p-2 text-foreground";
 
 
-export function ProductionGoals({ companyId, vehicles, drivers, onSnapshot }: { companyId: string; vehicles: VehicleRow[]; drivers: DriverRow[]; onSnapshot?: (state: MonitoringState) => void }) {
+export function ProductionGoals({ companyId, companyName = "", assistantEnabled = true, vehicles, drivers, onSnapshot }: { companyId: string; companyName?: string; assistantEnabled?: boolean; vehicles: VehicleRow[]; drivers: DriverRow[]; onSnapshot?: (state: MonitoringState) => void }) {
   const [month, setMonth] = useState("");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
@@ -45,7 +47,8 @@ export function ProductionGoals({ companyId, vehicles, drivers, onSnapshot }: { 
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Resultado, produção e metas do mês</h2><p className="mt-1 text-sm text-muted-foreground">Receitas, combustível e remunerações no mesmo período</p></div><label className="text-sm">Mês de referência<input type="month" min="2000-01" max="2099-12" aria-label="Mês do resultado e das metas" className={field} value={month || loaded?.month || ""} onChange={e => { if (e.target.value) { setLoading(true); setEditing(false); setMonth(e.target.value); } }} /></label><Button variant="outline" onClick={refresh} disabled={loading}>Atualizar acompanhamento</Button></div>
     {loading ? <p role="status" className="py-5 text-sm">Carregando metas...</p> : error ? <div role="alert" className="py-4"><p>{error}</p><Button onClick={refresh} variant="outline" className="mt-2">Tentar novamente</Button></div> : loaded && <>
       <p className="mt-3 text-xs text-muted-foreground">Último mês com produção informada. Apuração parcial não significa meta perdida; sem informação não significa produção zero.</p>
-      <FleetVehicleCards key={`${companyId}:${loaded.month}`} companyId={companyId} vehicles={vehicles} drivers={drivers} data={loaded} />
+      <div className="mt-3"><ShareOperationalReport report={operationalReport(loaded, companyName)} /></div>
+      <FleetVehicleCards key={`${companyId}:${loaded.month}`} companyId={companyId} companyName={companyName} assistantEnabled={assistantEnabled} vehicles={vehicles} drivers={drivers} data={loaded} />
       <details className="fleet-financial-details"><summary>Ver fechamento financeiro e totais de produção</summary>
       {loaded.revenueError && <div role="alert" className="mt-4 rounded-lg border border-warning p-3 text-sm"><p>{loaded.revenueError}</p><Button variant="outline" onClick={refresh} className="mt-2">Atualizar receitas</Button></div>}
       {loaded.revenueSummary && <section aria-label="Receitas registradas no mês" className="mt-4">

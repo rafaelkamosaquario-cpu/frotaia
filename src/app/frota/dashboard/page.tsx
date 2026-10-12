@@ -4,142 +4,34 @@ import { listVehiclesForPanel } from "@/services/supabase/vehicleService";
 import { listDriversForPanel } from "@/services/supabase/driverService";
 import { listMaintenanceSchedulesForPanel } from "@/services/supabase/maintenanceScheduleService";
 import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
-import { listExpenses } from "@/services/supabase/expenseService";
-import { listChecklistDispatchesForPanel, dispatchesFromToday } from "@/services/supabase/checklistDispatchService";
-import { computeFleetAlerts } from "@/services/supabase/fleetAlertsService";
-import { getOrCreatePreferences, saveDashboardInsight } from "@/services/supabase/companyPreferencesService";
-import { gerarInsightDashboard } from "@/services/dashboard/dashboardInsightService";
-import { DashboardClient, type CardStyleVariant } from "./DashboardOverview";
-import { monthlyMonitoringEnabled } from "@/lib/frota/monthlyMonitoring";
+import { listChecklistDispatchesForPanel } from "@/services/supabase/checklistDispatchService";
+import { DashboardClient } from "./DashboardOverview";
 import type { OperationalGroup } from "@/lib/frota/operationalGroups";
-import { ConfiguredDashboard } from "./ConfiguredDashboard";
+import { modulePathAllowed } from "@/lib/frota/companyModules";
 
-/** Insight regenerado no máximo 1x a cada 20h por empresa — mesmo espírito do daily_news_last_sent_at, evita custo de IA a cada carregamento de página. */
-const INSIGHT_CACHE_HORAS = 20;
-
-function diasAte(iso: string): number {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const alvo = new Date(`${iso}T00:00:00`);
-  return Math.round((alvo.getTime() - hoje.getTime()) / 86_400_000);
-}
-
-function precisaGerarInsight(geradoEm: string | null): boolean {
-  if (!geradoEm) return true;
-  const horasDesdeGeracao = (Date.now() - new Date(geradoEm).getTime()) / 3_600_000;
-  return horasDesdeGeracao >= INSIGHT_CACHE_HORAS;
-}
-
-function montarResumoParaInsight(input: {
-  veiculosAtivos: number;
-  motoristasAtivos: number;
-  manutencoesPendentes: number;
-  documentosVencidos: number;
-  documentosVencendo: number;
-  custo30Dias: number | null;
-  alertas: string[];
-  checklistsHoje: { total: number; respondidos: number };
-}): string {
-  const linhas = [
-    `Veículos ativos: ${input.veiculosAtivos}`,
-    `Motoristas ativos: ${input.motoristasAtivos}`,
-    `Manutenções pendentes: ${input.manutencoesPendentes}`,
-    `Documentos vencidos: ${input.documentosVencidos}`,
-    `Documentos vencendo em 30 dias: ${input.documentosVencendo}`,
-    `Custo em despesas nos últimos 30 dias: ${input.custo30Dias === null ? "sem registro" : input.custo30Dias.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
-    `Alertas urgentes: ${input.alertas.length === 0 ? "nenhum" : input.alertas.join("; ")}`,
-    `Checklists hoje: ${input.checklistsHoje.total === 0 ? "nenhum enviado hoje" : `${input.checklistsHoje.respondidos}/${input.checklistsHoje.total} respondidos`}`,
-  ];
-  return linhas.join("\n");
-}
-
-/** O layout de src/app/frota já garante o acesso. Só leitura — os KPIs agregam dados que as telas de Veículos/Motoristas/Manutenção/Documentos/Despesas já buscam. */
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ cardStyle?: string }> }) {
-  const { cardStyle: cardStyleParam } = await searchParams;
-  // Rodada "REFINAMENTO VISUAL DOS CARDS" (08/2026): duas variantes visuais comparáveis ao vivo via ?cardStyle=a/b.
-  // Default de produção é "b" (Premium) — recomendação registrada em docs/FROTA_IA_..._REFINAMENTO_CARDS.md.
-  const cardStyle: CardStyleVariant = cardStyleParam === "a" ? "a" : "b";
-
+/** One read-only dashboard for full and configured delivery; same company isolation. */
+export default async function DashboardPage() {
   const supabase = await createClient();
   const access = await loadFleetPanelAccess(supabase);
-
   if (!access.ok) return null;
-
-  if (access.moduleConfig && !access.moduleBypass) {
-    const enabled = access.moduleConfig.enabled;
-    const canManageGroups = ["owner", "admin"].includes(access.role);
-    const [vehicles, drivers, groupResult] = await Promise.all([
-      enabled.includes("frota") || enabled.includes("financeiro") ? listVehiclesForPanel(supabase, access.company.id) : Promise.resolve([]),
-      enabled.includes("frota") || enabled.includes("financeiro") ? listDriversForPanel(supabase, access.company.id) : Promise.resolve([]),
-      enabled.includes("grupos") && canManageGroups ? supabase.rpc("manage_operational_groups", { p_company: access.company.id, p_action: "list" }) : Promise.resolve(null),
-    ]);
-    return <ConfiguredDashboard companyId={access.company.id} enabled={enabled} vehicles={vehicles} drivers={drivers} groups={Array.isArray(groupResult?.data) ? groupResult.data as OperationalGroup[] : []} groupsError={!!groupResult?.error} canManageGroups={canManageGroups} />;
-  }
-
+  // Consultant permissions do not select a different customer-facing layout.
+  const enabled = access.moduleConfig?.enabled ?? null;
+  const allows = (path: string) => modulePathAllowed(enabled, path);
   const canManageGroups = ["owner", "admin"].includes(access.role);
-  const groupResult = canManageGroups
+  const groupResult = canManageGroups && allows("/frota/grupos")
     ? await supabase.rpc("manage_operational_groups", { p_company: access.company.id, p_action: "list" })
     : null;
   const groups = Array.isArray(groupResult?.data) ? groupResult.data as OperationalGroup[] : [];
-
-  const trintaDiasAtras = new Date();
-  trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-
-  const [veiculos, motoristas, manutencoes, documentos, despesasRecentes, checklistDispatches, preferences] = await Promise.all([
-    listVehiclesForPanel(supabase, access.company.id),
-    listDriversForPanel(supabase, access.company.id),
-    listMaintenanceSchedulesForPanel(supabase, access.company.id),
-    listVehicleDocumentsForPanel(supabase, access.company.id),
-    listExpenses(supabase, { companyId: access.company.id, dateFrom: trintaDiasAtras.toISOString().slice(0, 10), limit: 500 }),
-    listChecklistDispatchesForPanel(supabase, access.company.id),
-    getOrCreatePreferences(supabase, access.company.id),
+  const [veiculos, motoristas, manutencoes, documentos, checklistDispatches] = await Promise.all([
+    allows("/frota/veiculos") ? listVehiclesForPanel(supabase, access.company.id) : Promise.resolve([]),
+    allows("/frota/motoristas") ? listDriversForPanel(supabase, access.company.id) : Promise.resolve([]),
+    allows("/frota/manutencao") ? listMaintenanceSchedulesForPanel(supabase, access.company.id) : Promise.resolve([]),
+    allows("/frota/documentos") ? listVehicleDocumentsForPanel(supabase, access.company.id) : Promise.resolve([]),
+    allows("/frota/checklists") ? listChecklistDispatchesForPanel(supabase, access.company.id) : Promise.resolve([]),
   ]);
-
-  let insight = preferences.dashboard_insight_text;
-
-  if (!monthlyMonitoringEnabled(access.company.id) && precisaGerarInsight(preferences.dashboard_insight_generated_at)) {
-    const hojeIso = new Date().toISOString().slice(0, 10);
-    const alertas = computeFleetAlerts({ veiculos, manutencoes, documentos }).slice(0, 5);
-    const checklistsHoje = dispatchesFromToday(checklistDispatches);
-    const custo30Dias = despesasRecentes.length > 0 ? despesasRecentes.reduce((soma, d) => soma + d.amount, 0) : null;
-
-    const resumo = montarResumoParaInsight({
-      veiculosAtivos: veiculos.filter((v) => v.active).length,
-      motoristasAtivos: motoristas.filter((m) => m.active).length,
-      manutencoesPendentes: manutencoes.filter((m) => m.status !== "concluido").length,
-      documentosVencidos: documentos.filter((d) => d.expiry_date && d.expiry_date < hojeIso).length,
-      documentosVencendo: documentos.filter((d) => d.expiry_date && d.expiry_date >= hojeIso && diasAte(d.expiry_date) <= 30).length,
-      custo30Dias,
-      alertas: alertas.map((a) => a.descricao),
-      checklistsHoje: { total: checklistsHoje.length, respondidos: checklistsHoje.filter((c) => c.response_status !== "pendente").length },
-    });
-
-    try {
-      const gerado = await gerarInsightDashboard(resumo);
-      if (gerado) {
-        await saveDashboardInsight(supabase, access.company.id, gerado);
-        insight = gerado;
-      }
-    } catch {
-      // Sem ANTHROPIC_API_KEY configurada ou falha da API — Dashboard segue funcionando sem o bloco de insight (ou com o último cacheado, se houver).
-    }
-  }
-
-  return (
-    <DashboardClient
-      key={access.company.id}
-      companyId={access.company.id}
-      groups={groups}
-      groupsError={!!groupResult?.error}
-      canManageGroups={canManageGroups}
-      veiculos={veiculos}
-      motoristas={motoristas}
-      manutencoes={manutencoes}
-      documentos={documentos}
-      despesasRecentes={despesasRecentes}
-      checklistDispatches={checklistDispatches}
-      insight={insight}
-      cardStyle={cardStyle}
-    />
-  );
+  return <DashboardClient key={access.company.id} companyId={access.company.id}
+    companyName={access.company.name} enabledModules={enabled}
+    groups={groups} groupsError={!!groupResult?.error} canManageGroups={canManageGroups}
+    veiculos={veiculos} motoristas={motoristas} manutencoes={manutencoes}
+    documentos={documentos} checklistDispatches={checklistDispatches} />;
 }
