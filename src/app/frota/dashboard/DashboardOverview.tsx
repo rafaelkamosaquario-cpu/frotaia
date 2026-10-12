@@ -93,6 +93,7 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
       </>}
     </div>
     {allows("/frota/grupos") && <GroupsOverview groups={groups} error={groupsError} allowed={canManageGroups} />}
+    {alertas.filter(a => allows(a.href)).length > 0 && <section aria-label="Precisa da sua atenção" className="rounded-xl border border-border bg-surface p-4"><h2 className="mb-3 text-lg font-semibold">Precisa da sua atenção</h2><ul className="grid gap-3 sm:grid-cols-2">{alertas.filter(a => allows(a.href)).slice(0, 4).map(a => <li key={a.id} className="rounded-lg border border-border p-3"><p className="line-clamp-2 text-sm">{a.descricao}</p><Link href={a.href} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-primary">Conferir pendência →</Link></li>)}</ul><p className="mt-2 text-xs text-muted-foreground">Alertas dos registros atuais. Consulte o período no detalhe; não é acompanhamento em tempo real do veículo.</p></section>}
     {monthlyMonitoring && <ProductionGoals key={companyId} companyId={companyId} companyName={companyName} vehicles={veiculos} drivers={motoristas} onSnapshot={setMonitoring} assistantEnabled={assistantEnabled} />}
     <details className="fleet-operational-details"><summary>Indicadores e acompanhamento operacional</summary>
     <div data-tour="kpis" className="grid grid-cols-2 gap-3 md:grid-cols-3">

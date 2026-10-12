@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { CATALOGO_OFERTAS, formatarReais, type OfertaCatalogo, type OfertaPlano } from "@/lib/mercadopago/catalog";
 import { criarCheckoutAction } from "./actions";
 import type { MetodoCheckout } from "@/lib/mercadopago/paymentOptions";
+import { requiresPanelSetup, panelSetupUrl } from "@/lib/mercadopago/panelSetup";
 
 /**
  * Gate de contratação (09/2026, estrutura Individual/Essencial/Pro) —
@@ -72,6 +73,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
 
   const plano = resolverPlano(tier, frequencia, metodoAnual);
   const oferta = CATALOGO_OFERTAS[plano];
+  const assisted = requiresPanelSetup(plano);
   const infoTier = TIERS.find((t) => t.tier === tier)!;
 
   async function confirmar(emailInformado?: string) {
@@ -83,7 +85,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
         setErro(resultado.error ?? "Não recebemos o link de pagamento. Tente novamente.");
         return;
       }
-      window.location.href = resultado.initPoint;
+      window.location.assign(resultado.initPoint);
     } catch {
       setErro("Não foi possível abrir o pagamento. Tente novamente em instantes.");
     } finally {
@@ -149,7 +151,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
               </button>
             </div>
 
-            <fieldset className="space-y-2" disabled={enviando}>
+            {!assisted && <fieldset className="space-y-2" disabled={enviando}>
               <legend className="mb-2 text-sm font-semibold">Forma de pagamento</legend>
               {([
                 { id: "credito", label: "Cartão de crédito", detail: frequencia === "ANUAL" ? "Até 12 parcelas; condições e juros no Mercado Pago." : "Pagamento de um mês, sem renovação automática." },
@@ -163,7 +165,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
                   <p className="mt-1 text-xs text-muted-foreground">{option.detail}</p>
                 </label>
               ))}
-            </fieldset>
+            </fieldset>}
 
             <Card className="border-primary/40 bg-primary/5 p-4">
               <p className="text-sm font-semibold text-foreground">{infoTier.nome}</p>
@@ -178,7 +180,7 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
                 {frequencia === "MENSAL" && <span className="text-sm font-normal text-muted-foreground">/mês</span>}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {metodo === "recorrente" ? "Renovação automática mensal." : `${frequencia === "MENSAL" ? "1 mês" : "12 meses"} de acesso após pagamento aprovado. Sem renovação automática; ao vencer, será necessário pagar novamente.`}
+                {assisted ? "Entrega assistida: Rafael configura sua empresa e combina pagamento e ativação. Pagamento não significa painel pronto." : metodo === "recorrente" ? "Renovação automática mensal." : `${frequencia === "MENSAL" ? "1 mês" : "12 meses"} de acesso após pagamento aprovado. Sem renovação automática; ao vencer, será necessário pagar novamente.`}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {oferta.limiteVeiculos} veículo{oferta.limiteVeiculos > 1 ? "s" : ""} · WhatsApp{oferta.painel ? " + Painel" : ""}
@@ -195,9 +197,9 @@ export function CheckoutGate({ checkoutToken, companyName, planoPreSelecionado }
 
             {erro && <p className="text-sm text-danger">{erro}</p>}
 
-            <Button size="lg" className="w-full" onClick={continuar} isLoading={enviando}>
+            {assisted ? <a className="block rounded-lg bg-primary px-4 py-3 text-center font-semibold text-primary-foreground" href={panelSetupUrl(plano)}>Solicitar configuração com Rafael</a> : <Button size="lg" className="w-full" onClick={continuar} isLoading={enviando}>
               {metodo === "recorrente" ? "Continuar" : "Ir para pagamento"}
-            </Button>
+            </Button>}
           </div>
         ) : (
           <EtapaEmail oferta={oferta} nomeTier={infoTier.nome} email={email} setEmail={setEmail} erro={erro} enviando={enviando} onVoltar={() => setMostrarEmail(false)} onConfirmar={() => confirmar(email)} />

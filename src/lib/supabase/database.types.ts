@@ -2480,6 +2480,7 @@ export type Database = {
       }
       vehicles: {
         Row: {
+          illustration_key?: string | null
           active: boolean
           average_consumption_km_l: number | null
           average_speed_kmh: number | null
@@ -2506,6 +2507,7 @@ export type Database = {
           vehicle_type: Database["public"]["Enums"]["vehicle_type"] | null
         }
         Insert: {
+          illustration_key?: string | null
           active?: boolean
           average_consumption_km_l?: number | null
           average_speed_kmh?: number | null
@@ -2532,6 +2534,7 @@ export type Database = {
           vehicle_type?: Database["public"]["Enums"]["vehicle_type"] | null
         }
         Update: {
+          illustration_key?: string | null
           active?: boolean
           average_consumption_km_l?: number | null
           average_speed_kmh?: number | null
@@ -2625,6 +2628,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      link_group_observation: { Args: { p_company:string; p_actor:string; p_observation:string; p_type:string; p_record:string; p_note:string }; Returns: Json }
       confirm_direct_pix: { Args: { p_actor:string; p_id:string; p_company:string; p_phone:string; p_plan:string; p_reference:string; p_amount:number; p_paid_at:string }; Returns: Json }
       manage_operational_groups: { Args: { p_company: string; p_action: string; p_payload?: Json }; Returns: Json }
       consultancy_admin: { Args: { p_action: string; p_payload?: Json }; Returns: Json }

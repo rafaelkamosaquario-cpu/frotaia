@@ -1,7 +1,7 @@
 import { z } from "zod";
 export const observationCommand = z.object({ registryId: z.uuid(), action: z.enum(['activate','pause']) }).strict();
 export type GroupBinding = {company_id:string;registry_id:string;external_id:string;enabled:boolean;activated_at:string;updated_at:string;updated_by:string};
-export type GroupObservation = {id:string;company_id:string;registry_id:string;message_id:string;received_at:string;sender_name:string;kind:string;original_text:string;status:'processing'|'review'|'unreadable';summary:string;evidence:unknown};
+export type GroupObservation = {id:string;company_id:string;registry_id:string;message_id:string;received_at:string;sender_name:string;kind:string;original_text:string;status:'processing'|'review'|'unreadable';summary:string;evidence:unknown;fuel_fillup_id?:string|null;revenue_id?:string|null;reviewed_at?:string|null;reviewed_by?:string|null;review_note?:string|null};
 export const observationEvidence = z.object({
  summary: z.string().max(1000),
  category: z.enum(['abastecimento','pesagem','frete','manutencao','outro']),

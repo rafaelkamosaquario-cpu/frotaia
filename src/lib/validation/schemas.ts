@@ -118,6 +118,7 @@ export const vehicleBodyTypeSchema = z.enum([
 ]);
 
 const vehicleBaseSchema = z.object({
+  illustrationKey: z.enum(["generic", "truck", "julieta3", "julieta4", "loader", "winch"]).nullable().optional(),
   name: maxText(120, "Nome do veículo").optional(),
   // Validado condicionalmente em validarPlacaConformeTipo abaixo — aqui só normaliza.
   plate: z.string().trim().toUpperCase().optional(),

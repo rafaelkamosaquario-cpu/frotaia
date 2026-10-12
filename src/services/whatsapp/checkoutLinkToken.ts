@@ -2,6 +2,7 @@ import "server-only";
 import { createSignedToken, verifySignedToken } from "@/lib/security/signedToken";
 import { getWhatsappConfig } from "@/lib/whatsapp/config";
 import type { OfertaPlano } from "@/lib/mercadopago/catalog";
+import { requiresPanelSetup, panelSetupUrl } from "@/lib/mercadopago/panelSetup";
 
 /**
  * Link seguro de contratação (`/assinar`) — gerado pela tool
@@ -27,6 +28,7 @@ export interface CheckoutLinkPayload extends Record<string, unknown> {
 }
 
 export function buildCheckoutLinkUrl(companyId: string, planoPreSelecionado: OfertaPlano): string {
+  if (requiresPanelSetup(planoPreSelecionado)) return panelSetupUrl(planoPreSelecionado);
   const { WHATSAPP_WEBHOOK_SECRET, APP_URL } = getWhatsappConfig();
   const token = createSignedToken({ companyId, planoPreSelecionado }, LINK_TTL_SECONDS, WHATSAPP_WEBHOOK_SECRET);
   return `${APP_URL}/assinar?token=${encodeURIComponent(token)}`;

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/useToast";
 import { vehicleCreateSchema, vehicleUpdateSchema } from "@/lib/validation/schemas";
 import type { VehicleRow, VehicleDocumentRow } from "@/lib/supabase/tables";
+import { VehicleIllustrationPicker } from "@/components/frota/VehicleIllustrationPicker";
 
 const selectClass = cn(
   "flex h-10 w-full rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground",
@@ -27,6 +28,7 @@ interface VehicleFormModalProps {
 }
 
 interface FormState {
+  illustrationKey: string;
   name: string;
   plate: string;
   vehicleType: string;
@@ -51,6 +53,7 @@ function documentoVigente(documentos: VehicleDocumentRow[], vehicleId: string | 
 
 function toFormState(vehicle: VehicleRow | null, documentos: VehicleDocumentRow[]): FormState {
   return {
+    illustrationKey: vehicle?.illustration_key ?? "",
     name: vehicle?.name ?? "",
     plate: vehicle?.plate ?? "",
     vehicleType: vehicle?.vehicle_type ?? "",
@@ -78,6 +81,7 @@ function toFormState(vehicle: VehicleRow | null, documentos: VehicleDocumentRow[
  */
 function toPayload(form: FormState): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
+  payload.illustrationKey = form.illustrationKey || null;
   if (form.name) payload.name = form.name;
   if (form.plate) payload.plate = form.plate.toUpperCase();
   if (form.vehicleType) payload.vehicleType = form.vehicleType;
@@ -208,6 +212,7 @@ export function VehicleFormModal({ open, onClose, vehicle, documentos, onSaved }
   return (
     <Modal open={open} onClose={resetAndClose} title={isEditing ? "Editar veículo" : "Novo veículo"} className="max-w-lg">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <VehicleIllustrationPicker value={form.illustrationKey} onChange={value => updateField("illustrationKey", value)} />
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="name" className={labelClass}>

@@ -8,10 +8,12 @@ import { CATALOGO_OFERTAS, isOfertaPlano, type OfertaPlano } from "@/lib/mercado
 import { verifyCheckoutLinkToken } from "@/services/whatsapp/checkoutLinkToken";
 import { logEvent } from "@/lib/observability/logger";
 import { isMetodoCheckout } from "@/lib/mercadopago/paymentOptions";
+import { requiresPanelSetup, panelSetupUrl } from "@/lib/mercadopago/panelSetup";
 
 export interface CriarCheckoutState {
   error?: string;
   initPoint?: string;
+  contactUrl?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export async function criarCheckoutAction(
   const plano: OfertaPlano = planoBruto;
   const metodo = metodoBruto ?? (CATALOGO_OFERTAS[plano].cobranca === "recorrente" ? "recorrente" : CATALOGO_OFERTAS[plano].metodoUnico === "pix" ? "pix" : "credito");
   if (!isMetodoCheckout(metodo) || (metodo === "recorrente" && CATALOGO_OFERTAS[plano].cobranca !== "recorrente")) return { error: "Forma de pagamento inválida." };
+  if (requiresPanelSetup(plano)) return { error: "O painel é preparado com Rafael antes da entrega. Solicite a configuração pelo WhatsApp.", contactUrl: panelSetupUrl(plano) };
 
   const admin = createAdminClient();
   const company = await getCompany(admin, companyId);

@@ -1,4 +1,5 @@
 import type { VehicleRow } from "@/lib/supabase/tables";
+import { VEHICLE_ILLUSTRATIONS } from "./vehicleIllustrations";
 
 // Customer-approved illustrations, not technical vehicle registration data.
 const PILOT = "0fba8f5d-ee49-4b94-bbe5-5b34a33e88ac";
@@ -12,7 +13,10 @@ const illustrations: Record<string, { image: string; caption: string; tractor?: 
   BM125: { image: "tractor-front-yellow.webp", caption: "MUC dianteiro · carregamento", tractor: true },
   FO6610: { image: "tractor-winch.webp", caption: "Guincho florestal · sem MUC", tractor: true },
 };
-export function fleetIllustration(companyId: string, vehicle: Pick<VehicleRow, "company_id" | "plate">) {
+export function fleetIllustration(companyId: string, vehicle: Pick<VehicleRow, "company_id" | "plate" | "illustration_key">) {
+  if (vehicle.company_id !== companyId) return null;
+  const selected = VEHICLE_ILLUSTRATIONS.find(item => item.id === vehicle.illustration_key);
+  if (selected) return selected.image ? { ...selected, image: `/fleet-illustrations/${selected.image}` } : null;
   if (companyId !== PILOT || vehicle.company_id !== companyId) return null;
   const entry = illustrations[(vehicle.plate ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase()];
   return entry ? { ...entry, image: `/fleet-illustrations/${entry.image}` } : null;

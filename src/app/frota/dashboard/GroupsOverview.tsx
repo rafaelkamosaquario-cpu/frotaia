@@ -5,6 +5,7 @@ import { useTransition } from "react";
 import { MessageSquare } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { groupPurpose, type OperationalGroup } from "@/lib/frota/operationalGroups";
+import { GroupQueueSummary } from "./GroupQueueSummary";
 
 export function GroupsOverview({ groups, error, allowed }: { groups: OperationalGroup[]; error: boolean; allowed: boolean }) {
   const router = useRouter();
@@ -18,6 +19,7 @@ export function GroupsOverview({ groups, error, allowed }: { groups: Operational
     <p className="text-sm text-muted-foreground">Leitura de pesagens e abastecimentos · sem responder nos grupos.</p>
     {!allowed ? <p className="text-sm">O proprietário ou administrador pode preparar os grupos da empresa.</p> : error ? <p role="alert" className="text-sm text-danger">Não foi possível consultar os grupos. Tente atualizar; isso não significa que não existam cadastros.</p> : active.length ? <ul className="grid gap-2 sm:grid-cols-2">{active.map(group => <li key={group.id} className="min-w-0 rounded-lg border border-border p-3"><p className="break-words text-sm font-semibold">{group.name}</p><p className="mt-1 text-xs text-muted-foreground">{groupPurpose[group.purpose]} · Confira a leitura em Gerenciar grupos</p></li>)}</ul> : <p className="text-sm">Nenhum grupo em preparação. Cadastre os grupos para iniciar a vinculação.</p>}
     <p className="text-xs text-muted-foreground"><strong>Conferência no painel.</strong> Leitura não confirma lançamento. Sem respostas nos grupos nem lançamentos automáticos.</p>
+    {allowed && active.length > 0 && <GroupQueueSummary />}
     {allowed && <button type="button" disabled={pending} onClick={() => startTransition(() => router.refresh())} className="min-h-11 text-sm font-medium text-primary disabled:opacity-50">{pending ? "Atualizando…" : "Atualizar grupos"}</button>}
   </Card>;
 }

@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import type {OperationalGroup} from '@/lib/frota/operationalGroups';
 import type {GroupBinding,GroupObservation} from '@/lib/frota/groupObservation';
+import {ObservationReviewCard} from './ObservationReviewCard';
 const button='min-h-11 rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50';
 export function GroupObservations({groups}:{groups:OperationalGroup[]}) {
  const [bindings,setBindings]=useState<GroupBinding[]>([]),[events,setEvents]=useState<GroupObservation[]>([]);
@@ -25,6 +26,6 @@ export function GroupObservations({groups}:{groups:OperationalGroup[]}) {
   <div className="flex items-center justify-between gap-3"><h3 className="font-semibold">O que o Frota IA entendeu</h3><button className={button} disabled={busy} onClick={()=>refresh().catch(e=>setError(e.message))}>Atualizar recebimentos</button></div>
   <p className="text-xs text-muted-foreground">Até 100 recebimentos recentes, com atualização a cada 20 segundos enquanto esta tela estiver visível. Consulte o original no WhatsApp para conferir anexos.</p>
   {!events.length&&!error&&<p className="text-sm">Nenhuma mensagem recebida neste modo até agora.</p>}
-  {events.map(event=><article key={event.id} className="space-y-2 rounded-lg border border-border p-4"><p className="font-medium">{groups.find(g=>g.id===event.registry_id)?.name??'Grupo da empresa'} · {event.kind}</p><p className="text-xs text-muted-foreground">{new Date(event.received_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})} · {event.sender_name}</p>{event.original_text&&<details><summary className="cursor-pointer text-sm">Mensagem recebida</summary><p className="whitespace-pre-wrap break-words text-sm">{event.original_text}</p></details>}<p className="whitespace-pre-wrap break-words text-sm">{event.status==='processing'?'Interpretação pendente. Se permanecer assim, confira o original e solicite revisão.':event.summary}</p>{event.status==='review'&&<details><summary className="cursor-pointer text-sm">Dados identificados e dúvidas</summary><pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(event.evidence,null,2)}</pre></details>}<p className="text-xs text-muted-foreground">Somente observação · nenhum lançamento automático</p></article>)}
+  {events.map(event=><ObservationReviewCard key={event.id} event={event} groupName={groups.find(g=>g.id===event.registry_id)?.name??'Grupo da empresa'} onSaved={refresh} />)}
  </section>;
 }

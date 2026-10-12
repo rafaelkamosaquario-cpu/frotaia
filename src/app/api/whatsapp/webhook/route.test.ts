@@ -686,7 +686,7 @@ describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 pergu
     expect(gerarRespostaAssistente).not.toHaveBeenCalled();
   });
 
-  it("escolher um plano depois de 'Ver planos' gera o link de checkout de verdade", async () => {
+  it("escolher Essencial depois de 'Ver planos' encaminha para configuração", async () => {
     resolveOrCreateUserByPhone.mockResolvedValue({ userId: USER_ID, channelId: "canal-1", isNew: false });
     getOnboardingSession.mockResolvedValue({
       state: "awaiting_demo_input",
@@ -695,7 +695,7 @@ describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 pergu
 
     await chamarWebhook(mensagemBotao("demo_plano_essencial"))();
 
-    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("/assinar?token="));
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("https://wa.me/5541997295836"));
     expect(updateOnboardingSession).toHaveBeenCalledWith(
       expect.anything(),
       USER_ID,
@@ -709,7 +709,7 @@ describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 pergu
     getSubscription.mockResolvedValue({ status: "TRIAL", valido_ate: "2020-01-01" });
     const response = await chamarWebhook(mensagemTexto(texto))();
     expect(response.status).toBe(200);
-    expect(sendWhatsappText).toHaveBeenCalledWith(expect.any(String), expect.stringContaining("/assinar?token="));
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.any(String), expect.stringContaining(/individual/i.test(texto) ? "/assinar?token=" : "https://wa.me/5541997295836"));
     expect(getSubscription).not.toHaveBeenCalled();
     expect(appendMessage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ direction: "outbound" }));
   });

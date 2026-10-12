@@ -68,14 +68,14 @@ describe("mensagemConfirmacaoOferta", () => {
 
   it("Essencial mensal menciona o valor certo", () => {
     const texto = mensagemConfirmacaoOferta("ESSENCIAL_MENSAL");
-    expect(texto).toContain("149,90");
+    expect(texto).toContain("Rafael prepara sua empresa");
   });
 
   it("plano anual (cartão ou Pix) sempre menciona as duas formas de pagamento, pro mesmo tier", () => {
     const textoCartao = mensagemConfirmacaoOferta("PRO_ANUAL_PARCELADO");
     const textoPix = mensagemConfirmacaoOferta("PRO_ANUAL_PIX");
-    expect(textoCartao).toContain("cartão");
-    expect(textoCartao).toContain("Pix");
+    expect(textoCartao).toContain("configura os módulos");
+    expect(textoCartao).toContain("entrega do acesso");
     expect(textoCartao).toContain("Pro");
     expect(textoPix).toEqual(textoCartao); // mesma mensagem — a escolha acontece só no gate
   });

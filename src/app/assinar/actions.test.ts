@@ -12,8 +12,8 @@ import { criarCheckoutAction } from "./actions";
 describe("autorização do checkout", () => {
   it.each(["pix", "credito", "debito"])("permite mensal %s sem exigir e-mail da recorrência", async (metodo) => {
     anual.mockResolvedValue({ id: "fake", initPoint: "https://www.mercadopago.com.br/checkout" });
-    expect(await criarCheckoutAction("token", "PRO_MENSAL", undefined, metodo)).toHaveProperty("initPoint");
-    expect(anual).toHaveBeenCalledWith({ companyId: "empresa-assinada", plano: "PRO_MENSAL", metodo });
+    expect(await criarCheckoutAction("token", "INDIVIDUAL_MENSAL", undefined, metodo)).toHaveProperty("initPoint");
+    expect(anual).toHaveBeenCalledWith({ companyId: "empresa-assinada", plano: "INDIVIDUAL_MENSAL", metodo });
     expect(mensal).not.toHaveBeenCalled();
   });
   it("rejeita método desconhecido e anual recorrente", async () => {
@@ -33,6 +33,12 @@ describe("autorização do checkout", () => {
   });
   it("rejeita plano desconhecido", async () => {
     expect(await criarCheckoutAction("token", "GRATIS", "teste@example.com")).toHaveProperty("error"); expect(mensal).not.toHaveBeenCalled();
+  });
+  it.each(["ESSENCIAL_MENSAL", "ESSENCIAL_ANUAL_PIX", "ESSENCIAL_ANUAL_PARCELADO", "PRO_MENSAL", "PRO_ANUAL_PIX", "PRO_ANUAL_PARCELADO"])("encaminha %s para configuração sem criar pagamento", async plan => {
+    const result = await criarCheckoutAction("token", plan, "teste@example.com");
+    expect(result.contactUrl).toContain("https://wa.me/5541997295836");
+    expect(result.initPoint).toBeUndefined();
+    expect(company).not.toHaveBeenCalled(); expect(mensal).not.toHaveBeenCalled(); expect(anual).not.toHaveBeenCalled();
   });
   it("retorna erro recuperável se Mercado Pago falha", async () => {
     mensal.mockRejectedValue(new Error("simulado"));

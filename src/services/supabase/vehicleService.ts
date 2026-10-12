@@ -58,6 +58,7 @@ export async function createVehicle(
     .from("vehicles")
     .insert({
       company_id: companyId,
+      ...(parsed.illustrationKey !== undefined ? { illustration_key: parsed.illustrationKey } : {}),
       name: parsed.name,
       plate: parsed.plate,
       vehicle_type: parsed.vehicleType,
@@ -102,6 +103,7 @@ export async function updateVehicle(
   const { data, error } = await client
     .from("vehicles")
     .update({
+      ...(parsed.illustrationKey !== undefined ? { illustration_key: parsed.illustrationKey } : {}),
       name: parsed.name,
       plate: parsed.plate,
       vehicle_type: parsed.vehicleType,

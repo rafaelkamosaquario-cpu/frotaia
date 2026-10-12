@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CATALOGO_OFERTAS, formatarReais } from "./catalog";
+import { requiresPanelSetup, panelSetupUrl } from "./panelSetup";
 
 export const DIRECT_PLANS = ["INDIVIDUAL_MENSAL", "INDIVIDUAL_ANUAL_PIX", "ESSENCIAL_MENSAL", "ESSENCIAL_ANUAL_PIX", "PRO_MENSAL", "PRO_ANUAL_PIX"] as const;
 export type DirectPlan = typeof DIRECT_PLANS[number];
@@ -18,6 +19,7 @@ export const directPaymentCommand = z.object({
   if (new Date(v.paidAt).getTime() > Date.now()) ctx.addIssue({ code: "custom", message: "Pagamento no futuro." });
 });
 export function directSalesUrl(plan: DirectPlan) {
+  if (requiresPanelSetup(plan)) return panelSetupUrl(plan);
   const offer = CATALOGO_OFERTAS[plan];
   const period = plan.includes("ANUAL") ? "anual" : "mensal";
   return `https://wa.me/5541997295836?text=${encodeURIComponent(`Olá, Rafael! Vim pela página do Frota IA. Quero contratar ${offer.label}, ${period}, ${offer.limiteVeiculos} veículo(s), por ${formatarReais(offer.precoCentavos)}. Quero pagar por Pix com seu atendimento. Meu WhatsApp de uso no Frota IA é: `)}`;

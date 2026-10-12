@@ -53,7 +53,7 @@ async function executar(entrada: GerenciarAssinaturaEntrada): Promise<GerenciarA
     dadosFaltantes: [],
     plano,
     linkContratacao: link,
-    mensagemResumo: `Link de contratação do plano ${CATALOGO_OFERTAS[plano].label} gerado.`,
+    mensagemResumo: CATALOGO_OFERTAS[plano].painel ? `Atendimento com Rafael para configurar ${CATALOGO_OFERTAS[plano].label}. Combine implantação, módulos, pagamento e entrega. Abrir o link não ativa o painel.` : `Link de contratação do plano ${CATALOGO_OFERTAS[plano].label} gerado.`,
   };
 }
 
@@ -62,6 +62,7 @@ function descreverPlano(chave: OfertaPlano): string {
   const oferta = CATALOGO_OFERTAS[chave];
   const painel = oferta.painel ? "com Painel de Gestão" : "sem Painel de Gestão";
   const veiculos = `até ${oferta.limiteVeiculos} veículo${oferta.limiteVeiculos > 1 ? "s" : ""}`;
+  if (oferta.painel) return `${chave}: ${oferta.label}, ${formatarReais(oferta.precoCentavos)}, ${veiculos}, ${painel}. Atendimento obrigatório com Rafael para configuração e entrega; não é checkout automático.`;
 
   if (oferta.cobranca === "recorrente") {
     return `${chave}: ${oferta.label}, ${formatarReais(oferta.precoCentavos)}/mês recorrente, ${painel}, ${veiculos}.`;
@@ -89,9 +90,9 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
 
 export const ferramentaGerenciarAssinatura: DefinicaoFerramenta<GerenciarAssinaturaEntrada, GerenciarAssinaturaResultado> = {
   nome: "gerenciar_assinatura",
-  descricao: "Gera um link seguro de contratação do Frota IA (Individual, Essencial ou Pro, mensal ou anual) — o cliente confirma o plano e a forma de pagamento numa página leve antes de ir pro Mercado Pago.",
+  descricao: "Individual: link seguro para confirmar plano e pagamento. Essencial e Pro: atendimento obrigatório com Rafael para configurar e entregar o painel. Nunca prometa liberação automática dos planos de painel.",
   objetivo:
-    "Deixar o cliente assinar direto pelo WhatsApp: gera um link único vinculado à empresa dele, que abre uma página de resumo/confirmação e só então cria o checkout real do Mercado Pago — nunca gera o link de pagamento direto sem o cliente ver e confirmar o plano/valor antes.",
+    "Individual mantém a contratação pelo WhatsApp. Planos com painel encaminham a Rafael para preparar a empresa, módulos e entrega; pagamento e painel pronto são etapas distintas. O link não altera assinatura nem acessos.",
   parametros: PARAMETROS,
   executar,
 };

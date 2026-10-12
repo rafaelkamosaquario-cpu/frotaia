@@ -61,6 +61,7 @@ export function mensagemConfirmacaoOferta(plano: OfertaPlano): string {
   const oferta = CATALOGO_OFERTAS[plano];
   const tier = tierDoPlano(plano);
   const nome = NOME_TIER[tier];
+  if (oferta.painel) return `Você escolheu o Frota IA ${nome}. Rafael prepara sua empresa, configura os módulos e combina o pagamento e a entrega do acesso. Fale com ele pelo link abaixo. O painel não é liberado só por abrir o link.`;
 
   if (oferta.cobranca === "recorrente") {
     return `Você escolheu o Frota IA ${nome} por ${formatarReais(oferta.precoCentavos)}/mês. No próximo passo você também pode optar pelo pagamento anual, se preferir.`;
