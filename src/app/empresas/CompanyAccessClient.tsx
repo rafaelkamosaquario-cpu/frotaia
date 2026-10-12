@@ -19,6 +19,7 @@ export function CompanyAccessClient({canProvision=false}:{canProvision?:boolean}
  return <main className="min-h-dvh bg-background px-4 py-10 text-foreground"><div className="mx-auto max-w-4xl space-y-6">
   <header><p className="text-sm font-semibold text-primary">Frota IA · Gestão V2</p><h1 className="mt-2 text-3xl font-semibold">Minhas empresas</h1><p className="mt-3 text-muted-foreground">Cada cliente mantém sua conta e assinatura. Entre com seu próprio Google para implantar e acompanhar as empresas que autorizaram você.</p><p className="mt-2 text-sm">Sua conta: {email||"Verificando…"}</p></header>
   {canProvision&&<a href="/consultoria" className={`${button} inline-block bg-primary text-primary-foreground`}>Cadastrar cliente pela consultoria — sem checkout</a>}
+  {canProvision&&<a href="/contratacoes-diretas" className={`${button} inline-block`}>Contratações diretas / Pix — liberar plano</a>}
   {error&&<p role="alert" className="rounded-lg border border-red-500 p-4">{error}</p>}{message&&<p role="status" className="rounded-lg border border-emerald-500 p-4">{message}</p>}
   {!overview&&!error&&<p role="status">Carregando empresas…</p>}
   {overview&&<>

@@ -20,6 +20,7 @@ export type Database = {
   }
   public: {
     Tables: {
+      direct_pix_payments: CostTable<{ id:string; company_id:string; actor_id:string; customer_user_id:string; phone:string; plan:string; reference:string; amount_cents:number; paid_at:string; access_from:string; access_until:string; previous_subscription:Json; created_at:string }>
       operational_group_registry: CostTable<import("@/lib/frota/operationalGroups").OperationalGroup & { company_id:string }>
       operational_group_bindings: CostTable<import("@/lib/frota/groupObservation").GroupBinding>
       operational_group_observations: CostTable<import("@/lib/frota/groupObservation").GroupObservation>
@@ -2624,6 +2625,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      confirm_direct_pix: { Args: { p_actor:string; p_id:string; p_company:string; p_phone:string; p_plan:string; p_reference:string; p_amount:number; p_paid_at:string }; Returns: Json }
       manage_operational_groups: { Args: { p_company: string; p_action: string; p_payload?: Json }; Returns: Json }
       consultancy_admin: { Args: { p_action: string; p_payload?: Json }; Returns: Json }
       consultancy_deliver: { Args: { p_company: string; p_actor: string; p_user: string }; Returns: undefined }
