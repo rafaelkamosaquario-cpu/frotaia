@@ -64,6 +64,35 @@
 .frota-refined .fleet-financial-details,.frota-refined .fleet-operational-details{margin-top:24px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
 .frota-refined .fleet-financial-details>summary,.frota-refined .fleet-operational-details>summary{font-size:14px;font-weight:600;cursor:pointer;padding:5px 0;min-height:32px}
 .frota-refined .fleet-operational-details[open]>summary{margin-bottom:20px}
+.frota-refined .fleet-operating-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:20px;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden}
+.frota-refined .fleet-operating-strip button{display:flex;gap:10px;align-items:center;text-align:left;padding:14px 16px;min-height:58px;border-right:1px solid var(--border);cursor:pointer}
+.frota-refined .fleet-operating-strip button:last-child{border-right:0}
+.frota-refined .fleet-operating-strip strong{font-size:23px;font-weight:650;font-variant-numeric:tabular-nums}
+.frota-refined .fleet-operating-strip span{font-size:11px;color:var(--muted-foreground)}
+.frota-refined .fleet-operating-strip button[aria-pressed=true]{background:var(--surface-muted);box-shadow:inset 0 -3px var(--success)}
+.frota-refined .fleet-filter-count{margin-left:auto;align-self:center;font-size:11px;color:var(--muted-foreground)}
+.frota-refined .fleet-vehicle-card{transition:border-color .15s ease}
+.frota-refined .fleet-vehicle-card:hover{border-color:var(--primary)}
+.frota-refined .fleet-card-title{padding:15px 15px 0}
+.frota-refined .fleet-status{font-size:10px;font-weight:600;max-width:110px}
+.frota-refined .fleet-vehicle-picture{height:92px;margin-top:6px}
+.frota-refined .fleet-driver{padding:10px 15px;gap:8px}
+.frota-refined .fleet-driver>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.frota-refined .fleet-driver small{display:block;font-size:9px;color:var(--muted-foreground);margin-bottom:2px}
+.frota-refined .fleet-driver time{font-size:9px;color:var(--muted-foreground);text-align:right;max-width:72px}
+.frota-refined .fleet-goal-line{padding:13px 15px 8px}
+.frota-refined .fleet-goal-line>div,.frota-refined .fleet-goal-line>p{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px}
+.frota-refined .fleet-goal-line>div>span,.frota-refined .fleet-goal-line>p{color:var(--muted-foreground)}
+.frota-refined .fleet-goal-line strong{font-size:13px;font-variant-numeric:tabular-nums}
+.frota-refined .fleet-goal-line progress{appearance:none;display:block;width:100%;height:6px;margin:10px 0 7px;border:0;border-radius:5px;background:var(--surface-muted);overflow:hidden}
+.frota-refined .fleet-goal-line progress::-webkit-progress-bar{background:var(--surface-muted)}
+.frota-refined .fleet-goal-line progress::-webkit-progress-value{background:var(--primary);border-radius:5px}
+.frota-refined .fleet-goal-line progress::-moz-progress-bar{background:var(--primary)}
+.frota-refined .fleet-comparison>summary{min-height:38px;padding:10px 15px;font-size:10px;color:var(--muted-foreground);cursor:pointer}
+.frota-refined .fleet-money{padding:11px 0;margin:0 15px}
+.frota-refined .fleet-card-result{padding:11px 15px}
+.frota-refined .fleet-vehicle-card :is(button,summary,a,input):focus-visible,.frota-refined .fleet-filter-row button:focus-visible,.frota-refined .fleet-operating-strip button:focus-visible{outline:2px solid var(--primary);outline-offset:-3px}
+@media(max-width:600px){.frota-refined .fleet-operating-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.frota-refined .fleet-operating-strip button{padding:12px;border-bottom:1px solid var(--border)}.frota-refined .fleet-operating-strip button:nth-child(2){border-right:0}.frota-refined .fleet-operating-strip button:nth-child(n+3){border-bottom:0}.frota-refined .fleet-filter-count{width:100%;margin-left:0}.frota-refined .fleet-comparison>summary{min-height:44px}}
 .frota-refined .fleet-operational-details .dashboard-insight{margin-top:20px}
 @media(min-width:1024px){.frota-refined>div>aside{width:248px}.frota-refined .frota-menu{background:#091d35;color:#c7d4d6}.frota-refined .frota-menu p,.frota-refined .frota-menu a{color:#b9c9dd}.frota-refined .frota-menu a[aria-current=page]{background:#123d59;color:#91efd0;border-color:#327363}}
 @media(max-width:1190px){.frota-refined .fleet-vehicle-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.frota-refined .fleet-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -44,8 +44,8 @@ export function ProductionGoals({ companyId, vehicles, drivers, onSnapshot }: { 
   return <Card className="mt-5 p-4 sm:p-5" id="metas-producao">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Resultado, produção e metas do mês</h2><p className="mt-1 text-sm text-muted-foreground">Receitas, combustível e remunerações no mesmo período</p></div><label className="text-sm">Mês de referência<input type="month" min="2000-01" max="2099-12" aria-label="Mês do resultado e das metas" className={field} value={month || loaded?.month || ""} onChange={e => { if (e.target.value) { setLoading(true); setEditing(false); setMonth(e.target.value); } }} /></label><Button variant="outline" onClick={refresh} disabled={loading}>Atualizar acompanhamento</Button></div>
     {loading ? <p role="status" className="py-5 text-sm">Carregando metas...</p> : error ? <div role="alert" className="py-4"><p>{error}</p><Button onClick={refresh} variant="outline" className="mt-2">Tentar novamente</Button></div> : loaded && <>
-      <p className="mt-3 text-xs text-muted-foreground">Ao abrir, exibimos o último mês com produção informada. O ritmo parcial é proporcional aos dias corridos até a data da apuração, não uma previsão de lucro.</p>
-      <FleetVehicleCards companyId={companyId} vehicles={vehicles} drivers={drivers} data={loaded} />
+      <p className="mt-3 text-xs text-muted-foreground">Último mês com produção informada. Apuração parcial não significa meta perdida; sem informação não significa produção zero.</p>
+      <FleetVehicleCards key={`${companyId}:${loaded.month}`} companyId={companyId} vehicles={vehicles} drivers={drivers} data={loaded} />
       <details className="fleet-financial-details"><summary>Ver fechamento financeiro e totais de produção</summary>
       {loaded.revenueError && <div role="alert" className="mt-4 rounded-lg border border-warning p-3 text-sm"><p>{loaded.revenueError}</p><Button variant="outline" onClick={refresh} className="mt-2">Atualizar receitas</Button></div>}
       {loaded.revenueSummary && <section aria-label="Receitas registradas no mês" className="mt-4">
