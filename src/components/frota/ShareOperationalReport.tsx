@@ -21,7 +21,16 @@ export function ShareOperationalReport({ report }: { report: OperationalReport }
       ctx.font = "28px Arial";
       const wrap = (text: string) => {
         const result: string[] = []; let line = "";
-        for (const char of text) { if (char === "\n" || ctx.measureText(line + char).width > width - padding * 2) { result.push(line); line = char === "\n" ? "" : char; } else line += char; }
+        for (const word of text.split(/\s+/)) {
+          const candidate = line ? `${line} ${word}` : word;
+          if (line && ctx.measureText(candidate).width > width - padding * 2) { result.push(line); line = ""; }
+          if (ctx.measureText(word).width > width - padding * 2) {
+            for (const char of word) {
+              if (ctx.measureText(line + char).width > width - padding * 2) { result.push(line); line = ""; }
+              line += char;
+            }
+          } else line = line ? `${line} ${word}` : word;
+        }
         if (line) result.push(line); return result;
       };
       const lines = [report.company, report.subject, `Período: ${report.period}`, "", ...report.fields.map(f => `${f.label}: ${f.value}`), "", report.notice].flatMap(text => text ? wrap(text) : [""]);
@@ -43,3 +52,4 @@ export function ShareOperationalReport({ report }: { report: OperationalReport }
   }
   return <details className="rounded-lg border border-border p-3 text-sm"><summary className="min-h-8 cursor-pointer font-medium">Compartilhar resumo</summary><p className="my-2 text-xs text-muted-foreground">Texto ou imagem com os mesmos registros. Você escolhe para quem enviar.</p><div className="flex flex-wrap gap-2"><button type="button" onClick={copy} className="min-h-11 rounded-lg border border-border px-3">Copiar texto para WhatsApp</button><button type="button" disabled={busy} onClick={download} className="min-h-11 rounded-lg border border-border px-3 disabled:opacity-50">{busy ? "Gerando…" : "Baixar imagem do resumo"}</button></div>{manual && <textarea readOnly aria-label="Resumo para copiar" className="mt-3 min-h-60 w-full bg-background p-3" value={reportText(report)} />}{notice && <p role="status" className="mt-2 text-xs">{notice}</p>}</details>;
 }
+
