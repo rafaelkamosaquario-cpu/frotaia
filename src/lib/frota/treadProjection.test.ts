@@ -1,0 +1,10 @@
+import {it,expect} from 'vitest';
+import {treadProjection,caseSchema,type TireCase} from './tireCases';
+const t:TireCase['tires'][number]={id:'00000000-0000-4000-8000-000000000001',code:'P01',product:'Teste',brand:'',model:'',size:'',life:'Outra',position:'Tração',mountedAt:'2026-03-19',mountedKm:1062237,cost:1700,targetKm:null,advice:'',initialDepth:20,retirementDepth:1.6,projectedLifeKm:92000};
+const e:TireCase['events'][number]={id:'00000000-0000-4000-8000-000000000002',tireId:t.id,date:'2026-10-10',km:1134989,type:'Inspeção',position:'',notes:'',evidence:[],depth:7,depthBasis:'conjunto'};
+it('calcula o caso real preservando origem do conjunto',()=>{const r=treadProjection(t,[e]);expect(r.distance).toBe(72752);expect(r.days).toBe(205);expect(r.kmPerMm).toBeCloseTo(5596.30769);expect(r.remaining).toBeCloseTo(30220.0615);expect(r.months).toBeCloseTo(2.83846);expect(r.status).toBe('dentro');expect(r.reading?.depthBasis).toBe('conjunto');});
+it('não reutiliza sulco antigo como leitura atual',()=>{const r=treadProjection(t,[e,{...e,id:'00000000-0000-4000-8000-000000000003',date:'2026-10-11',km:1135000,depth:null}]);expect(r.total).toBeNull();expect(r.status).toBe('sem-base');});
+it('TWI e retirada interrompem projeção',()=>{expect(treadProjection(t,[{...e,twi:true}]).remaining).toBe(0);expect(treadProjection(t,[{...e,type:'Retirada'}]).status).toBe('retirada');});
+it('desgaste maior sinaliza resultado abaixo da referência',()=>{expect(treadProjection(t,[{...e,depth:4}]).status).toBe('abaixo');});
+it('sem desgaste não projeta',()=>{expect(treadProjection(t,[{...e,depth:20}]).total).toBeNull();});
+it('validação rejeita referência inferior e medição superior à montagem',()=>{const c:TireCase={client:{name:'Teste',document:'',address:'',phone:''},plate:'ABC1D23',vehicle:'',operation:'',baseline:{product:'',cost:0,distance:0,basis:'parcial',notes:''},tires:[{...t,retirementDepth:1}],events:[e],notes:''};expect(caseSchema.safeParse(c).success).toBe(false);c.tires=[t];c.events=[{...e,depth:21}];expect(caseSchema.safeParse(c).success).toBe(false);});

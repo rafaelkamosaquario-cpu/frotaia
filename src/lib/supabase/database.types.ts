@@ -20,6 +20,7 @@ export type Database = {
   }
   public: {
     Tables: {
+      consultant_tire_cases: CostTable<import("@/lib/frota/tireCases").TireCaseRow>
       direct_pix_payments: CostTable<{ id:string; company_id:string; actor_id:string; customer_user_id:string; phone:string; plan:string; reference:string; amount_cents:number; paid_at:string; access_from:string; access_until:string; previous_subscription:Json; created_at:string }>
       operational_group_registry: CostTable<import("@/lib/frota/operationalGroups").OperationalGroup & { company_id:string }>
       operational_group_bindings: CostTable<import("@/lib/frota/groupObservation").GroupBinding>
