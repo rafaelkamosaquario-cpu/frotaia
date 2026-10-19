@@ -13,10 +13,10 @@ export default async function ReceitasPage() {
   if (!access.ok) return null;
 
   const [receitasIniciais, veiculos, motoristas] = await Promise.all([
-    listRevenues(supabase, { companyId: access.company.id, limit: 200 }),
+    listRevenues(supabase, { companyId: access.company.id, all: true }),
     listVehiclesForPanel(supabase, access.company.id),
     listDriversForPanel(supabase, access.company.id),
   ]);
 
-  return <ReceitasClient receitasIniciais={receitasIniciais} veiculos={veiculos} motoristas={motoristas} />;
+  return <ReceitasClient receitasIniciais={receitasIniciais} veiculos={veiculos} motoristas={motoristas} canEdit={["owner","admin","operator"].includes(access.role)} />;
 }

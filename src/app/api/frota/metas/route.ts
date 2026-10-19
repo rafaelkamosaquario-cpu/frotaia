@@ -6,6 +6,7 @@ import { listRevenues } from "@/services/supabase/revenueService";
 import { productionMonthRange, summarizeProductionRevenue } from "@/lib/frota/productionRevenue";
 import { loadMonthlyExpenses } from "@/services/supabase/monthlyExpenseService";
 import { monthlyFuelConsolidates } from "@/lib/frota/monthlyExpenses";
+import { settlementTotals } from "@/lib/frota/settlement";
 
 const fail = (error: string, status: number) => Response.json({ error }, { status });
 export async function GET(request: Request) {
@@ -22,10 +23,13 @@ export async function GET(request: Request) {
   const { data, error } = await db.from("fleet_monthly_production").select("*").eq("company_id", access.company.id).eq("month", month).order("vehicle_id");
   if (error) return fail("Não foi possível carregar as metas. Tente novamente.", 503);
   let revenueSummary = null;
+  let revenueSettlement = null;
+  let expenseSettlement = null;
   let revenueError: string | null = null;
   try {
     const revenues = await listRevenues(db, { companyId: access.company.id, ...productionMonthRange(month), all: true });
     revenueSummary = summarizeProductionRevenue(data ?? [], revenues);
+    revenueSettlement = settlementTotals(revenues);
   } catch {
     revenueError = "Não foi possível carregar as receitas deste mês. Os valores não estão sendo exibidos como zero. Tente atualizar.";
   }
@@ -38,12 +42,13 @@ export async function GET(request: Request) {
     if (!["owner", "admin", "operator"].includes(access.role)) throw new Error("Payroll access required");
     const financial = await loadMonthlyExpenses(db, access.company.id, month);
     expenseSummary = financial.summary;
+    expenseSettlement = settlementTotals(financial.expenses);
     payrollDue = financial.payrollDue;
     fuelConsolidates = monthlyFuelConsolidates(month, data ?? [], financial.expenses);
   } catch {
     expenseError = access.role === "viewer" ? "O detalhamento de despesas e remunerações requer acesso de proprietário, administrador ou operador." : "Não foi possível conferir as despesas e remunerações deste mês. Os totais e o saldo ficam indisponíveis até atualizar.";
   }
-  return Response.json({ month, today, checkedAt: new Date().toISOString(), rows: data, revenueSummary, revenueError, expenseSummary, expenseError, fuelConsolidates, payrollDue, canEdit: ["owner", "admin", "operator"].includes(access.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  return Response.json({ month, today, checkedAt: new Date().toISOString(), rows: data, revenueSummary, revenueError, expenseSummary, expenseError, revenueSettlement, expenseSettlement, fuelConsolidates, payrollDue, canEdit: ["owner", "admin", "operator"].includes(access.role) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");

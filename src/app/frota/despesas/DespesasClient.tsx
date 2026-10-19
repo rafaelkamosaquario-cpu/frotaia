@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SettlementControl, SettlementFilter, SettlementSummary } from "@/components/frota/SettlementControl";
 import { WalletCards, SquarePen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -10,10 +11,13 @@ import { useToast } from "@/hooks/useToast";
 import type { ExpenseRow, ExpenseTypeEnum, VehicleRow } from "@/lib/supabase/tables";
 import { ExpenseFormModal } from "./ExpenseFormModal";
 import { ContextualHelp } from "@/components/frota/ContextualHelp";
+import { salaryExpenseLabel, type SalaryExpenseLink } from "@/lib/frota/salaryExpense";
 
 interface DespesasClientProps {
   despesasIniciais: ExpenseRow[];
   veiculos: VehicleRow[];
+  salarios?: SalaryExpenseLink[];
+  canEdit?: boolean;
 }
 
 function formatDate(iso: string) {
@@ -37,7 +41,7 @@ export const EXPENSE_TYPE_LABEL: Record<ExpenseTypeEnum, string> = {
   outro: "Outro",
 };
 
-export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientProps) {
+export function DespesasClient({ despesasIniciais, veiculos, salarios = [], canEdit = false }: DespesasClientProps) {
   const { showToast } = useToast();
   const [despesas, setDespesas] = useState(despesasIniciais);
   const [formTarget, setFormTarget] = useState<ExpenseRow | null | undefined>(undefined);
@@ -45,16 +49,21 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
   const [isDeleting, setIsDeleting] = useState(false);
   const [filtroVeiculo, setFiltroVeiculo] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroSituacao, setFiltroSituacao] = useState("");
+  const [filtroMes, setFiltroMes] = useState("");
 
   const veiculosPorId = useMemo(() => new Map(veiculos.map((v) => [v.id, v])), [veiculos]);
 
   const despesasFiltradas = useMemo(() => {
     return despesas.filter((d) => {
+      if (filtroMes && !d.expense_date.startsWith(filtroMes)) return false;
+      if (filtroSituacao && (d.settlement_status ?? "unknown") !== filtroSituacao) return false;
       if (filtroVeiculo && d.vehicle_id !== filtroVeiculo) return false;
-      if (filtroTipo && d.expense_type !== filtroTipo) return false;
+      if (filtroTipo === "salario" && !salaryExpenseLabel(d.id, salarios)) return false;
+      if (filtroTipo && filtroTipo !== "salario" && (d.expense_type !== filtroTipo || salaryExpenseLabel(d.id, salarios))) return false;
       return true;
     });
-  }, [despesas, filtroVeiculo, filtroTipo]);
+  }, [despesas, filtroVeiculo, filtroTipo, salarios, filtroSituacao, filtroMes]);
 
   const totalFiltrado = useMemo(() => despesasFiltradas.reduce((soma, d) => soma + d.amount, 0), [despesasFiltradas]);
 
@@ -105,6 +114,8 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
+        <SettlementFilter value={filtroSituacao} onChange={setFiltroSituacao} />
+        <label className="text-sm">Competência <input aria-label="Mês de competência" type="month" value={filtroMes} onChange={e=>setFiltroMes(e.target.value)} className="h-9 rounded border border-border bg-surface px-2"/></label>
         <select
           value={filtroVeiculo}
           onChange={(e) => setFiltroVeiculo(e.target.value)}
@@ -123,6 +134,7 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
           className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-foreground"
         >
           <option value="">Todos os tipos</option>
+          <option value="salario">Salário</option>
           {Object.entries(EXPENSE_TYPE_LABEL).map(([valor, label]) => (
             <option key={valor} value={valor}>
               {label}
@@ -131,6 +143,7 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
         </select>
       </div>
 
+      <SettlementSummary rows={despesasFiltradas} />
       {despesasFiltradas.length === 0 ? (
         <Card className="p-2">
           <EmptyState
@@ -152,6 +165,7 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
                 <th className="px-4 py-3 font-medium">Tipo</th>
                 <th className="px-4 py-3 font-medium">Veículo</th>
                 <th className="px-4 py-3 font-medium">Fornecedor</th>
+                <th className="px-4 py-3 font-medium">Situação</th>
                 <th className="px-4 py-3 font-medium text-right">Valor</th>
                 <th className="px-4 py-3 font-medium text-right">Ações</th>
               </tr>
@@ -159,15 +173,18 @@ export function DespesasClient({ despesasIniciais, veiculos }: DespesasClientPro
             <tbody>
               {despesasFiltradas.map((despesa) => {
                 const veiculo = despesa.vehicle_id ? veiculosPorId.get(despesa.vehicle_id) : null;
+                const salario = salarios.find(s => s.expense_id === despesa.id);
                 return (
                   <tr key={despesa.id} className="border-b border-border last:border-0 hover:bg-surface-muted/50">
                     <td data-label="Data" className="px-4 py-3 text-muted-foreground">{formatDate(despesa.expense_date)}</td>
-                    <td data-label="Tipo" className="px-4 py-3 text-foreground">{EXPENSE_TYPE_LABEL[despesa.expense_type]}</td>
+                    <td data-label="Tipo" className="px-4 py-3 text-foreground">{salario ? "Salário" : EXPENSE_TYPE_LABEL[despesa.expense_type]}{salario && <p className="text-xs text-muted-foreground">{salario.paid_on ? `Pago em ${formatDate(salario.paid_on)}` : "Pagamento pendente"}</p>}</td>
                     <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
                     <td data-label="Fornecedor" className="px-4 py-3 text-muted-foreground">{despesa.vendor ?? "—"}</td>
+                    <td data-label="Situação" className="px-4 py-3"><SettlementControl row={despesa} kind="expenses" onSaved={handleSaved} canEdit={canEdit} linked={!!salario}/></td>
                     <td data-label="Valor" className="px-4 py-3 text-right font-medium text-foreground">{formatBRL(despesa.amount)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
+                        {salario?.paid_on && <a className="px-2 py-2 text-sm text-primary" href={`/api/frota/custos/recibo?id=${salario.id}`}>Recibo PDF</a>}
                         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setFormTarget(despesa)}>
                           <SquarePen className="size-3.5" aria-hidden />
                           Editar

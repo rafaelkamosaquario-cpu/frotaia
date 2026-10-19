@@ -3,7 +3,7 @@ import { z } from "zod";
 /** Modules are product capabilities, not row-level privacy boundaries. Financial summaries include historical records. */
 export const COMPANY_MODULES = [
   { id: "frota", label: "Frota e motoristas", routes: ["veiculos", "motoristas"], tools: ["gerenciar_veiculo", "gerenciar_motorista"] },
-  { id: "financeiro", label: "Resultados, receitas, despesas e remunerações", routes: ["resultados", "metas", "receitas", "clientes", "despesas", "custos", "abastecimentos", "estoque-diesel", "fornecedores", "relatorios"], tools: ["registrar_receita", "registrar_despesa", "gerenciar_abastecimento", "gerenciar_fornecedor", "calcular_combustivel", "calcular_cpk", "calcular_margem", "calcular_receita_km", "calcular_custo_dia", "calcular_custo_veiculo_parado"] },
+  { id: "financeiro", label: "Resultados, receitas, despesas e remunerações", routes: ["resultados", "metas", "receitas", "clientes", "despesas", "custos", "baixas", "abastecimentos", "estoque-diesel", "fornecedores", "relatorios"], tools: ["registrar_receita", "registrar_despesa", "gerenciar_abastecimento", "gerenciar_fornecedor", "calcular_combustivel", "calcular_cpk", "calcular_margem", "calcular_receita_km", "calcular_custo_dia", "calcular_custo_veiculo_parado"] },
   { id: "manutencao", label: "Manutenção", routes: ["manutencao"], tools: ["gerenciar_manutencao"] },
   { id: "pneus", label: "Pneus", routes: ["pneus"], tools: ["gerenciar_pneu_veiculo", "comparar_pneus"] },
   { id: "documentos", label: "Documentos da frota", routes: ["documentos"], tools: ["gerenciar_documento_frota"] },

@@ -3,7 +3,7 @@ import { fleetCardStatus } from "./fleetCardStatus";
 import type { ProductionRevenue } from "./productionRevenue";
 import type { MonthlyExpenses } from "./monthlyExpenses";
 
-export type MonthlySnapshot = { month: string; today: string; rows: MonthlyProduction[]; revenueSummary: ProductionRevenue | null; expenseSummary: MonthlyExpenses | null; checkedAt?: string; payrollDue?: {date:string;amount:number}[] | null };
+export type MonthlySnapshot = { month: string; today: string; rows: MonthlyProduction[]; revenueSummary: ProductionRevenue | null; expenseSummary: MonthlyExpenses | null; checkedAt?: string; payrollDue?: {date:string;amount:number}[] | null; revenueSettlement?: {settled:number;pending:number;unknown:number}|null; expenseSettlement?: {settled:number;pending:number;unknown:number}|null };
 const money = (n: number) => n.toLocaleString("pt-BR", {style:"currency",currency:"BRL"});
 export function monthlyMonitoringBrief(data: MonthlySnapshot) {
   const messages: string[] = [];

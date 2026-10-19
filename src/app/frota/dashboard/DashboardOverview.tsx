@@ -92,6 +92,17 @@ export function DashboardClient({ groups, groupsError, canManageGroups, companyI
       <a href="#metas-producao" className="fleet-summary-result"><span>Saldo parcial<Wallet size={19} aria-hidden /></span><strong className={monitoring.data?.revenueSummary && monitoring.data?.expenseSummary && monitoring.data.revenueSummary.total < monitoring.data.expenseSummary.total ? "text-danger" : ""}>{!monitoring.loading && !monitoring.error && monitoring.data?.revenueSummary && monitoring.data.expenseSummary ? ((Math.round(monitoring.data.revenueSummary.total*100)-Math.round(monitoring.data.expenseSummary.total*100))/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "—"}</strong><small>Receitas menos despesas · não é lucro líquido</small></a>
       </>}
     </div>
+    {monthlyMonitoring && !monitoring.loading && !monitoring.error && monitoring.data && <section className="rounded-xl border border-border bg-surface p-4" aria-label="Situação financeira">
+      <h2 className="font-semibold">Situação financeira · {monitoring.data.month.split("-").reverse().join("/")}</h2>
+      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        {(["revenueSettlement","expenseSettlement"] as const).map((key)=>{
+          const values=monitoring.data?.[key];const revenue=key==="revenueSettlement";
+          const money=(v:number)=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+          return <div key={key} className="text-sm"><p className="font-medium">{revenue?"Receitas":"Despesas"}</p>{values?<><p>{revenue?"Recebidas":"Pagas"}: {money(values.settled)}</p><p>{revenue?"A receber":"A pagar"}: {money(values.pending)}</p><p className="text-muted-foreground">Não informado: {money(values.unknown)}</p></>:<p>Baixas indisponíveis</p>}</div>;
+        })}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">Situação atual dos lançamentos da competência selecionada, não saldo de caixa. A data da baixa pode pertencer a outro mês.</p>
+    </section>}
     {allows("/frota/grupos") && <GroupsOverview groups={groups} error={groupsError} allowed={canManageGroups} />}
     {alertas.filter(a => allows(a.href)).length > 0 && <section aria-label="Precisa da sua atenção" className="rounded-xl border border-border bg-surface p-4"><h2 className="mb-3 text-lg font-semibold">Precisa da sua atenção</h2><ul className="grid gap-3 sm:grid-cols-2">{alertas.filter(a => allows(a.href)).slice(0, 4).map(a => <li key={a.id} className="rounded-lg border border-border p-3"><p className="line-clamp-2 text-sm">{a.descricao}</p><Link href={a.href} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-primary">Conferir pendência →</Link></li>)}</ul><p className="mt-2 text-xs text-muted-foreground">Alertas dos registros atuais. Consulte o período no detalhe; não é acompanhamento em tempo real do veículo.</p></section>}
     {monthlyMonitoring && <ProductionGoals key={companyId} companyId={companyId} companyName={companyName} vehicles={veiculos} drivers={motoristas} onSnapshot={setMonitoring} assistantEnabled={assistantEnabled} />}

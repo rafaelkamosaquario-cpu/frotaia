@@ -1,0 +1,30 @@
+import { beforeEach, it, expect, vi } from "vitest";
+const m=vi.hoisted(()=>({access:vi.fn(),admin:vi.fn(),eq:vi.fn(),update:vi.fn(),maybe:vi.fn(),limit:vi.fn()}));
+vi.mock("@/lib/supabase/server",()=>({createClient:vi.fn()}));
+vi.mock("@/lib/supabase/admin",()=>({createAdminClient:m.admin}));
+vi.mock("@/services/supabase/fleetPanelAccess",()=>({loadFleetPanelAccess:m.access}));
+import { POST } from "./route";
+const input={kind:"revenues",id:"00000000-0000-4000-8000-000000000001",status:"settled",date:null,note:"Recebimento confirmado",version:2};
+const request=(body:unknown=input)=>new Request("https://test/api/frota/baixas",{method:"POST",headers:{origin:"https://test"},body:JSON.stringify(body)});
+beforeEach(()=>{
+  vi.clearAllMocks();
+  m.access.mockResolvedValue({ok:true,role:"admin",userId:"actor",company:{id:"company-a"}});
+  const q={select:vi.fn(),eq:m.eq,update:m.update,maybeSingle:m.maybe,limit:m.limit};
+  q.select.mockReturnValue(q);m.eq.mockReturnValue(q);m.update.mockReturnValue(q);
+  m.maybe.mockResolvedValue({data:{id:input.id,settlement_status:"settled"},error:null});
+  m.limit.mockResolvedValue({data:[],error:null});m.admin.mockReturnValue({from:vi.fn().mockReturnValue(q)});
+});
+it("não autenticado não escreve",async()=>{m.access.mockResolvedValue({ok:false,reason:"unauthenticated"});expect((await POST(request())).status).toBe(401);expect(m.admin).not.toHaveBeenCalled();});
+it("leitor não escreve",async()=>{m.access.mockResolvedValue({ok:true,role:"viewer"});expect((await POST(request())).status).toBe(403);expect(m.admin).not.toHaveBeenCalled();});
+it("usa empresa da sessão e versão, preserva competência e valor",async()=>{
+  expect((await POST(request())).status).toBe(200);
+  expect(m.eq).toHaveBeenCalledWith("company_id","company-a");expect(m.eq).toHaveBeenCalledWith("id",input.id);expect(m.eq).toHaveBeenCalledWith("settlement_version",2);
+  expect(m.update).toHaveBeenCalledWith({settlement_status:"settled",settled_on:null,settlement_note:input.note,settlement_updated_by:"actor"});
+});
+it("rejeita tentativa de mudar a empresa",async()=>{expect((await POST(request({...input,companyId:"b"}))).status).toBe(400);expect(m.update).not.toHaveBeenCalled();});
+it("registro de outra empresa ou versão antiga não produz sucesso",async()=>{m.maybe.mockResolvedValue({data:null,error:null});expect((await POST(request())).status).toBe(409);});
+it("salário segue o fluxo original",async()=>{m.limit.mockResolvedValue({data:[{id:"salary"}],error:null});expect((await POST(request({...input,kind:"expenses"}))).status).toBe(409);expect(m.update).not.toHaveBeenCalled();});
+it("falha na conferência de salário bloqueia a baixa",async()=>{m.limit.mockResolvedValue({data:null,error:{message:"fail"}});expect((await POST(request({...input,kind:"expenses"}))).status).toBe(500);expect(m.update).not.toHaveBeenCalled();});
+it("JSON inválido retorna 400",async()=>{expect((await POST(new Request("https://test",{method:"POST",headers:{origin:"https://test"},body:"{"}))).status).toBe(400);});
+it("aceita a origem pública atrás do proxy",async()=>{expect((await POST(new Request("http://internal:3000/api/frota/baixas",{method:"POST",headers:{origin:"https://frotaia.up.railway.app","x-forwarded-host":"frotaia.up.railway.app"},body:JSON.stringify(input)}))).status).toBe(200);});
+it("bloqueia origem externa antes de consultar a sessão",async()=>{expect((await POST(new Request("https://test/api/frota/baixas",{method:"POST",headers:{origin:"https://other.test"},body:JSON.stringify(input)}))).status).toBe(403);expect(m.access).not.toHaveBeenCalled();});

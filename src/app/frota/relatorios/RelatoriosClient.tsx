@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { SettlementSummary } from "@/components/frota/SettlementControl";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Download } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -80,6 +81,7 @@ export function RelatoriosClient({ todosVeiculos, todosMotoristas, periodo, filt
         <div>
           <h1 className="text-lg font-semibold text-foreground">Relatórios</h1>
           <p className="text-sm text-muted-foreground">Resumo operacional da frota</p>
+          <p className="text-xs text-muted-foreground">As situações financeiras abaixo são exibidas na tela; o PDF operacional mantém seu modelo atual.</p>
         </div>
         <button
           type="button"
@@ -100,6 +102,9 @@ export function RelatoriosClient({ todosVeiculos, todosMotoristas, periodo, filt
         </button>
       </div>
 
+      <h2 className="text-sm font-semibold">Baixas dos lançamentos do período selecionado</h2>
+      <SettlementSummary rows={dados.despesas} />
+      <SettlementSummary rows={dados.receitas} revenue />
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <select
           value={periodo.preset}

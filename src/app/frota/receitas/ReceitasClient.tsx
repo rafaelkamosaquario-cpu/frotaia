@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SettlementControl, SettlementFilter, SettlementSummary } from "@/components/frota/SettlementControl";
 import Link from "next/link";
 import { TrendingUp, SquarePen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -15,6 +16,7 @@ interface ReceitasClientProps {
   receitasIniciais: RevenueRow[];
   veiculos: VehicleRow[];
   motoristas: DriverRow[];
+  canEdit?: boolean;
 }
 
 function formatDate(iso: string) {
@@ -25,21 +27,24 @@ function formatBRL(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function ReceitasClient({ receitasIniciais, veiculos, motoristas }: ReceitasClientProps) {
+export function ReceitasClient({ receitasIniciais, veiculos, motoristas, canEdit = false }: ReceitasClientProps) {
   const { showToast } = useToast();
   const [receitas, setReceitas] = useState(receitasIniciais);
   const [formTarget, setFormTarget] = useState<RevenueRow | null | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<RevenueRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [filtroVeiculo, setFiltroVeiculo] = useState("");
+  const [filtroSituacao, setFiltroSituacao] = useState("");
+  const [filtroMes, setFiltroMes] = useState("");
 
   const veiculosPorId = useMemo(() => new Map(veiculos.map((v) => [v.id, v])), [veiculos]);
   const motoristasPorId = useMemo(() => new Map(motoristas.map((m) => [m.id, m])), [motoristas]);
 
   const receitasFiltradas = useMemo(() => {
-    if (!filtroVeiculo) return receitas;
-    return receitas.filter((r) => r.vehicle_id === filtroVeiculo);
-  }, [receitas, filtroVeiculo]);
+    return receitas.filter(r => (!filtroVeiculo || r.vehicle_id === filtroVeiculo)
+      && (!filtroMes || r.revenue_date.startsWith(filtroMes))
+      && (!filtroSituacao || (r.settlement_status ?? "unknown") === filtroSituacao));
+  }, [receitas, filtroVeiculo, filtroSituacao, filtroMes]);
 
   const totalFiltrado = useMemo(() => receitasFiltradas.reduce((soma, r) => soma + r.amount, 0), [receitasFiltradas]);
 
@@ -87,6 +92,8 @@ export function ReceitasClient({ receitasIniciais, veiculos, motoristas }: Recei
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
+        <SettlementFilter value={filtroSituacao} onChange={setFiltroSituacao} revenue />
+        <label className="text-sm">Competência <input aria-label="Mês de competência" type="month" value={filtroMes} onChange={e=>setFiltroMes(e.target.value)} className="h-9 rounded border border-border bg-surface px-2"/></label>
         <Link href="/frota/receitas/clientes" className="inline-flex h-9 items-center rounded-lg border border-border bg-surface px-3 text-sm font-medium hover:bg-surface-muted">Clientes do transporte</Link>
         <select
           value={filtroVeiculo}
@@ -102,6 +109,7 @@ export function ReceitasClient({ receitasIniciais, veiculos, motoristas }: Recei
         </select>
       </div>
 
+      <SettlementSummary rows={receitasFiltradas} revenue />
       {receitasFiltradas.length === 0 ? (
         <Card className="p-2">
           <EmptyState
@@ -127,6 +135,7 @@ export function ReceitasClient({ receitasIniciais, veiculos, motoristas }: Recei
                 <th className="px-4 py-3 font-medium">Veículo</th>
                 <th className="px-4 py-3 font-medium">Motorista</th>
                 <th className="px-4 py-3 font-medium">Descrição</th>
+                <th className="px-4 py-3 font-medium">Situação</th>
                 <th className="px-4 py-3 font-medium text-right">Valor</th>
                 <th className="px-4 py-3 font-medium text-right">Ações</th>
               </tr>
@@ -141,6 +150,7 @@ export function ReceitasClient({ receitasIniciais, veiculos, motoristas }: Recei
                     <td data-label="Veículo" className="px-4 py-3 text-muted-foreground">{veiculo ? veiculo.name || veiculo.plate : "—"}</td>
                     <td data-label="Motorista" className="px-4 py-3 text-muted-foreground">{motorista?.name ?? "—"}</td>
                     <td data-label="Descrição" className="px-4 py-3 text-muted-foreground">{receita.description ?? "—"}</td>
+                    <td data-label="Situação" className="px-4 py-3"><SettlementControl row={receita} kind="revenues" onSaved={handleSaved} canEdit={canEdit}/></td>
                     <td data-label="Valor" className="px-4 py-3 text-right font-medium text-success">{formatBRL(receita.amount)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">

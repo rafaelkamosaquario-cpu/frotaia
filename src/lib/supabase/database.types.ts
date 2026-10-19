@@ -698,6 +698,11 @@ export type Database = {
       }
       expenses: {
         Row: {
+          settlement_status?: "unknown" | "pending" | "settled"
+          settled_on?: string | null
+          settlement_version?: number
+          settlement_updated_by?: string | null
+          settlement_note?: string | null
           amount: number
           company_id: string
           conversation_id: string | null
@@ -738,6 +743,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           expense_date?: string
+          settlement_status?: "unknown" | "pending" | "settled"
+          settled_on?: string | null
+          settlement_updated_by?: string | null
+          settlement_note?: string | null
           expense_type?: Database["public"]["Enums"]["expense_type"]
           fuel_fillup_id?: string | null
           id?: string
@@ -1549,6 +1558,11 @@ export type Database = {
       }
       revenues: {
         Row: {
+          settlement_status?: "unknown" | "pending" | "settled"
+          settled_on?: string | null
+          settlement_version?: number
+          settlement_updated_by?: string | null
+          settlement_note?: string | null
           amount: number
           analysis_run_id: string | null
           company_id: string
@@ -1584,6 +1598,10 @@ export type Database = {
           driver_id?: string | null
           id?: string
           revenue_date?: string
+          settlement_status?: "unknown" | "pending" | "settled"
+          settled_on?: string | null
+          settlement_updated_by?: string | null
+          settlement_note?: string | null
           user_id?: string
           vehicle_id?: string | null
         }
