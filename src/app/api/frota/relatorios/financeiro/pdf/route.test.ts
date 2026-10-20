@@ -1,0 +1,15 @@
+import { beforeEach,expect,it,vi } from "vitest";
+const m=vi.hoisted(()=>({access:vi.fn(),admin:vi.fn(),load:vi.fn(),pdf:vi.fn()}));
+vi.mock("@/lib/supabase/server",()=>({createClient:vi.fn().mockResolvedValue("client")}));
+vi.mock("@/lib/supabase/admin",()=>({createAdminClient:m.admin}));
+vi.mock("@/services/supabase/fleetPanelAccess",()=>({loadFleetPanelAccess:m.access}));
+vi.mock("@/services/supabase/financialReportService",()=>({loadFinancialReport:m.load}));
+vi.mock("@/services/documents/financialReport",()=>({generateFinancialReport:m.pdf}));
+import {GET} from "./route";
+const req=(query="period=custom&from=2026-09-01&to=2026-09-30")=>new Request(`https://f.test/api/frota/relatorios/financeiro/pdf?${query}`);
+beforeEach(()=>{vi.clearAllMocks();m.access.mockResolvedValue({ok:true,role:"admin",company:{id:"a",name:"Empresa A"}});m.admin.mockReturnValue("admin");m.load.mockResolvedValue({from:"2026-09-01",to:"2026-09-30"});m.pdf.mockResolvedValue(new Uint8Array([37,80,68,70]));});
+it("exige autenticação antes de acessar dados",async()=>{m.access.mockResolvedValue({ok:false,reason:"unauthenticated"});expect((await GET(req())).status).toBe(401);expect(m.load).not.toHaveBeenCalled();});
+it("bloqueia perfil leitor e módulo desabilitado",async()=>{m.access.mockResolvedValue({ok:true,role:"viewer"});expect((await GET(req())).status).toBe(403);m.access.mockResolvedValue({ok:true,role:"admin",moduleConfig:{enabled:[]}});expect((await GET(req())).status).toBe(403);expect(m.admin).not.toHaveBeenCalled();});
+it("valida datas e impede filtro de motorista financeiro enganoso",async()=>{for(const q of ["period=custom&from=2026-09-31&to=2026-10-01","period=custom&from=2026-10-01&to=2026-09-01","period=custom","driverId=abc","vehicleId=abc"])expect((await GET(req(q))).status).toBe(400);expect(m.load).not.toHaveBeenCalled();});
+it("usa empresa autorizada e resposta privada sem cache",async()=>{const r=await GET(req());expect(r.status).toBe(200);expect(m.load).toHaveBeenCalledWith("client","admin",{id:"a",name:"Empresa A"},{from:"2026-09-01",to:"2026-09-30"});expect(r.headers.get("cache-control")).toBe("private, no-store");});
+it("não entrega relatório parcial se leitura falhar",async()=>{m.load.mockRejectedValue(new Error("secret database error"));const r=await GET(req());expect(r.status).toBe(500);expect(await r.text()).not.toContain("secret");expect(m.pdf).not.toHaveBeenCalled();});

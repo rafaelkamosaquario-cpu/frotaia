@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { SettlementSummary } from "@/components/frota/SettlementControl";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Download } from "lucide-react";
@@ -54,6 +54,8 @@ export function RelatoriosClient({ todosVeiculos, todosMotoristas, periodo, filt
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [financialBusy, setFinancialBusy] = useState(false);
+  const [financialError, setFinancialError] = useState("");
 
   const blocos = useMemo(() => computeRelatoriosBlocos(dados, periodo.label), [dados, periodo.label]);
 
@@ -81,7 +83,7 @@ export function RelatoriosClient({ todosVeiculos, todosMotoristas, periodo, filt
         <div>
           <h1 className="text-lg font-semibold text-foreground">Relatórios</h1>
           <p className="text-sm text-muted-foreground">Resumo operacional da frota</p>
-          <p className="text-xs text-muted-foreground">As situações financeiras abaixo são exibidas na tela; o PDF operacional mantém seu modelo atual.</p>
+          <p className="text-xs text-muted-foreground">O PDF financeiro detalha receitas, despesas, folha, veículos, baixas e participação dos custos no faturamento. Selecione um mês completo para incluir as metas cadastradas e o gráfico de produção. O resumo operacional continua disponível.</p>
         </div>
         <button
           type="button"
@@ -101,6 +103,29 @@ export function RelatoriosClient({ todosVeiculos, todosMotoristas, periodo, filt
           Baixar PDF
         </button>
       </div>
+
+      <Card className="mb-5 p-4">
+        <h2 className="font-semibold">Relatório financeiro completo</h2>
+        <p className="mb-3 text-sm text-muted-foreground">Competência de {periodo.from.split("-").reverse().join("/")} a {periodo.to.split("-").reverse().join("/")}. Inclui faturamento e custos por veículo, folha por funcionário e situação de cada lançamento, inclusive baixas feitas fora do mês. Não é extrato bancário nem lucro líquido.</p>
+        <button type="button" disabled={financialBusy || !!filtroAtual.driverId}
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          onClick={async()=>{
+            setFinancialBusy(true);setFinancialError("");
+            try {
+              // Pin absolute dates at click time; do not let a relative month roll over during download.
+              const p=new URLSearchParams({period:"custom",from:periodo.from,to:periodo.to});
+              if(filtroAtual.vehicleId)p.set("vehicleId",filtroAtual.vehicleId);
+              const response=await fetch(`/api/frota/relatorios/financeiro/pdf?${p}`,{cache:"no-store"});
+              if(!response.ok)throw new Error("Falha ao gerar o relatório. Confira o período e sua permissão de acesso.");
+              const url=URL.createObjectURL(await response.blob());
+              const link=document.createElement("a");link.href=url;link.download=`relatorio-financeiro-${periodo.from}-${periodo.to}.pdf`;link.click();
+              setTimeout(()=>URL.revokeObjectURL(url),1000);
+            } catch {setFinancialError("Não foi possível emitir o relatório financeiro. Nenhum dado foi alterado. Tente novamente.");}
+            finally{setFinancialBusy(false);}
+          }}>{financialBusy?"Gerando relatório...":"Baixar PDF financeiro completo"}</button>
+        {filtroAtual.driverId && <p className="mt-2 text-sm">Selecione Todos os motoristas para emitir o financeiro. Para um recorte específico, use o filtro de veículo.</p>}
+        {financialError && <p role="alert" className="mt-2 text-sm text-red-500">{financialError}</p>}
+      </Card>
 
       <h2 className="text-sm font-semibold">Baixas dos lançamentos do período selecionado</h2>
       <SettlementSummary rows={dados.despesas} />
