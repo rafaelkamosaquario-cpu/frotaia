@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/api/frota/pneus/cases/modelos": ["./private-assets/tire-mapping/*.pdf"],
+  },
   turbopack: {
     root: path.join(__dirname),
   },

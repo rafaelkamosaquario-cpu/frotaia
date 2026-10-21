@@ -3,6 +3,7 @@ import {useEffect,useState} from "react";
 import Link from "next/link";
 import {comparison,treadProjection,type TireCase,type TireCaseRow} from "@/lib/frota/tireCases";
 import {TireCaseReport} from "./TireCaseReport";
+import {TireMappingModels} from "./TireMappingModels";
 const input="w-full rounded-lg border border-border bg-surface p-2 text-foreground";
 const button="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-40";
 function Field({label,value,onChange,type="text"}:{label:string;value:string|number;onChange:(v:string)=>void;type?:string}){return <label className="block text-sm">{label}<input className={input} type={type} step={type==="number"?"any":undefined} value={value} onChange={e=>onChange(e.target.value)}/></label>}
@@ -24,6 +25,7 @@ export function TireCasesClient(){
   <Link href="/frota/pneus" className="text-primary">← Cadastro padrão de pneus</Link>
   <header><p className="text-primary text-sm">PRIVADO · RODOCORE / FROTA IA</p><h1 className="text-2xl font-semibold">Acompanhamento de clientes e CPK</h1><p className="text-muted-foreground">Registros exclusivos da conta adm. Não cadastra clientes como usuários nem altera os pneus da frota. Compartilhamento manual, sem disparos automáticos.</p></header>
   <section className="rounded-xl border border-border p-4 space-y-2"><a className="text-primary font-semibold" href="https://diagnosticocpk.netlify.app/" target="_blank" rel="noopener noreferrer">Abrir aplicativo CPK original ↗</a><p className="text-sm text-muted-foreground">Ferramenta externa: abre em outra aba, sem enviar os dados deste cadastro. O comparativo abaixo usa custo por pneu e distância registrada; não é uma reprodução completa do aplicativo original. Registre a origem e o período da referência.</p></section>
+  <TireMappingModels/>
   {error&&<p role="alert" className="border border-danger p-3">{error}</p>}{notice&&<p role="status">{notice}</p>}
   <div className="flex flex-wrap gap-3"><button className={button} disabled={busy} onClick={()=>{choose(blankCase());setDirty(true);}}>Novo acompanhamento</button><button className={button} disabled={busy} onClick={()=>void load()}>Atualizar lista</button><input className={`${input} max-w-sm`} aria-label="Buscar cliente ou placa" placeholder="Buscar cliente ou placa" value={query} onChange={e=>setQuery(e.target.value)}/></div>
   <div className="grid sm:grid-cols-2 gap-3">{rows.filter(r=>`${r.data.client.name} ${r.data.plate}`.toLowerCase().includes(query.toLowerCase())).map(r=><button className={`${button} text-left`} key={r.id} onClick={()=>choose(r)}><strong>{r.data.client.name} · {r.data.plate}</strong><br/>{r.data.tires.length} pneu(s) · revisão {r.version}</button>)}</div>
