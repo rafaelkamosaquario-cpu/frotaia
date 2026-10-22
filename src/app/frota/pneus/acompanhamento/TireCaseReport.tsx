@@ -19,9 +19,29 @@ export function TireCaseReport({row}:{row:TireCaseRow}){
    rect(0,0,1200,1697,'white');rect(0,0,1200,140,ink);text('RODOCORE',50,60,34,'white',true);text('CONSULTORIA · ACOMPANHAMENTO DE PNEUS',50,103,19,'#b4d4e9');text('FROTA IA',940,60,30,'#62ccf5',true);text('PAINEL WEB',940,100,21,'#b4d4e9');
    wrap(c.client.name,50,187,1100,29,ink);wrap(`${c.plate} | ${c.vehicle}`,50,237,1100,22,ink);wrap(c.operation,50,282,1100,19);
    rect(50,310,1100,55,'#e8f3fa');text('REGISTRO SALVO · DATAS DE INSPEÇÃO INDICADAS POR PNEU',70,345,21,'#087eae',true);
-   ctx.drawImage(truck,65,390,195,292);text('Ilustração genérica',65,711,17,muted);
-   group.forEach((t,i)=>{const x=370+(i%2)*390,y=420+Math.floor(i/2)*135;const r=treadProjection(t,c.events);ctx.beginPath();ctx.arc(x,y,31,0,Math.PI*2);ctx.fillStyle='#f4c952';ctx.fill();ctx.strokeStyle='#86620d';ctx.lineWidth=2;ctx.stroke();for(let j=0;j<16;j++){const a=j*Math.PI/8;ctx.beginPath();ctx.moveTo(x+26*Math.cos(a),y+26*Math.sin(a));ctx.lineTo(x+30*Math.cos(a+.07),y+30*Math.sin(a+.07));ctx.stroke();}ctx.beginPath();ctx.arc(x,y,17,0,Math.PI*2);ctx.fillStyle='white';ctx.fill();ctx.stroke();text(String(offset+i+1),x-7,y+6,16,ink,true);wrap(t.code,x+48,y-5,275,21,ink);wrap(r.reading?.position||t.position,x+48,y+24,275,18);});
-   wrap('Amarelo: pneu acompanhado. Posições conforme cadastro; a ilustração não confirma a configuração de eixos. Identificação provisória deve ser conferida.',330,685,810,18);
+   ctx.drawImage(truck,490,380,220,330);text('FRENTE DO VEÍCULO',490,382,17,muted);
+   const sides={left:0,right:0};
+   group.forEach((t)=>{
+    const r=treadProjection(t,c.events),position=r.reading?.position||t.position;
+    const normalized=position.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    const knownLeft=normalized.includes('esquer'),knownRight=normalized.includes('direit');
+    // Unknown positions are listed but never mapped to a physical wheel.
+    const preferred=knownLeft?'left':knownRight?'right':sides.left<=sides.right?'left':'right';
+    const side=sides[preferred]<2?preferred:preferred==='left'?'right':'left';
+    const slot=sides[side]++,x=side==='left'?50:790,y=400+slot*145;
+    rect(x,y,360,132,'#eaf1f6');text(t.code,x+16,y+29,23,ink,true);
+    wrap(position,x+16,y+55,328,17);
+    wrap([t.brand,t.model,t.size].filter(Boolean).join(' · '),x+16,y+101,328,17,ink);
+    const traction=normalized.includes('tracao');
+    const inner=normalized.includes('intern')||normalized.includes('dentro');
+    const outer=normalized.includes('extern')||normalized.includes('fora');
+    if(traction&&(knownLeft||knownRight)&&(inner||outer)){
+     const wx=490+220*(knownLeft?(inner ? .33 : .25):(inner ? .67 : .75)),wy=380+330*.72;
+     ctx.strokeStyle='#ae841b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(side==='left'?410:790,y+65);ctx.lineTo(wx,wy);ctx.stroke();
+     ctx.beginPath();ctx.ellipse(wx,wy,9,17,0,0,Math.PI*2);ctx.fillStyle='#f4c952';ctx.fill();ctx.stroke();
+    }
+   });
+   wrap('Amarelo: pneus acompanhados na tração conforme posição cadastrada. Desenho ilustrativo. Códigos provisórios não substituem número de fogo ou série.',50,735,1100,17);
    group.forEach((t,i)=>{const y=770+i*170,r=treadProjection(t,c.events);rect(50,y,1100,158,i%2?'#f5f8fa':'#eaf1f6');
     wrap(`${t.code} | ${t.product}`,65,y+27,1070,21,ink);
     text(`Montagem: ${date(t.mountedAt)} · ${n(t.mountedKm)} km`,65,y+59,18);text(`Leitura: ${date(r.reading?.date)} · ${n(r.reading?.km)} km`,620,y+59,18);
@@ -41,3 +61,4 @@ export function TireCaseReport({row}:{row:TireCaseRow}){
  async function share(){try{const files=await Promise.all(images.map(async(url,i)=>new File([await (await fetch(url)).blob()],`${c.plate}-pneus-${i+1}.png`,{type:'image/png'})));if(!navigator.canShare?.({files})){setNotice('Baixe a imagem ou PDF e anexe no WhatsApp. Este navegador não compartilha arquivos.');return;}await navigator.share({files,title:'Acompanhamento de pneus',text:message});setNotice('Compartilhamento entregue ao aparelho; confirme o envio no aplicativo.');}catch{setNotice('Compartilhamento cancelado ou indisponível. Nenhum envio confirmado.');}}
  return <section className="rounded-xl border border-border p-4 space-y-3"><h2 className="font-semibold">Ficha visual para o cliente</h2><button disabled={busy} className={btn} onClick={()=>void generate()}>Gerar relatório para o cliente</button>{images.length>0&&<><div className="flex flex-wrap gap-2"><button className={btn} disabled={busy} onClick={()=>void pdf()}>Baixar PDF visual</button><button className={btn} disabled={busy} onClick={()=>void share()}>Compartilhar arquivo</button><button className={btn} onClick={async()=>{try{await navigator.clipboard.writeText(message);setNotice('Mensagem copiada. Anexe o arquivo na conversa.');}catch{setNotice('Copie a mensagem exibida abaixo.');}}}>Copiar mensagem</button></div>{images.map((src,i)=><div key={src.slice(-60)+i}><button className={btn} onClick={()=>download(src,`${c.plate}-pneus-${i+1}.png`)}>Baixar imagem {i+1}</button>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={src} alt={`Ficha visual - página ${i+1}`} className="w-full max-w-2xl mt-3"/></div>)}<textarea readOnly value={message} aria-label="Mensagem para o cliente" className="w-full border border-border rounded-lg p-3 bg-surface" rows={5}/></>}{notice&&<p role="status">{notice}</p>}<p className="text-sm text-muted-foreground">Nenhum envio automático. Ficha somente dos dados salvos; não divulga endereço ou contato privado. O PDF técnico abaixo contém histórico e dados cadastrais: confira antes de enviar.</p></section>;
 }
+

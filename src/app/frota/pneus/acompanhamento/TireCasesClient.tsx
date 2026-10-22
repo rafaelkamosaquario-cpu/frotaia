@@ -25,9 +25,10 @@ export function TireCasesClient(){
   <Link href="/frota/pneus" className="text-primary">← Cadastro padrão de pneus</Link>
   <header><p className="text-primary text-sm">PRIVADO · RODOCORE / FROTA IA</p><h1 className="text-2xl font-semibold">Acompanhamento de clientes e CPK</h1><p className="text-muted-foreground">Registros exclusivos da conta adm. Não cadastra clientes como usuários nem altera os pneus da frota. Compartilhamento manual, sem disparos automáticos.</p></header>
   <section className="rounded-xl border border-border p-4 space-y-2"><a className="text-primary font-semibold" href="https://diagnosticocpk.netlify.app/" target="_blank" rel="noopener noreferrer">Abrir aplicativo CPK original ↗</a><p className="text-sm text-muted-foreground">Ferramenta externa: abre em outra aba, sem enviar os dados deste cadastro. O comparativo abaixo usa custo por pneu e distância registrada; não é uma reprodução completa do aplicativo original. Registre a origem e o período da referência.</p></section>
-  <TireMappingModels/>
   {error&&<p role="alert" className="border border-danger p-3">{error}</p>}{notice&&<p role="status">{notice}</p>}
-  <div className="flex flex-wrap gap-3"><button className={button} disabled={busy} onClick={()=>{choose(blankCase());setDirty(true);}}>Novo acompanhamento</button><button className={button} disabled={busy} onClick={()=>void load()}>Atualizar lista</button><input className={`${input} max-w-sm`} aria-label="Buscar cliente ou placa" placeholder="Buscar cliente ou placa" value={query} onChange={e=>setQuery(e.target.value)}/></div>
+  <div className="flex flex-wrap gap-3"><button className={button} disabled={busy} onClick={()=>{choose(blankCase());setDirty(true);}}>Novo acompanhamento</button><Link className={`${button} bg-primary text-primary-foreground`} href={selected?.version?`/frota/pneus/mapeamento?cliente=${encodeURIComponent(selected.id)}`:"/frota/pneus/mapeamento"} onClick={e=>{if(busy||(dirty&&!confirm("Há alterações não salvas no acompanhamento. Sair sem salvar?")))e.preventDefault();}}>Mapeamento e cadastro de pneus</Link><button className={button} disabled={busy} onClick={()=>void load()}>Atualizar lista</button><input className={`${input} max-w-sm`} aria-label="Buscar cliente ou placa" placeholder="Buscar cliente ou placa" value={query} onChange={e=>setQuery(e.target.value)}/></div>
+  <p className="text-sm text-muted-foreground">Dois caminhos na sua área privada: acompanhamento e CPK para desempenho; mapeamento para número de fogo, DOT, série, estoque, posições e baixas. O mapeamento permite reutilizar o cliente selecionado, sem copiar pneus ou medições automaticamente.</p>
+  <details className="rounded-xl border border-border p-4"><summary className="cursor-pointer font-semibold">Consultar os dois modelos de relatório aprovados</summary><TireMappingModels/></details>
   <div className="grid sm:grid-cols-2 gap-3">{rows.filter(r=>`${r.data.client.name} ${r.data.plate}`.toLowerCase().includes(query.toLowerCase())).map(r=><button className={`${button} text-left`} key={r.id} onClick={()=>choose(r)}><strong>{r.data.client.name} · {r.data.plate}</strong><br/>{r.data.tires.length} pneu(s) · revisão {r.version}</button>)}</div>
   {c&&selected&&<>
   <section className="rounded-xl border border-border p-4 space-y-4"><h2 className="text-lg font-semibold">Cliente e veículo</h2><div className="grid sm:grid-cols-2 gap-3">
@@ -62,3 +63,4 @@ export function TireCasesClient(){
   </>}
  </div>;
 }
+

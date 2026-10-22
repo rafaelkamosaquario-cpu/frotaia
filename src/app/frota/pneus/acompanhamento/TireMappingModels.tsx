@@ -6,6 +6,7 @@ const models = [
 export function TireMappingModels() {
   return <section aria-labelledby="mapping-models-title" className="rounded-xl border border-border p-4 space-y-3">
     <h2 id="mapping-models-title" className="text-lg font-semibold">Modelos de mapeamento</h2>
+    <a href="/frota/pneus/mapeamento" className="inline-block rounded-lg bg-primary px-4 py-3 text-primary-foreground">Abrir cadastro, estoque e mapeamento de pneus →</a>
     <p className="text-sm text-muted-foreground">Biblioteca privada ADM · RodoCore / Frota IA Painel Web. PDFs de identificação, sem quilometragem ou projeções. Não alteram os cadastros nem enviam mensagens.</p>
     <div className="grid gap-3 md:grid-cols-2">{models.map(model => <article key={model.id} className="rounded-lg border border-border p-4 space-y-3">
       <h3 className="font-semibold">{model.title}</h3>
@@ -18,3 +19,4 @@ export function TireMappingModels() {
     <p className="text-xs text-muted-foreground">Modelos fixos aprovados para referência e impressão, ainda sem preenchimento automático pelo cadastro selecionado. A carreta é ilustrativa: confirmar configuração real e quantidade dos estepes antes de usar. Para compartilhar, baixe e anexe manualmente no WhatsApp.</p>
   </section>;
 }
+
