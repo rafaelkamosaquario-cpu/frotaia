@@ -3,6 +3,7 @@ import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { listVehiclesForPanel } from "@/services/supabase/vehicleService";
 import { listVehicleDocumentsForPanel } from "@/services/supabase/vehicleDocumentService";
 import { VeiculosClient } from "./VeiculosClient";
+import { isConsultant } from "@/lib/frota/consultancy";
 
 /**
  * O layout de src/app/frota já garante o acesso — esta página busca os
@@ -21,5 +22,6 @@ export default async function VeiculosPage() {
     listVehicleDocumentsForPanel(supabase, access.company.id),
   ]);
 
-  return <VeiculosClient veiculosIniciais={veiculosIniciais} documentosIniciais={documentosIniciais} />;
+  const {data: {user}} = await supabase.auth.getUser();
+  return <VeiculosClient veiculosIniciais={veiculosIniciais} documentosIniciais={documentosIniciais} nfcCompanyId={isConsultant(user) && ["owner", "admin"].includes(access.role) ? access.company.id : undefined} />;
 }

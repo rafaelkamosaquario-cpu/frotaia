@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/useToast";
 import { vehicleCreateSchema, vehicleUpdateSchema } from "@/lib/validation/schemas";
 import type { VehicleRow, VehicleDocumentRow } from "@/lib/supabase/tables";
 import { VehicleIllustrationPicker } from "@/components/frota/VehicleIllustrationPicker";
+import { NfcConfiguration } from "@/components/frota/NfcConfiguration";
 
 const selectClass = cn(
   "flex h-10 w-full rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground",
@@ -19,6 +20,7 @@ const selectClass = cn(
 const labelClass = "mb-1.5 block text-sm font-medium text-foreground";
 
 interface VehicleFormModalProps {
+  nfcCompanyId?: string;
   open: boolean;
   onClose: () => void;
   vehicle: VehicleRow | null;
@@ -139,7 +141,8 @@ async function salvarSeguroELicenciamento(vehicleId: string, form: FormState, do
   await Promise.all(tarefas);
 }
 
-export function VehicleFormModal({ open, onClose, vehicle, documentos, onSaved }: VehicleFormModalProps) {
+export function VehicleFormModal({ open, onClose, vehicle, documentos, onSaved, nfcCompanyId }: VehicleFormModalProps) {
+  const [tab, setTab] = useState<"vehicle" | "nfc">("vehicle");
   const { showToast } = useToast();
   const [form, setForm] = useState<FormState>(() => toFormState(vehicle, documentos));
   const [plateError, setPlateError] = useState<string | null>(null);
@@ -211,7 +214,12 @@ export function VehicleFormModal({ open, onClose, vehicle, documentos, onSaved }
 
   return (
     <Modal open={open} onClose={resetAndClose} title={isEditing ? "Editar veículo" : "Novo veículo"} className="max-w-lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {nfcCompanyId && <div className="mb-4 flex gap-2" aria-label="Seções do cadastro">
+        <Button type="button" variant="outline" aria-pressed={tab === "vehicle"} onClick={() => setTab("vehicle")}>Dados do veículo</Button>
+        <Button type="button" variant="outline" aria-pressed={tab === "nfc"} onClick={() => setTab("nfc")}>Identificação NFC</Button>
+      </div>}
+      {tab === "nfc" && nfcCompanyId && (vehicle ? <NfcConfiguration key={vehicle.id} companyId={nfcCompanyId} vehicleId={vehicle.id} vehicleLabel={vehicle.plate ?? vehicle.name ?? "Veículo"} /> : <p>Salve o veículo primeiro. Depois abra Editar → Identificação NFC para vincular o cartão sem duplicar o cadastro.</p>)}
+      <form hidden={tab !== "vehicle"} onSubmit={handleSubmit} className="space-y-4">
         <VehicleIllustrationPicker value={form.illustrationKey} onChange={value => updateField("illustrationKey", value)} />
         <div className="grid grid-cols-2 gap-3">
           <div>

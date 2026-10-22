@@ -23,6 +23,7 @@ export type Database = {
   }
   public: {
     Tables: {
+      fleet_nfc_tags: CostTable<import("@/lib/frota/nfc").NfcTag>
       consultant_tire_inventory: CostTable<import("@/lib/frota/tireInventory").InventoryRow>
       consultant_tire_cases: CostTable<import("@/lib/frota/tireCases").TireCaseRow>
       direct_pix_payments: CostTable<{ id:string; company_id:string; actor_id:string; customer_user_id:string; phone:string; plan:string; reference:string; amount_cents:number; paid_at:string; access_from:string; access_until:string; previous_subscription:Json; created_at:string }>

@@ -10,8 +10,10 @@ import { useToast } from "@/hooks/useToast";
 import type { VehicleRow, VehicleDocumentRow } from "@/lib/supabase/tables";
 import { VehicleFormModal } from "./VehicleFormModal";
 import { VehiclePlate } from "@/components/frota/VehiclePlate";
+import { NfcConfiguration } from "@/components/frota/NfcConfiguration";
 
 interface VeiculosClientProps {
+  nfcCompanyId?: string;
   veiculosIniciais: VehicleRow[];
   documentosIniciais: VehicleDocumentRow[];
 }
@@ -34,7 +36,7 @@ const VEHICLE_TYPE_LABEL: Record<string, string> = {
   outro: "Outro",
 };
 
-export function VeiculosClient({ veiculosIniciais, documentosIniciais }: VeiculosClientProps) {
+export function VeiculosClient({ veiculosIniciais, documentosIniciais, nfcCompanyId }: VeiculosClientProps) {
   const { showToast } = useToast();
   const [veiculos, setVeiculos] = useState(veiculosIniciais);
   const [documentos, setDocumentos] = useState(documentosIniciais);
@@ -217,7 +219,9 @@ export function VeiculosClient({ veiculosIniciais, documentosIniciais }: Veiculo
         </Card>
       )}
 
+      {nfcCompanyId && <details className="my-4"><summary className="cursor-pointer font-semibold">Configurar NFC da bomba de combustível (ADM)</summary><NfcConfiguration key={nfcCompanyId} companyId={nfcCompanyId} /></details>}
       <VehicleFormModal
+        nfcCompanyId={nfcCompanyId}
         // O modal nunca desmonta sozinho (só fica oculto via `open`), então o
         // form interno precisa de uma key que mude a cada abertura pra
         // recarregar os dados do veículo clicado — sem isso, ele fica preso

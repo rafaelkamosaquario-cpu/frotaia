@@ -12,7 +12,7 @@ export function companyScope(client: object) { return scopes.get(client); }
 
 export function requestCompanyScope(path:string, header:string|null, cookie:string|undefined) {
   if (path === "/api/chat") return header; // Only the panel widget sends the explicit scope.
-  if (path === "/frota" || path.startsWith("/frota/") || path === "/frota-ativacao" || path.startsWith("/api/frota/")) return header ?? cookie;
+  if (path === "/frota" || path.startsWith("/frota/") || path.startsWith("/nfc/") || path === "/frota-ativacao" || path.startsWith("/api/frota/")) return header ?? cookie;
   return undefined; // Checkout, account linking and WhatsApp keep the default company.
 }
 
