@@ -17,7 +17,7 @@ describe("web AI entitlement", () => {
     m.context.mockResolvedValue({ company: { id: "company", fleet_panel_enabled: false }, profile: { is_admin: false } });
     m.ai.mockResolvedValue({ message: "ok" });
   });
-  for (const subscription of [null, { status: "EXPIRADA", fleet_panel_included: true }, { status: "ATIVA", fleet_panel_included: false }, { status: "ATIVA", fleet_panel_included: true, valido_ate: "2020-01-01" }]) {
+  for (const subscription of [null, { status: "EXPIRADA", fleet_panel_included: true }, { status: "ATIVA", fleet_panel_included: true, valido_ate: "2020-01-01" }]) {
     it(`blocks ${JSON.stringify(subscription)} before AI`, async () => {
       m.subscription.mockResolvedValue(subscription);
       expect((await POST(request())).status).toBe(403);
@@ -27,6 +27,16 @@ describe("web AI entitlement", () => {
   it("allows an active panel subscription", async () => {
     m.subscription.mockResolvedValue({ status: "ATIVA", fleet_panel_included: true, valido_ate: null });
     expect((await POST(request())).status).toBe(200);
+  });
+  it("allows active individual assistant without granting fleet entitlement", async () => {
+    m.subscription.mockResolvedValue({status:"ATIVA",plan:"INDIVIDUAL_MENSAL",fleet_panel_included:false,valido_ate:null});
+    expect((await POST(request())).status).toBe(200);
+  });
+  it("does not grant scoped panel chat to individual subscriptions", async () => {
+    m.subscription.mockResolvedValue({status:"ATIVA",fleet_panel_included:false,valido_ate:null});
+    const req=request();req.headers.set("x-frota-company","company");
+    expect((await POST(req)).status).toBe(403);
+    expect(m.ai).not.toHaveBeenCalled();
   });
   it("preserves existing manual panel grants", async () => {
     m.context.mockResolvedValue({ company: { id: "company", fleet_panel_enabled: true } });
@@ -53,3 +63,4 @@ describe("web AI entitlement", () => {
     expect(tools).not.toContain("registrar_despesa");
   });
 });
+

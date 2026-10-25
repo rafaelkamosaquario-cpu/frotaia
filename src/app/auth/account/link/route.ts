@@ -5,6 +5,8 @@ import { verifyAccountLinkToken } from "@/services/whatsapp/accountLinkToken";
 import { loadCustomerContext } from "@/ai/context/customerContext";
 import { linkUserToCompany } from "@/services/supabase/companyMemberService";
 import { isUniqueViolation } from "@/lib/supabase/errors";
+import { getCompany } from "@/services/supabase/companyService";
+import { getSubscription, isFleetPanelAccessAllowed } from "@/services/supabase/subscriptionService";
 
 /**
  * Confirma o vínculo de identidade WhatsApp↔Painel: o link chega pelo
@@ -40,10 +42,16 @@ export async function GET(request: Request) {
   }
 
   const context = await loadCustomerContext(supabase, data.user.id);
+  const destination = async () => {
+    const client = createAdminClient();
+    const company = await getCompany(client, payload.companyId);
+    if (company?.fleet_panel_enabled) return "/frota/dashboard";
+    return isFleetPanelAccessAllowed(await getSubscription(client, payload.companyId)) ? "/frota/dashboard" : "/";
+  };
 
   if (context.company?.id === payload.companyId) {
     // Já vinculado (reenvio do mesmo link, ou clicou 2x) — nada a fazer.
-    return NextResponse.redirect(`${appOrigin}/frota/dashboard?vinculo=ja_feito`);
+    return NextResponse.redirect(`${appOrigin}${await destination()}?vinculo=ja_feito`);
   }
 
   if (context.company) {
@@ -61,5 +69,6 @@ export async function GET(request: Request) {
     // Já era membro dessa empresa (só não era a padrão) — segue normalmente.
   }
 
-  return NextResponse.redirect(`${appOrigin}/frota/dashboard?vinculo=1`);
+  return NextResponse.redirect(`${appOrigin}${await destination()}?vinculo=1`);
 }
+

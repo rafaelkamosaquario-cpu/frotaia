@@ -6,11 +6,12 @@ import { loadCustomerContext, loadVehicleContext } from "@/ai/context/customerCo
 import { getConversationById, getOrCreateOpenConversation } from "@/services/supabase/conversationService";
 import { gerarRespostaAssistente } from "@/ai/chat/gerarRespostaAssistente";
 import { captureError } from "@/lib/observability/logger";
-import { getSubscription, isFleetPanelAccessAllowed } from "@/services/supabase/subscriptionService";
+import { getSubscription, isAccessAllowed, isFleetPanelAccessAllowed } from "@/services/supabase/subscriptionService";
 import { isConsultant } from "@/lib/frota/consultancy";
 import { readCompanyModules } from "@/services/supabase/companyModulesService";
 import { moduleToolAllowed } from "@/lib/frota/companyModules";
 import { FERRAMENTAS_FROTA_IA } from "@/ai/tools";
+import { COMPANY_HEADER } from "@/lib/frota/companyScope";
 
 const ROTA = "/api/chat";
 
@@ -66,8 +67,9 @@ export async function POST(request: Request) {
   // A browser session alone does not grant access to the paid AI endpoint.
   if (!customerContext.profile?.is_admin && !customerContext.company.fleet_panel_enabled) {
     const subscription = await getSubscription(supabase, companyId);
-    if (!isFleetPanelAccessAllowed(subscription)) {
-      return NextResponse.json({ error: "Seu plano não libera o chat do painel ou está vencido." }, { status: 403 });
+    const panelRequest = request.headers.has(COMPANY_HEADER);
+    if (!(panelRequest ? isFleetPanelAccessAllowed(subscription) : isAccessAllowed(subscription))) {
+      return NextResponse.json({ error: "Seu acesso ao assistente precisa ser ativado ou renovado." }, { status: 403 });
     }
   }
   const vehicleContext = await loadVehicleContext(supabase, companyId);
@@ -120,3 +122,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Não foi possível obter resposta da IA agora. Tente novamente." }, { status: 502 });
   }
 }
+

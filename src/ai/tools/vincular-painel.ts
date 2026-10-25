@@ -66,9 +66,10 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
 
 export const ferramentaVincularPainel: DefinicaoFerramenta<VincularPainelEntrada, VincularPainelResultado> = {
   nome: "vincular_painel",
-  descricao: "Gera um link seguro (válido por 15 minutos) para o cliente acessar o Painel Web com a MESMA empresa que já usa pelo WhatsApp, sem duplicar cadastro.",
+  descricao: "Gera um link seguro (válido por 15 minutos) para vincular o login Google à MESMA operação do WhatsApp. Plano individual abre o aplicativo assistente; plano com painel abre o painel. Use também para 'quero vincular meu aplicativo' ou 'quero instalar o aplicativo'. Não cria nova empresa nem libera assinatura.",
   objetivo:
     "Resolver o pedido 'quero acessar pelo computador'/'tem painel?' sem o cliente precisar se cadastrar do zero — ele abre o link já logado com Google, e a empresa do painel vira a mesma do WhatsApp.",
   parametros: PARAMETROS,
   executar,
 };
+

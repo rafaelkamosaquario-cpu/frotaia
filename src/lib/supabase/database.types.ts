@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 28179)
-Total output lines: 3258
-
 import type { CostOperation, CostRuleRow, CostEntry } from "@/lib/frota/costs";
 import type { FuelBalanceRow, FuelMovementRow } from "@/lib/frota/fuelStock";
 import type { FuelGroupDraft } from "@/lib/frota/fuelGroup";
@@ -1224,7 +1221,741 @@ export type Database = {
           {
             foreignKeyName: "generated_documents_analysis_run_id_fkey"
             columns: ["analysis_run_id"]
-            isOneToOne: f…6179 tokens truncated…val_cancellations: Json
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_documents_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_integrations: {
+        Row: {
+          calendar_enabled: boolean
+          company_id: string | null
+          connection_status: Database["public"]["Enums"]["google_connection_status"]
+          created_at: string
+          default_calendar_id: string | null
+          google_account_email: string
+          google_subject_id: string | null
+          granted_scopes: string[]
+          id: string
+          last_synced_at: string | null
+          refresh_token_secret_id: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_enabled?: boolean
+          company_id?: string | null
+          connection_status?: Database["public"]["Enums"]["google_connection_status"]
+          created_at?: string
+          default_calendar_id?: string | null
+          google_account_email: string
+          google_subject_id?: string | null
+          granted_scopes?: string[]
+          id?: string
+          last_synced_at?: string | null
+          refresh_token_secret_id?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_enabled?: boolean
+          company_id?: string | null
+          connection_status?: Database["public"]["Enums"]["google_connection_status"]
+          created_at?: string
+          default_calendar_id?: string | null
+          google_account_email?: string
+          google_subject_id?: string | null
+          granted_scopes?: string[]
+          id?: string
+          last_synced_at?: string | null
+          refresh_token_secret_id?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_schedules: {
+        Row: {
+          alert_sent: boolean
+          company_id: string
+          created_at: string
+          due_date: string
+          executed_date: string | null
+          executed_km: number | null
+          id: string
+          next_due_km: number | null
+          notes: string | null
+          status: Database["public"]["Enums"]["maintenance_status"]
+          type: string
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          alert_sent?: boolean
+          company_id: string
+          created_at?: string
+          due_date: string
+          executed_date?: string | null
+          executed_km?: number | null
+          id?: string
+          next_due_km?: number | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["maintenance_status"]
+          type: string
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          alert_sent?: boolean
+          company_id?: string
+          created_at?: string
+          due_date?: string
+          executed_date?: string | null
+          executed_km?: number | null
+          id?: string
+          next_due_km?: number | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["maintenance_status"]
+          type?: string
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_schedules_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          company_id: string
+          content: string | null
+          content_type: string
+          conversation_id: string
+          created_at: string
+          direction: Database["public"]["Enums"]["message_direction"]
+          external_message_id: string | null
+          id: string
+          metadata: Json
+          role: Database["public"]["Enums"]["message_role"]
+          tool_call_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          content?: string | null
+          content_type?: string
+          conversation_id: string
+          created_at?: string
+          direction: Database["public"]["Enums"]["message_direction"]
+          external_message_id?: string | null
+          id?: string
+          metadata?: Json
+          role: Database["public"]["Enums"]["message_role"]
+          tool_call_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          content?: string | null
+          content_type?: string
+          conversation_id?: string
+          created_at?: string
+          direction?: Database["public"]["Enums"]["message_direction"]
+          external_message_id?: string | null
+          id?: string
+          metadata?: Json
+          role?: Database["public"]["Enums"]["message_role"]
+          tool_call_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_tool_call_id_fkey"
+            columns: ["tool_call_id"]
+            isOneToOne: false
+            referencedRelation: "tool_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      news_digests: {
+        Row: {
+          content: string
+          generated_at: string
+          id: string
+        }
+        Insert: {
+          content: string
+          generated_at?: string
+          id?: string
+        }
+        Update: {
+          content?: string
+          generated_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      onboarding_sessions: {
+        Row: {
+          channel: Database["public"]["Enums"]["channel_type"]
+          collected_data: Json
+          created_at: string
+          state: Database["public"]["Enums"]["onboarding_state"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["channel_type"]
+          collected_data?: Json
+          created_at?: string
+          state?: Database["public"]["Enums"]["onboarding_state"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["channel_type"]
+          collected_data?: Json
+          created_at?: string
+          state?: Database["public"]["Enums"]["onboarding_state"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payment_events: {
+        Row: {
+          company_id: string | null
+          event_type: string
+          id: string
+          mercadopago_payment_id: string | null
+          payload_json: Json | null
+          provider: string
+          received_at: string
+          status_recebido: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          event_type: string
+          id?: string
+          mercadopago_payment_id?: string | null
+          payload_json?: Json | null
+          provider?: string
+          received_at?: string
+          status_recebido?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          event_type?: string
+          id?: string
+          mercadopago_payment_id?: string | null
+          payload_json?: Json | null
+          provider?: string
+          received_at?: string
+          status_recebido?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          is_admin: boolean
+          locale: string
+          onboarding_completed: boolean
+          phone_e164: string | null
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          is_admin?: boolean
+          locale?: string
+          onboarding_completed?: boolean
+          phone_e164?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_admin?: boolean
+          locale?: string
+          onboarding_completed?: boolean
+          phone_e164?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      revenues: {
+        Row: {
+          settlement_status?: "unknown" | "pending" | "settled"
+          settled_on?: string | null
+          settlement_version?: number
+          settlement_updated_by?: string | null
+          settlement_note?: string | null
+          amount: number
+          analysis_run_id: string | null
+          company_id: string
+          conversation_id: string | null
+          created_at: string
+          description: string | null
+          driver_id: string | null
+          id: string
+          revenue_date: string
+          user_id: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          amount: number
+          analysis_run_id?: string | null
+          company_id: string
+          conversation_id?: string | null
+          created_at?: string
+          description?: string | null
+          driver_id?: string | null
+          id?: string
+          revenue_date: string
+          user_id: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          amount?: number
+          analysis_run_id?: string | null
+          company_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          description?: string | null
+          driver_id?: string | null
+          id?: string
+          revenue_date?: string
+          settlement_status?: "unknown" | "pending" | "settled"
+          settled_on?: string | null
+          settlement_updated_by?: string | null
+          settlement_note?: string | null
+          user_id?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenues_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revenues_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_journeys: {
+        Row: {
+          actual_arrival: string | null
+          actual_departure: string | null
+          analysis_run_id: string | null
+          company_id: string
+          conversation_id: string | null
+          created_at: string
+          created_by_user_id: string | null
+          destination: string | null
+          driver_id: string | null
+          duration_minutes: number | null
+          id: string
+          notes: string | null
+          origin: string | null
+          result_data: Json
+          scheduled_arrival: string | null
+          scheduled_departure: string | null
+          status: Database["public"]["Enums"]["journey_status"]
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          actual_arrival?: string | null
+          actual_departure?: string | null
+          analysis_run_id?: string | null
+          company_id: string
+          conversation_id?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          destination?: string | null
+          driver_id?: string | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          origin?: string | null
+          result_data?: Json
+          scheduled_arrival?: string | null
+          scheduled_departure?: string | null
+          status?: Database["public"]["Enums"]["journey_status"]
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          actual_arrival?: string | null
+          actual_departure?: string | null
+          analysis_run_id?: string | null
+          company_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          destination?: string | null
+          driver_id?: string | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          origin?: string | null
+          result_data?: Json
+          scheduled_arrival?: string | null
+          scheduled_departure?: string | null
+          status?: Database["public"]["Enums"]["journey_status"]
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_journeys_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_journeys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_journeys_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_journeys_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_journeys_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_routes: {
+        Row: {
+          active: boolean
+          average_consumption_km_l: number | null
+          average_speed_kmh: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          data_source: Database["public"]["Enums"]["route_data_source"]
+          destination_city: string | null
+          destination_name: string | null
+          destination_state: string | null
+          distance_km: number | null
+          estimated_duration_minutes: number | null
+          estimated_toll_cost: number | null
+          id: string
+          is_favorite: boolean
+          metadata: Json
+          name: string | null
+          origin_city: string | null
+          origin_name: string | null
+          origin_state: string | null
+          updated_at: string
+          updated_by: string | null
+          user_id: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          average_consumption_km_l?: number | null
+          average_speed_kmh?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          data_source?: Database["public"]["Enums"]["route_data_source"]
+          destination_city?: string | null
+          destination_name?: string | null
+          destination_state?: string | null
+          distance_km?: number | null
+          estimated_duration_minutes?: number | null
+          estimated_toll_cost?: number | null
+          id?: string
+          is_favorite?: boolean
+          metadata?: Json
+          name?: string | null
+          origin_city?: string | null
+          origin_name?: string | null
+          origin_state?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          average_consumption_km_l?: number | null
+          average_speed_kmh?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_source?: Database["public"]["Enums"]["route_data_source"]
+          destination_city?: string | null
+          destination_name?: string | null
+          destination_state?: string | null
+          distance_km?: number | null
+          estimated_duration_minutes?: number | null
+          estimated_toll_cost?: number | null
+          id?: string
+          is_favorite?: boolean
+          metadata?: Json
+          name?: string | null
+          origin_city?: string | null
+          origin_name?: string | null
+          origin_state?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_routes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_routes_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_alerts: {
+        Row: {
+          category: string | null
+          company_id: string
+          conversation_id: string | null
+          created_at: string
+          error_message_safe: string | null
+          id: string
+          maintenance_schedule_id: string | null
+          notes: string | null
+          scheduled_for: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["scheduled_alert_status"]
+          title: string
+          updated_at: string
+          user_id: string
+          vehicle_document_id: string | null
+          vehicle_id: string | null
+          vehicle_tire_id: string | null
+        }
+        Insert: {
+          category?: string | null
+          company_id: string
+          conversation_id?: string | null
+          created_at?: string
+          error_message_safe?: string | null
+          id?: string
+          maintenance_schedule_id?: string | null
+          notes?: string | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["scheduled_alert_status"]
+          title: string
+          updated_at?: string
+          user_id: string
+          vehicle_document_id?: string | null
+          vehicle_id?: string | null
+          vehicle_tire_id?: string | null
+        }
+        Update: {
+          category?: string | null
+          company_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          error_message_safe?: string | null
+          id?: string
+          maintenance_schedule_id?: string | null
+          notes?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["scheduled_alert_status"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+          vehicle_document_id?: string | null
+          vehicle_id?: string | null
+          vehicle_tire_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_alerts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_alerts_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_alerts_maintenance_schedule_id_fkey"
+            columns: ["maintenance_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_alerts_vehicle_document_id_fkey"
+            columns: ["vehicle_document_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_alerts_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_alerts_vehicle_tire_id_fkey"
+            columns: ["vehicle_tire_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_tires"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          company_id: string
+          created_at: string
+          fleet_panel_included: boolean
+          id: string
+          iniciado_em: string | null
+          mercadopago_payment_id: string | null
+          mercadopago_subscription_id: string | null
+          pending_preapproval_cancellations: Json
           plan: Database["public"]["Enums"]["subscription_plan"]
           status: Database["public"]["Enums"]["subscription_status"]
           trial_avisado_dia5: boolean
@@ -2524,5 +3255,6 @@ export const Constants = {
     },
   },
 } as const
+
 
 

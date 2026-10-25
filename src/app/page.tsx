@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadCustomerContext } from "@/ai/context/customerContext";
 import { checkCalendarConnection } from "@/services/google/googleCalendarService";
-import { isCustomerPanelEnabled } from "@/lib/featureFlags";
-import { HomeClient } from "./HomeClient";
+import { getSubscription, isAccessAllowed } from "@/services/supabase/subscriptionService";
+import { DriverAssistant } from "@/components/chat/DriverAssistant";
+import { directSalesUrl } from "@/lib/mercadopago/directSales";
+import type { Metadata } from "next";
 import { Card } from "@/components/ui/Card";
 import { LogoMark } from "@/components/icons/Logo";
 
@@ -17,6 +19,8 @@ const MENSAGEM_ERRO_CALENDAR: Record<string, string> = {
   falha_conexao: "Não foi possível concluir a conexão com o Google agora.",
   sem_empresa: "Sua conta ainda não tem uma empresa cadastrada no Frota IA — finalize o cadastro antes de conectar a Agenda Google.",
 };
+
+export const metadata: Metadata = { title: "Frota IA — Assistente", manifest: "/assistente.webmanifest" };
 
 /** Retorno do OAuth do Google Calendar (/auth/calendar/callback). Renderizado ANTES de qualquer redirect de login/painel porque quem conecta a Agenda pelo link do WhatsApp normalmente nunca teve sessão no painel (V1 é WhatsApp-only) — sem isso, cai direto no /login sem ver nenhum resultado (bug real encontrado em 06/08/2026: o usuário concluía o login no Google e via uma tela sem feedback nenhum). */
 function CalendarConnectionResult({ sucesso, erro }: { sucesso: boolean; erro?: string }) {
@@ -42,10 +46,9 @@ function CalendarConnectionResult({ sucesso, erro }: { sucesso: boolean; erro?: 
 }
 
 /**
- * Painel web (V1 centrada no WhatsApp — Camada 6): a experiência do
- * cliente comum é 100% pelo WhatsApp agora. Esta rota continua existindo
- * (nada foi removido) para administração/testes/V2 — com
- * CUSTOMER_PANEL_ENABLED=false, só quem tem profiles.is_admin=true entra.
+ * Aplicativo complementar da V1. Exige vínculo de empresa e assinatura
+ * válida (ou permissão administrativa já existente). As rotas /frota
+ * conservam suas próprias regras de acesso ao painel empresarial.
  */
 export default async function Home({
   searchParams,
@@ -61,17 +64,17 @@ export default async function Home({
   const { data } = await supabase.auth.getUser();
 
   if (!data.user) {
-    redirect("/login");
+    redirect("/login?next=%2F");
   }
 
   const context = await loadCustomerContext(supabase, data.user.id);
 
-  if (!isCustomerPanelEnabled() && !context.profile?.is_admin) {
-    redirect("/login?painel_indisponivel=1");
+  if (!context.company) {
+    return <main className="mx-auto max-w-lg p-8"><h1 className="text-2xl font-bold">Conecte seu WhatsApp ao aplicativo</h1><p className="my-5">No seu WhatsApp, peça ao Frota IA: “Quero vincular meu aplicativo”. Abra o link seguro recebido e entre com esta conta Google. Não crie outra empresa.</p><a className="underline" href="https://wa.me/5541997454382">Abrir WhatsApp do Frota IA</a></main>;
   }
 
-  if (!context.company) {
-    redirect("/onboarding");
+  if (!context.profile?.is_admin && !context.company.fleet_panel_enabled && !isAccessAllowed(await getSubscription(supabase, context.company.id))) {
+    return <main className="mx-auto max-w-lg p-8"><h1 className="text-2xl font-bold">Ative seu Frota IA</h1><p className="my-5">Seu acesso precisa ser ativado ou renovado. Se já pagou por Pix, aguarde a conferência do responsável. Não faça outro pagamento sem conferir.</p><a className="underline" href={directSalesUrl("INDIVIDUAL_MENSAL")}>Falar com Rafael sobre o Pix</a></main>;
   }
 
   // Veiculo e opcional (mesmo principio do onboarding via WhatsApp: coleta
@@ -83,5 +86,6 @@ export default async function Home({
     .then((status) => status.connected)
     .catch(() => false);
 
-  return <HomeClient calendarConnected={calendarConnected} />;
+  return <DriverAssistant calendarConnected={calendarConnected} />;
 }
+

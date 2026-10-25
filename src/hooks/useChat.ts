@@ -58,6 +58,7 @@ export function useChat({ conversation, onPersist }: UseChatOptions) {
 
       onPersist(response.conversationId, [...persistedMessages, confirmedUserMessage, assistantMessage], trimmed);
       setPendingUserMessage(null);
+      return assistantMessage.content;
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Não foi possível enviar a mensagem.");
       setPendingUserMessage((current) => (current ? { ...current, status: "error" } : current));
@@ -68,3 +69,4 @@ export function useChat({ conversation, onPersist }: UseChatOptions) {
 
   return { messages, isTyping, sendMessage, errorMessage };
 }
+
