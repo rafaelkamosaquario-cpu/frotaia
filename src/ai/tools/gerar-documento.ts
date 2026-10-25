@@ -187,7 +187,7 @@ async function executar(entrada: GerarDocumentoEntrada): Promise<GerarDocumentoR
       enviado: enviadoPeloWhatsapp,
       mensagemResumo: enviadoPeloWhatsapp
         ? `Documento "${tituloFinal}" gerado e enviado pelo WhatsApp.`
-        : `Documento "${tituloFinal}" gerado — como esta conta não tem WhatsApp vinculado, acesse "Documentos gerados" no painel pra visualizar e baixar.`,
+        : `Documento "${tituloFinal}" gerado. No aplicativo individual, abra Minha operação → Meus relatórios e toque em Atualizar para abrir ou baixar o PDF. No painel empresarial, use Documentos gerados. Não foi enviado ao WhatsApp porque este login não tem um número vinculado.`,
     };
   } catch (err) {
     const detalhe = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
