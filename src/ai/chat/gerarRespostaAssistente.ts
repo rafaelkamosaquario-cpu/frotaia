@@ -1,4 +1,5 @@
 import "server-only";
+import { construirTextoAjudaCompleto, ehPedidoExatoDeApresentacao } from "@/lib/helpMenu";
 import { canExecuteFinancialTool } from "./financialAuthorization";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createAnthropicClient, CLAUDE_MODEL } from "@/lib/anthropic/client";
@@ -125,6 +126,17 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     content: mensagemUsuario,
     ...params.inboundMessageExtra,
   });
+
+  // A apresentação aprovada é conteúdo fixo, não uma resposta livre do modelo.
+  // Mantém a persistência normal e não intercepta imagens ou pedidos compostos.
+  if (!params.modoDemo && !params.conteudoMultimodal?.length && ehPedidoExatoDeApresentacao(mensagemUsuario)) {
+    const content = construirTextoAjudaCompleto();
+    const saved = await appendMessage(client, {
+      conversation_id: conversation.id, company_id: companyId, user_id: userId,
+      role: "assistant", direction: "outbound", content,
+    });
+    return { conversationId: conversation.id, message: { id: saved.id, content, createdAt: saved.created_at }, ferramentasExecutadas: [] };
+  }
 
   mensagensAnthropic.push({
     role: "user",
@@ -312,3 +324,4 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     ferramentasExecutadas,
   };
 }
+

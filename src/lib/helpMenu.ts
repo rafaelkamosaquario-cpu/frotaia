@@ -148,6 +148,12 @@ export function ehPedidoDeFuncionalidades(texto: string | undefined | null): boo
   return PALAVRAS_GATILHO_FUNCOES.some((gatilho) => normalizado === gatilho || normalizado.includes(gatilho));
 }
 
+/** Somente pedidos puros de apresentação, sem capturar uma pergunta operacional. */
+export function ehPedidoExatoDeApresentacao(texto: string): boolean {
+  const normalizado = texto.trim().toLowerCase().replace(/[?!.,]+$/g, "").trim();
+  return [...PALAVRAS_GATILHO_FUNCOES, "conheça todas as áreas do frota ia", "ver tudo que o frota ia faz"].includes(normalizado);
+}
+
 /**
  * Guia de Primeiros Passos V1 (08/2026) — comando permanente pra
  * (re)abrir o guia manualmente a qualquer momento, mesmo depois de

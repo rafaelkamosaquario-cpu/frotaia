@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { prepararTextoParaVoz } from "./speechText";
-import { construirTextoAjudaCompleto, CATEGORIAS_AJUDA } from "./helpMenu";
+import { construirTextoAjudaCompleto, CATEGORIAS_AJUDA, ehPedidoExatoDeApresentacao } from "./helpMenu";
 import { ajudaConversacionalV1 } from "../ai/whatsapp/conversationExperience";
 
 describe("apresentação sem exemplos e leitura sem ícones", () => {
+  it("intercepta somente pedidos diretos de apresentação", () => {
+    expect(ehPedidoExatoDeApresentacao("O que você faz?")).toBe(true);
+    expect(ehPedidoExatoDeApresentacao("Conheça todas as áreas do Frota IA")).toBe(true);
+    expect(ehPedidoExatoDeApresentacao("O que você faz quando meu pneu estoura?")).toBe(false);
+  });
   it("mantém todas as áreas sem emojis, numeração ou exemplos", () => {
     const texto=construirTextoAjudaCompleto();
     for(const categoria of CATEGORIAS_AJUDA){
