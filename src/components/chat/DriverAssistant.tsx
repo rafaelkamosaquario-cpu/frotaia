@@ -46,7 +46,7 @@ export function DriverAssistant({calendarConnected}:{calendarConnected:boolean})
    links.forEach(link=>{link.href="/assistente.webmanifest";});
    return()=>{links.forEach((link,index)=>{if(link===added)link.remove();else if(previous[index])link.setAttribute("href",previous[index]!);});};
  },[]);
- useEffect(()=>{bottom.current?.scrollIntoView({behavior:"smooth",block:"nearest"});},[messages.length,isTyping]);
+ useEffect(()=>{const area=bottom.current?.parentElement;if(area)area.scrollTo({top:area.scrollHeight,behavior:"smooth"});},[messages.length,isTyping]);
  function stopVoice(){window.speechSynthesis?.cancel();setSpeaking(false);}
  function read(text:string){if(!("speechSynthesis" in window)){setNotice("Voz indisponível neste navegador. A resposta continua disponível em texto.");return;}stopVoice();const speech=new SpeechSynthesisUtterance(prepararTextoParaVoz(text));const voice=voices.find(v=>v.voiceURI===voiceURI);speech.voice=voice||null;speech.lang=voice?.lang||"pt-BR";speech.onstart=()=>{if(alive.current)setSpeaking(true);};speech.onend=speech.onerror=()=>{if(alive.current)setSpeaking(false);};window.speechSynthesis.speak(speech);}
  async function send(){if(!draft.trim()||busy.current||isTyping)return;busy.current=true;recognition.current?.abort();setListening(false);stopVoice();const text=draft;setDraft("");try{const answer=await sendMessage(text);if(answer&&alive.current&&voiceReplies)read(answer);if(!answer&&alive.current)setDraft(text);}finally{busy.current=false;}}
