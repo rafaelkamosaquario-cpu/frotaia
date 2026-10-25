@@ -124,7 +124,7 @@ export const FROTA_SUGGESTIONS: FrotaSuggestion[] = [
   {
     id: "ver_tudo",
     title: "Ver tudo que o Frota IA faz",
-    description: "Conheça todas as áreas do Frota IA",
+    description: "O que você faz?",
     icon: "List",
     intent: "ver_tudo",
     whatsappTitle: "Ver tudo que o Frota IA faz",
@@ -162,3 +162,4 @@ export function resolverSelecaoNumerada(texto: string | undefined | null): Frota
 
   return FROTA_SUGGESTIONS.find((s) => s.title.toLowerCase() === normalizado);
 }
+

@@ -33,7 +33,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "fretes",
     emoji: "🚛",
     titulo: "Fretes e oportunidades",
-    descricao: "Analiso se o frete compensa, comparo propostas lado a lado, calculo margem e valor mínimo, leio CT-e direto da foto — e encontro oportunidades de carga compatíveis com o Radar de Fretes.",
+    descricao: "Analiso se o frete compensa, comparo propostas lado a lado, calculo margem e valor mínimo, leio CT-e enviado por foto e busco oportunidades de carga compatíveis com o Radar de Fretes, nas fontes disponíveis.",
     exemplos: [
       "Esse frete de R$ 4.200 pra Santos compensa?",
       "Analise este CT-e (manda a foto)",
@@ -45,7 +45,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "combustivel_custos",
     emoji: "💰",
     titulo: "Custos e despesas",
-    descricao: "Calculo consumo, gasto de diesel, CPK, custo do caminhão parado e sua margem real em qualquer frete.",
+    descricao: "Calculo consumo, gasto de combustível, custo por quilômetro rodado, custo do caminhão parado e a margem estimada do frete com base nos dados informados.",
     exemplos: [
       "Meu caminhão faz 2,5 km/l, quanto vou gastar até Curitiba?",
       "Calcula meu CPK",
@@ -57,7 +57,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "pneus_manutencao",
     emoji: "🔧",
     titulo: "Manutenção e pneus",
-    descricao: "Comparo pneu novo com recapado, calculo custo por km, e ajudo a organizar a manutenção preventiva.",
+    descricao: "Comparo pneu novo com pneu recapado, calculo o custo por quilômetro rodado e ajudo a organizar sua manutenção preventiva.",
     exemplos: ["Vale mais a pena recapar ou comprar pneu novo?", "De quanto em quanto tempo faço manutenção preventiva?"],
   },
   {
@@ -78,14 +78,14 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "jornada",
     emoji: "🕐",
     titulo: "Jornada",
-    descricao: "Organizo sua jornada de viagem — horário de saída, paradas obrigatórias e se dá tempo de rodar sozinho.",
+    descricao: "Ajudo a planejar sua jornada de viagem, considerando horário de saída, tempo de direção, pausas e períodos de descanso.",
     exemplos: ["Vou sair amanhã às 5h de Curitiba pra São Paulo, organize minha jornada", "Dá tempo de fazer essa viagem sozinho, sem parar?"],
   },
   {
     id: "rotas",
     emoji: "🗺️",
     titulo: "Rotas e viagens",
-    descricao: "Calculo distância e duração de qualquer trajeto, e guardo as rotas que você roda com frequência.",
+    descricao: "Calculo a distância e a duração estimada dos trajetos e guardo as rotas que você roda com frequência.",
     exemplos: ["Salva essa rota", "Quais rotas eu tenho salvas?"],
   },
   {
@@ -177,16 +177,15 @@ export function ehPedidoDeGuia(texto: string | undefined | null): boolean {
 /**
  * Versão em texto corrido (painel web / WhatsApp determinístico via
  * ehPedidoDeFuncionalidades / referência no system prompt) — sem sintaxe
- * de lista nativa do WhatsApp. Formato numerado com descrição + exemplos
- * por categoria, refeito em 07/08/2026 a partir de um rascunho do Rafael —
- * versão anterior (só emoji + bullets) era rasa demais pra decidir se vale
- * a pena continuar usando o produto.
+ * de lista nativa do WhatsApp. Apresentação por área, sem ícones,
+ * numeração ou exemplos, para leitura natural no aplicativo e WhatsApp.
+ * Os exemplos permanecem nos dados de referência, não nesta apresentação.
  */
 export function construirTextoAjudaCompleto(): string {
-  const intro = "🚛 O Frota IA ajuda você em várias áreas da operação:";
-  const categorias = CATEGORIAS_AJUDA.map((categoria, indice) => {
-    const exemplos = categoria.exemplos.map((ex) => `  - "${ex}"`).join("\n");
-    return `${indice + 1}. ${categoria.emoji} ${categoria.titulo}\n${categoria.descricao}\n${exemplos}`;
-  }).join("\n\n");
-  return `${intro}\n\n${categorias}\n\nManda o que precisar que eu já calculo.`;
+  const intro = "Sou o Frota IA, seu assistente na estrada. Posso ajudar você nestas áreas:";
+  const categorias = CATEGORIAS_AJUDA.map((categoria) =>
+    `${categoria.titulo}\n${categoria.descricao}`
+  ).join("\n\n");
+  return `${intro}\n\n${categorias}`;
 }
+

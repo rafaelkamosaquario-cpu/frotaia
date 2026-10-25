@@ -1,7 +1,9 @@
+import { construirTextoAjudaCompleto } from "@/lib/helpMenu";
+
 /** Experiência exclusiva do WhatsApp V1; ferramentas e painel continuam disponíveis. */
 export const APRESENTACAO_V1 = "Olá! Sou o Frota IA, seu assistente para o dia a dia do caminhão. 🚛\n\nTe ajudo com combustível, manutenção, pneus e fretes, aqui no WhatsApp. Também posso ajudar com documentos e lembretes, consultar fontes oficiais e acompanhar oportunidades nas fontes disponíveis.\n\nPode escrever, mandar áudio, foto ou documento. Quer experimentar antes de escolher um plano? O que você quer resolver hoje?";
 export function ajudaConversacionalV1(): string {
-  return "Te ajudo no dia a dia do caminhão:\n\n• Combustível: gasto de diesel e consumo.\n• Manutenção: serviços, custos e lembretes.\n• Pneus: comparar custos e acompanhar os pneus registrados.\n• Fretes: analisar ofertas e acompanhar oportunidades nas fontes disponíveis.\n\nTambém posso ajudar com despesas, receitas, documentos, rotas, agenda, histórico e PDFs, conforme seu acesso e as integrações disponíveis. Para regras e informações oficiais, consulto a fonte.\n\nNão precisa aprender comandos. Me diga o que precisa, por texto, áudio, foto ou documento.";
+  return construirTextoAjudaCompleto();
 }
 export const COMPORTAMENTO_WHATSAPP_V1 = [
   "EXPERIÊNCIA WHATSAPP V1 — assistente do caminhoneiro:",
@@ -29,3 +31,4 @@ export function resolverSugestaoV1(texto?: string | null) {
   if (/^[1-5]$/.test(t)) return SUGESTOES_V1[Number(t) - 1];
   return SUGESTOES_V1.find(s => s.title.toLowerCase() === t);
 }
+
