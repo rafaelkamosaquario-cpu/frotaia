@@ -20,6 +20,14 @@ export function DriverAssistant({calendarConnected}:{calendarConnected:boolean})
  const lastAnswer=[...messages].reverse().find(m=>m.role==="assistant")?.content;
  const [voices,setVoices]=useState<SpeechSynthesisVoice[]>([]);
  const [voiceURI,setVoiceURI]=useState("");
+ const [truckReady,setTruckReady]=useState(false);
+ const [arrival,setArrival]=useState(0);
+ useEffect(()=>{
+   // Reopen the installed app or return to its tab: replay only the visual arrival.
+   const reopen=()=>{if(document.visibilityState==="visible")setArrival(value=>value+1);};
+   document.addEventListener("visibilitychange",reopen);
+   return()=>document.removeEventListener("visibilitychange",reopen);
+ },[]);
  useEffect(()=>{
    if(!("speechSynthesis" in window))return;
    const refresh=()=>setVoices(window.speechSynthesis.getVoices().slice().sort((a,b)=>Number(b.lang.startsWith("pt"))-Number(a.lang.startsWith("pt"))||a.name.localeCompare(b.name)));
@@ -46,7 +54,7 @@ export function DriverAssistant({calendarConnected}:{calendarConnected:boolean})
  const status=listening?"Ouvindo você…":speaking?"Respondendo por voz":isTyping?"Analisando sua mensagem…":"Como posso ajudar hoje?";
  return <main className={styles.shell}><div className={styles.app}>
  <header className={styles.header}><button aria-label="Histórico" onClick={()=>setPanel("history")}><History/></button><div className={styles.brand}><div><h1>FROTA <span>IA</span></h1><p>Seu assistente na estrada</p></div></div><button aria-label="Nova conversa" disabled={isTyping} onClick={()=>{stopVoice();conversations.startNewConversation();}}><Plus/></button></header>
- <section className={styles.hero} data-active={speaking||listening} aria-label={status}><Image src="/images/assistant-truck-front.png" alt="Caminhão de frente do assistente Frota IA" width={1254} height={1254} priority/><AudioLines className={styles.leftWave} aria-hidden/><AudioLines className={styles.rightWave} aria-hidden/></section>
+ <section className={styles.hero} data-active={speaking||listening} aria-label={status}><div key={arrival} className={styles.arrival} data-ready={truckReady}><div className={styles.road} aria-hidden/><div className={styles.truckMotion}><Image src="/images/assistant-truck-front.png" alt="Caminhão de frente do assistente Frota IA" width={1254} height={1254} priority onLoad={()=>setTruckReady(true)}/></div></div><AudioLines className={styles.leftWave} aria-hidden/><AudioLines className={styles.rightWave} aria-hidden/></section>
  <p className={styles.status} aria-live="polite"><AudioLines/>{status}</p>
  <section className={styles.messages} aria-label="Conversa">{!messages.length?<p className={styles.welcome}>Fale ou escreva sobre fretes, pneus, rotas e custos. Eu ajudo você a organizar sua operação.</p>:messages.map(m=><article key={m.id} className={m.role==="user"?styles.user:styles.assistant}><small>{m.role==="user"?"Você":"Frota IA"}</small><p>{m.content}</p>{m.status==="error"&&<small>Não enviado. Confira e tente novamente.</small>}</article>)}{isTyping&&<p role="status">Preparando resposta…</p>}<div ref={bottom}/></section>
  {errorMessage&&<p role="alert" className={styles.notice}>{errorMessage}</p>}
