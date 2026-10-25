@@ -23,6 +23,16 @@ export function DriverAssistant({calendarConnected}:{calendarConnected:boolean})
  const [voiceURI,setVoiceURI]=useState("");
  const [truckReady,setTruckReady]=useState(false);
  const [arrival,setArrival]=useState(0);
+ const [operationOpen,setOperationOpen]=useState(false);
+ const operationDialog=useRef<HTMLDialogElement>(null);
+ useEffect(()=>{
+   const dialog=operationDialog.current;
+   if(!operationOpen||!dialog)return;
+   dialog.showModal();
+   const previous=document.body.style.overflow;
+   document.body.style.overflow="hidden";
+   return()=>{dialog.close();document.body.style.overflow=previous;};
+ },[operationOpen]);
  useEffect(()=>{
    // Reopen the installed app or return to its tab: replay only the visual arrival.
    const reopen=()=>{if(document.visibilityState==="visible")setArrival(value=>value+1);};
@@ -57,11 +67,11 @@ export function DriverAssistant({calendarConnected}:{calendarConnected:boolean})
  <header className={styles.header}><button aria-label="Histórico" onClick={()=>setPanel("history")}><History/></button><div className={styles.brand}><div><h1>FROTA <span>IA</span></h1><p>Seu assistente na estrada</p></div></div><button aria-label="Nova conversa" disabled={isTyping} onClick={()=>{stopVoice();conversations.startNewConversation();}}><Plus/></button></header>
  <section className={styles.hero} data-active={speaking||listening} aria-label={status}><div key={arrival} className={styles.arrival} data-ready={truckReady}><div className={styles.road} aria-hidden/><div className={styles.truckMotion}><Image src="/images/assistant-truck-front.png" alt="Caminhão de frente do assistente Frota IA" width={1254} height={1254} priority onLoad={()=>setTruckReady(true)}/></div></div><AudioLines className={styles.leftWave} aria-hidden/><AudioLines className={styles.rightWave} aria-hidden/></section>
  <p className={styles.status} aria-live="polite"><AudioLines/>{status}</p>
- <a className={styles.more} href="#minha-operacao" style={{textAlign:"center"}}>Minha operação · registros e relatórios</a>
  <section className={styles.messages} aria-label="Conversa">{!messages.length?<p className={styles.welcome}>Fale ou escreva sobre fretes, pneus, rotas e custos. Eu ajudo você a organizar sua operação.</p>:messages.map(m=><article key={m.id} className={m.role==="user"?styles.user:styles.assistant}><small>{m.role==="user"?"Você":"Frota IA"}</small><p>{m.content}</p>{m.status==="error"&&<small>Não enviado. Confira e tente novamente.</small>}</article>)}{isTyping&&<p role="status">Preparando resposta…</p>}<div ref={bottom}/></section>
  {errorMessage&&<p role="alert" className={styles.notice}>{errorMessage}</p>}
  {lastAnswer&&<button className={styles.audio} onClick={()=>speaking?stopVoice():read(lastAnswer)}>{speaking?<Square/>:<Volume2/>}{speaking?"Parar áudio":"Ouvir resposta"}</button>}
  <nav className={styles.shortcuts} aria-label="Ferramentas">{[{name:"Fretes",icon:FileText,text:"Quero analisar um frete"},{name:"Rotas",icon:Route,text:"Quero planejar uma rota"},{name:"Notícias",icon:Newspaper,text:"Quero consultar notícias do transporte"},{name:"Custos",icon:CircleDollarSign,text:"Quero consultar meus custos"}].map(({name,icon:Icon,text})=><button key={name} disabled={isTyping} onClick={()=>setDraft(text)}><Icon/>{name}</button>)}</nav>
+ <button type="button" className={styles.operationCard} aria-haspopup="dialog" aria-expanded={operationOpen} onClick={()=>setOperationOpen(true)}><FileText aria-hidden/><span><strong>Minha operação</strong><small>Receitas, despesas e relatórios</small></span></button>
  <button className={styles.more} onClick={()=>setPanel("tools")}>Mais ferramentas</button>
  <button className={styles.talk} disabled={isTyping} onClick={listen}>{listening?<Square/>:<Mic/>}{listening?"Parar escuta":"Toque para falar"}</button>
  <label className={styles.toggle}><input type="checkbox" checked={voiceReplies} onChange={e=>{setVoiceReplies(e.target.checked);if(!e.target.checked)stopVoice();}}/>Ler novas respostas em voz alta</label>
@@ -69,7 +79,7 @@ export function DriverAssistant({calendarConnected}:{calendarConnected:boolean})
  <form className={styles.composer} onSubmit={e=>{e.preventDefault();void send();}}><textarea aria-label="Sua mensagem" placeholder="Ou digite sua mensagem…" maxLength={6000} value={draft} disabled={isTyping} onChange={e=>setDraft(e.target.value)} rows={2}/><button aria-label="Enviar mensagem" disabled={isTyping||!draft.trim()}><Send/></button></form>
  {notice&&<p className={styles.notice} role="status">{notice}</p>}
  <details className={styles.info}><summary>WhatsApp, aplicativo e instalação</summary><p>Use o link de vínculo enviado ao seu próprio WhatsApp para acessar a mesma operação. Os registros pertencem à empresa vinculada; o histórico exibido aqui é o disponível para seu login.</p><p>Para instalar: no menu do navegador, escolha “Instalar aplicativo” ou “Adicionar à tela inicial”. No iPhone, use Compartilhar → Adicionar à Tela de Início.</p><a href="https://wa.me/5541997454382" target="_blank" rel="noopener noreferrer">Abrir WhatsApp do Frota IA</a><p>Agenda Google: {calendarConnected?"conectada":"peça ao assistente para conectar"}.</p></details>
- <MyOperation revision={isTyping?0:messages.length} onAsk={text=>{setDraft(text);document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Sua mensagem"]')?.focus();}}/>
+ {operationOpen&&<dialog ref={operationDialog} className={styles.operationDialog} aria-label="Minha operação" onCancel={()=>setOperationOpen(false)} onClose={()=>setOperationOpen(false)}><div className={styles.operationBar}><button type="button" autoFocus onClick={()=>setOperationOpen(false)}><X aria-hidden/>Voltar à conversa</button></div><MyOperation revision={isTyping?0:messages.length} onAsk={text=>{setDraft(text);setOperationOpen(false);window.setTimeout(()=>document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Sua mensagem"]')?.focus(),0);}}/></dialog>}
  <footer className={styles.footer}>Use com o veículo parado. Confira os dados antes de confirmar lançamentos.</footer>
  {panel&&<section className={styles.panel} role="dialog" aria-modal="true" aria-label={panel==="history"?"Histórico":"Ferramentas"}><button autoFocus aria-label="Fechar" onClick={()=>setPanel(null)}><X/></button><h2>{panel==="history"?"Suas conversas":"Como posso ajudar?"}</h2>{panel==="history"?<><button disabled={isTyping} onClick={()=>window.location.reload()}><RefreshCw/>Atualizar histórico</button>{conversations.conversations.map(c=><button disabled={isTyping} key={c.id} onClick={()=>{stopVoice();conversations.selectConversation(c.id);setPanel(null);}}>{c.title}</button>)}{!conversations.conversations.length&&<p>Nenhuma conversa disponível para este login.</p>}<button onClick={async()=>{stopVoice();await signOut();window.location.assign("/login?next=%2F");}}><LogOut/>Sair da conta</button></>:FROTA_SUGGESTIONS.map(s=><button key={s.id} onClick={()=>{setDraft(s.description);setPanel(null);}}>{s.title}</button>)}</section>}
  </div></main>;
