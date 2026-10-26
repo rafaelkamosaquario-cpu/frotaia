@@ -27,6 +27,7 @@ import { processarMensagemDeGrupo } from "@/services/freight/groupMessageIntake"
 import { processGroupFuel } from "@/services/fuel/groupFuelIntake";
 import { processOperationalObservation } from "@/services/whatsapp/groupObservationIntake";
 import { resolverIntencaoComercialLanding, mensagemConfirmacaoOferta, MENSAGEM_INTERESSE_EMPRESAS } from "@/lib/mercadopago/landingIntent";
+import { mensagemOpcoesContratacao } from "@/lib/mercadopago/whatsappCheckout";
 import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
 import { isOfertaPlano, type OfertaPlano } from "@/lib/mercadopago/catalog";
 import { captureError, logEvent } from "@/lib/observability/logger";
@@ -507,7 +508,7 @@ export async function POST(request: Request) {
       }).catch(err => { if (!isUniqueViolation(err)) throw err; });
       try {
         const link = buildCheckoutLinkUrl(companyIdDemo, ofertaEscolhida);
-        await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(ofertaEscolhida)}\n\n${link}`);
+        await sendWhatsappText(phoneE164, mensagemOpcoesContratacao(ofertaEscolhida, link));
         await appendMessage(admin, { conversation_id: conversa.id, company_id: companyIdDemo, user_id: userId,
           role: "assistant", direction: "outbound", content: `${mensagemConfirmacaoOferta(ofertaEscolhida)}\nLink de contratação enviado (token omitido).`, content_type: "text" });
         await updateOnboardingSession(admin, userId, { collectedData: { ...collectedDataAtual, awaitingPlanChoice: false } });
@@ -657,7 +658,7 @@ export async function POST(request: Request) {
         const ofertaPretendida = collectedDataAtual.ofertaPretendida;
         if (empresaFinalizada && typeof ofertaPretendida === "string" && isOfertaPlano(ofertaPretendida)) {
           const link = buildCheckoutLinkUrl(empresaFinalizada.id, ofertaPretendida);
-          await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(ofertaPretendida)}\n\n${link}`).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_link_checkout_landing"));
+          await sendWhatsappText(phoneE164, mensagemOpcoesContratacao(ofertaPretendida, link)).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_link_checkout_landing"));
         }
 
         // Guia de Primeiros Passos V1 (08/2026, validação 08/2026) —
@@ -843,7 +844,7 @@ export async function POST(request: Request) {
     } else {
       try {
         const link = buildCheckoutLinkUrl(companyId, intencaoComercial);
-        await sendWhatsappText(phoneE164, `${mensagemConfirmacaoOferta(intencaoComercial)}\n\n${link}`);
+        await sendWhatsappText(phoneE164, mensagemOpcoesContratacao(intencaoComercial, link));
         await appendMessage(admin, { conversation_id: conversation.id, company_id: companyId, user_id: userId,
           role: "assistant", direction: "outbound", content: `${mensagemConfirmacaoOferta(intencaoComercial)}\nLink de contratação enviado (token omitido).`, content_type: "text" });
       } catch (err) {

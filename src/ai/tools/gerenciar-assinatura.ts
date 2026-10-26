@@ -1,5 +1,6 @@
 import type { DefinicaoFerramenta, DefinicaoParametroFerramenta, ResultadoFerramentaBase } from "./types";
 import { buildCheckoutLinkUrl } from "@/services/whatsapp/checkoutLinkToken";
+import { mensagemOpcoesContratacao } from "@/lib/mercadopago/whatsappCheckout";
 import { CATALOGO_OFERTAS, PLANOS_AUTOATENDIMENTO, formatarReais, type OfertaPlano } from "@/lib/mercadopago/catalog";
 
 /**
@@ -53,7 +54,7 @@ async function executar(entrada: GerenciarAssinaturaEntrada): Promise<GerenciarA
     dadosFaltantes: [],
     plano,
     linkContratacao: link,
-    mensagemResumo: CATALOGO_OFERTAS[plano].painel ? `Atendimento com Rafael para configurar ${CATALOGO_OFERTAS[plano].label}. Combine implantação, módulos, pagamento e entrega. Abrir o link não ativa o painel.` : `Link de contratação do plano ${CATALOGO_OFERTAS[plano].label} gerado.`,
+    mensagemResumo: mensagemOpcoesContratacao(plano, link),
   };
 }
 
@@ -90,7 +91,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
 
 export const ferramentaGerenciarAssinatura: DefinicaoFerramenta<GerenciarAssinaturaEntrada, GerenciarAssinaturaResultado> = {
   nome: "gerenciar_assinatura",
-  descricao: "Individual: link seguro para confirmar plano e pagamento. Essencial e Pro: atendimento obrigatório com Rafael para configurar e entregar o painel. Nunca prometa liberação automática dos planos de painel.",
+  descricao: "Individual: apresente sempre as DUAS opções e seus links retornados em mensagemResumo: checkout Mercado Pago OU Pix com atendimento do Rafael e liberação manual após conferência. Nunca omita a alternativa de Pix assistido, nem invente confirmação de pagamento. Essencial e Pro: atendimento obrigatório para configurar e entregar o painel.",
   objetivo:
     "Individual mantém a contratação pelo WhatsApp. Planos com painel encaminham a Rafael para preparar a empresa, módulos e entrega; pagamento e painel pronto são etapas distintas. O link não altera assinatura nem acessos.",
   parametros: PARAMETROS,
