@@ -20,3 +20,6 @@ describe("inventário privado de pneus",()=>{
  it("exige placa única por cliente",()=>{const s=fixture();expect(()=>applyCommand(s,{type:"vehicle",vehicle:{...vehicle,id:crypto.randomUUID()}})).toThrow("já cadastrados");});
 });
 
+
+it("4×2 guarda referência sem inventar pneus e rejeita terceiro eixo",()=>{const v={...vehicle,layout:"cavalo4x2",spares:null,mountingReference:{date:"2026-09-25",km:845501}};const s=applyCommand(emptyInventory(customer),{type:"vehicle",vehicle:v});expect(s.tires).toHaveLength(0);expect(s.vehicles[0].mountingReference).toEqual(v.mountingReference);expect(positions(s.vehicles[0])).toHaveLength(6);expect(positions(s.vehicles[0]).filter(p=>p.axis===2)).toHaveLength(4);expect(()=>move(applyCommand(s,batch),"montado","E3-P1")).toThrow("posição inválida");});
+

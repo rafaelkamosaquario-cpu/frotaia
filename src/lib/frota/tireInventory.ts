@@ -4,7 +4,7 @@ const text=z.string().trim().max(160);
 const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!Number.isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v,"Data inválida");
 const uuid=z.string().uuid();
 export const customerSchema=z.object({name:text.min(2),document:text,address:z.string().trim().max(500),phone:text}).strict();
-export const vehicleSchema=z.object({id:uuid,plate:text.min(7).max(12).transform(v=>v.toUpperCase().replace(/[^A-Z0-9]/g,"")),model:text.min(1),layout:z.enum(["cavalo6x2","tanque4"]),spares:z.number().int().min(0).max(2)}).strict();
+export const vehicleSchema=z.object({id:uuid,plate:text.min(7).max(12).transform(v=>v.toUpperCase().replace(/[^A-Z0-9]/g,"")),model:text.min(1),layout:z.enum(["cavalo4x2","cavalo6x2","tanque4"]),spares:z.number().int().min(0).max(2).nullable(),mountingReference:z.object({date,km:z.number().finite().min(0).max(10000000)}).strict().optional()}).strict();
 const identity=z.object({fire:text.max(30),dot:text.max(30),serial:text.max(80),marked:z.boolean()}).strict();
 const product=z.object({brand:text.min(1),model:text.min(1),size:text.min(1),tread:text,life:z.enum(["Novo","1ª recapagem","2ª recapagem","Outra"])}).strict();
 export const commandSchema=z.discriminatedUnion("type",[
@@ -21,9 +21,10 @@ export type Tire=z.infer<typeof identity>&z.infer<typeof product>&{id:string;sta
 export type Movement={id:string;tireId:string;date:string;recordedAt:string;from:string;to:string;reason:string;km:number|null;vehicleId:string|null;position:string|null};
 export type Inventory={customer:Customer;vehicles:Vehicle[];tires:Tire[];movements:Movement[]};
 export type InventoryRow={id:string;company_id:string;actor_id:string;source_case_id:string|null;version:number;data:Inventory;created_at:string;updated_at:string};
+export const vehicleLayouts={cavalo4x2:{label:"Cavalo 4×2",axes:["dianteiro","tração"]},cavalo6x2:{label:"Cavalo 6×2",axes:["dianteiro","tração","auxiliar"]},tanque4:{label:"Carreta tanque · 4 eixos",axes:["eixo 1","eixo 2","eixo 3","eixo 4"]}} as const;
 export function positions(v:Vehicle){
- const axes=v.layout==="cavalo6x2"?[["DE","DD"],["EE","EI","DI","DE"],["EE","EI","DI","DE"]]:Array.from({length:4},()=>["EE","EI","DI","DE"]);
- return axes.flatMap((s,i)=>s.map((side,j)=>({id:`E${i+1}-P${j+1}`,label:`${i+1}º eixo · ${s.length===2?(j===0?"esquerdo":"direito"):["esquerdo externo","esquerdo interno","direito interno","direito externo"][j]}`,axis:i+1,side}))).concat(Array.from({length:v.spares},(_,i)=>({id:`S${i+1}`,label:`Estepe ${i+1}`,axis:0,side:"S"})));
+ const axes=vehicleLayouts[v.layout].axes.map((_,i)=>v.layout!=="tanque4"&&i===0?["DE","DD"]:["EE","EI","DI","DE"]);
+ return axes.flatMap((s,i)=>s.map((side,j)=>({id:`E${i+1}-P${j+1}`,label:`${i+1}º eixo · ${s.length===2?(j===0?"esquerdo":"direito"):["esquerdo externo","esquerdo interno","direito interno","direito externo"][j]}`,axis:i+1,side}))).concat(Array.from({length:v.spares??0},(_,i)=>({id:`S${i+1}`,label:`Estepe ${i+1}`,axis:0,side:"S"})));
 }
 const fireKey=(v:string)=>v.trim().toUpperCase().replace(/^0+(?=\d)/,"");
 export function emptyInventory(customer:Customer):Inventory{return {customer,vehicles:[],tires:[],movements:[]};}
@@ -70,4 +71,5 @@ export function applyCommand(input:Inventory,raw:unknown,now=new Date().toISOStr
  s.movements.push({id:crypto.randomUUID(),tireId:t.id,date:c.date,recordedAt:now,from:`${t.status}${t.vehicleId?": "+s.vehicles.find(v=>v.id===t.vehicleId)?.plate+" / "+t.position:""}`,to:c.destination,reason:c.reason,km:c.km,vehicleId:c.vehicleId,position:c.position});
  Object.assign(t,{status:c.destination,vehicleId:c.vehicleId,position:c.position});return s;
 }
+
 
