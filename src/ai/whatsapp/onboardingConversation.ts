@@ -1,42 +1,15 @@
 import type { OnboardingState, VehicleTypeEnum, VehicleBodyTypeEnum } from "@/lib/supabase/tables";
 import type { CompanyRow } from "@/lib/supabase/tables";
-import { classificarConfiguracaoVeiculo, resolverDesambiguacaoArticulado } from "./vehicleConfigClassifier";
+import { nextVehicleConfiguration, type VehicleSetup } from "./vehicleSetup";
 import { CATEGORIAS_AJUDA } from "@/lib/helpMenu";
 import { ajudaConversacionalV1 } from "./conversationExperience";
 
-/**
- * Onboarding conversacional pelo WhatsApp (Camada 6, seções 3-6 do prompt
- * V1-WhatsApp): uma pergunta por vez, sem formulário, com estado explícito
- * em vez de depender só do histórico de texto. Função pura — quem chama
- * (o webhook) é responsável por persistir o estado/collected_data, enviar
- * a `reply` (texto, lista ou botões, conforme `kind`) e por finalizar
- * (criar company/vehicle) quando finalize=true.
- *
- * Redesenho V1 "1 usuário + 1 veículo" (08/2026, a pedido do Rafael): o
- * veículo passou a ser configurado por completo no próprio onboarding —
- * marca/modelo/ano (agora obrigatório, sem "depois"), placa (opcional),
- * configuração (obrigatória, classificador determinístico inalterado),
- * carroceria/implemento (sempre resolve, cai em "outro" se não reconhecer)
- * e consumo médio (opcional). Também ganhou uma etapa condicional de rota
- * principal, só perguntada a quem respondeu "sim" pra rota fixa/recorrente.
- * Google Calendar continua NUNCA fazendo parte do onboarding — só é pedido
- * sob demanda, depois, quando alguma ferramenta precisar (gerenciar_alerta/
- * gerenciar_google_calendar).
- *
- * nome → perfil (lista) → intenção → cidade → região → rota fixa (sim/não)
- * → [rota principal, só se sim] → marca/modelo/ano → placa → configuração
- * → [composição, só cavalo/carreta] → carroceria → consumo → concluído.
- *
- * Camada 7: a pergunta "quantos veículos" foi removida — o produto só
- * permite 1 veículo ativo por conta (constraint no banco,
- * vehicles_one_active_per_company_idx). O estado `awaiting_vehicle_count`
- * segue existindo no enum do banco só por compatibilidade histórica, mas
- * o código nunca mais atribui esse estado.
- */
+/** Cadastro V1: nome, perfil, intenção, cidade, veículo, placa, configuração, implementos, carroceria e consumo. Confirmação final obrigatória. Estados antigos são mantidos para retomada sem perda de dados. */
 
 export type OnboardingCompanyType = CompanyRow["company_type"];
 
 export interface OnboardingCollectedData {
+  vehicleSetup?: VehicleSetup;
   /** Preenchido assim que a empresa mínima é criada no primeiro contato (inversão do funil, 09/2026) — presente aqui significa que `finalizeOnboarding` deve ATUALIZAR essa empresa em vez de criar uma nova. Ausente = caminho legado (ex.: lead "Empresas", que nunca passa pela demo). */
   companyId?: string;
   name?: string;
@@ -199,117 +172,22 @@ function askBaseLocation(): OnboardingReply {
   return textReply("Qual cidade você usa como base principal da sua operação?\n\nEx.: Curitiba - PR");
 }
 
-const OPCOES_REGIAO: Array<{ id: string; title: string; label: string }> = [
-  { id: "norte", title: "Norte", label: "Norte" },
-  { id: "nordeste", title: "Nordeste", label: "Nordeste" },
-  { id: "centro_oeste", title: "Centro-Oeste", label: "Centro-Oeste" },
-  { id: "sudeste", title: "Sudeste", label: "Sudeste" },
-  { id: "sul", title: "Sul", label: "Sul" },
-  { id: "todas", title: "Todas as regiões", label: "Todas as regiões" },
-];
-
-/**
- * Lista nativa (confirmada entregando bem em teste real, ao contrário dos
- * botões — ver askFixedRoute) com as 5 regiões + "todas". A lista do
- * WhatsApp só permite tocar em UMA opção por vez (sem seleção múltipla
- * nativa) — pra quem atua em mais de uma região, digitar texto livre
- * continua funcionando em paralelo (ver resolverRegiao), por isso o texto
- * da pergunta menciona as duas formas.
- */
-function askRegion(): OnboardingReply {
-  return {
-    kind: "list",
-    text: "Em quais regiões você costuma rodar mais? Toque numa opção, ou digite se forem várias (ex.: \"Sul e Sudeste\").",
-    title: "Região de atuação",
-    buttonLabel: "Escolher opção",
-    options: OPCOES_REGIAO.map((o) => ({ id: o.id, title: o.title })),
-  };
-}
-
-/** Mapeia o toque na lista pro rótulo bonito; texto livre (uma ou várias regiões) passa direto. */
-function resolverRegiao(texto: string): string {
-  const t = norm(texto);
-  const porId = OPCOES_REGIAO.find((o) => o.id === t);
-  return porId ? porId.label : texto.trim();
-}
-
-/**
- * Texto simples, não botões — botões nativos (kind "buttons",
- * sendWhatsappButtons/send-button-actions) não estavam sendo entregues em
- * teste real no WhatsApp (05/08/2026), travando o onboarding aqui sem
- * nenhum erro visível nos logs (a chamada à Z-API não lançava exceção, só
- * a mensagem nunca chegava no aparelho). parseFixedRoute já aceita
- * "sim"/"não" em texto livre — trocar pra texto evita depender desse
- * recurso até investigarmos a causa raiz do lado da Z-API.
- */
-function askFixedRoute(): OnboardingReply {
-  return textReply('Você costuma trabalhar em uma rota fixa ou recorrente?\n\nResponda "sim" ou "não".');
-}
-
-function askPrimaryRoute(): OnboardingReply {
-  return textReply("Qual é sua rota principal?\n\nEx.: Curitiba → São Paulo");
-}
-
-/**
- * Best-effort: identifica o primeiro par origem/destino no texto livre.
- * Se o cliente mencionar mais de uma rota (ex.: "Curitiba → São Paulo e
- * Curitiba → Campinas"), só a primeira vira campos estruturados — o texto
- * completo é sempre preservado em primaryRouteRaw (e vira memória na
- * finalização), então nenhuma informação é perdida mesmo quando o parser
- * não separa tudo.
- */
-const SEPARADOR_ROTA = /\s*(?:→|->)\s*|\s+at[ée]\s+|\s+pra\s+|\s+para\s+|\s+-\s+/i;
-function parsePrimaryRoute(texto: string): { origin: string; destination: string } | null {
-  const partes = texto.trim().split(SEPARADOR_ROTA);
-  if (partes.length < 2) return null;
-  const origin = partes[0].trim();
-  const destination = partes[1].trim().split(/\s+e\s+|[,;]/)[0].trim();
-  if (!origin || !destination) return null;
-  return { origin, destination };
-}
-
 function askPrimaryVehicle(): OnboardingReply {
-  return textReply("Vamos conhecer seu caminhão para reaproveitar os dados nas próximas conversas.\n\nQual a marca, modelo e ano?\n\nEx.: Scania R450 2022");
+  return textReply("Vamos cadastrar seu caminhão.\n\nQual a marca, modelo e ano?\n\nEx.: Scania R450 2022");
 }
 
 function askPlate(): OnboardingReply {
-  return textReply('Qual a placa do veículo?\n\nEx.: ABC1D23\n\nSe preferir informar depois, responda "depois".');
+  return textReply('Qual a placa do veículo?\n\nEx.: ABC1D23 ou ABC1234. A placa é necessária para identificar seus registros.');
 }
 
-/** Normaliza (remove espaço/hífen, maiúsculas) e valida contra o formato de placa (Mercosul ou antigo) — mesmo padrão aceito por vehicleCreateSchema. Nunca bloqueia a etapa: se não bater, a placa simplesmente não é gravada. */
+/** Normaliza (remove espaço/hífen, maiúsculas) e valida contra o formato de placa (Mercosul ou antigo) — mesmo padrão aceito por vehicleCreateSchema. Sem formato válido, a etapa pede a placa novamente. */
 function parsePlaca(texto: string): string | null {
   const t = texto.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
   return /^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$/.test(t) ? t : null;
 }
 
-/**
- * Ids batem literalmente com as palavras-chave que
- * vehicleConfigClassifier.ts já reconhece — o toque na lista vira
- * `selectedRowId`, que entra em classificarConfiguracaoVeiculo() do mesmo
- * jeito que texto digitado (nenhuma mudança precisou no classificador).
- * Cavalo mecânico/carreta continuam caindo na desambiguação (5/6/7/9
- * eixos) depois do toque, igual já funcionava com texto livre.
- */
-const OPCOES_CONFIG_VEICULO: Array<{ id: string; title: string }> = [
-  { id: "toco", title: "Toco" },
-  { id: "truck", title: "Truck / Trucado" },
-  { id: "tres quartos", title: "Três-quartos" },
-  { id: "bitruck", title: "Bitruck" },
-  { id: "cavalo mecanico", title: "Cavalo mecânico" },
-  { id: "carreta", title: "Carreta" },
-  { id: "bitrem", title: "Bitrem" },
-  { id: "rodotrem", title: "Rodotrem" },
-  { id: "outro", title: "Outro / não sei" },
-];
-
 function askVehicleConfiguration(): OnboardingReply {
-  return {
-    kind: "list",
-    text: "Qual a configuração do seu veículo? Toque numa opção, ou digite se preferir (ex.: \"cavalo mecânico\").",
-    title: "Configuração do veículo",
-    buttonLabel: "Escolher opção",
-    options: OPCOES_CONFIG_VEICULO.map((o) => ({ id: o.id, title: o.title })),
-  };
+  return textReply("É um caminhão rígido (com carroceria no próprio chassi) ou cavalo mecânico? Informe também a tração, como 4x2, 6x2, 6x4 ou 8x4.");
 }
 
 /** Mesmo vocabulário já usado pela ferramenta gerenciar_veiculo (carroceria) — nada inventado aqui. Sempre resolve algo (cai em "outro" quando não reconhece), então esta etapa nunca trava o onboarding. */
@@ -328,7 +206,7 @@ const OPCOES_CARROCERIA: Array<{ id: VehicleBodyTypeEnum; title: string; palavra
 function askBodyType(): OnboardingReply {
   return {
     kind: "list",
-    text: "Qual carroceria ou implemento você utiliza?",
+    text: "Qual o tipo de carroceria: baú, sider, tanque, graneleiro, basculante ou outra?",
     title: "Carroceria / implemento",
     buttonLabel: "Escolher opção",
     options: OPCOES_CARROCERIA.map((o) => ({ id: o.id, title: o.title })),
@@ -463,14 +341,9 @@ function processOnboardingStep(
     if (!collectedData.companyType) return { nextState: "awaiting_profile", reply: askProfile(collectedData.name), collectedData, finalize: false };
     if (!collectedData.intentId) return { nextState: "awaiting_intent", reply: askIntent(), collectedData, finalize: false };
     if (!collectedData.baseCity) return { nextState: "awaiting_base_location", reply: askBaseLocation(), collectedData, finalize: false };
-    if (!collectedData.region) return { nextState: "awaiting_region", reply: askRegion(), collectedData, finalize: false };
-    if (collectedData.hasFixedRoute === undefined) return { nextState: "awaiting_fixed_route", reply: askFixedRoute(), collectedData, finalize: false };
-    if (collectedData.hasFixedRoute === true && !collectedData.primaryRouteRaw) {
-      return { nextState: "awaiting_primary_route", reply: askPrimaryRoute(), collectedData, finalize: false };
-    }
     if (!collectedData.primaryVehicleRaw) return { nextState: "awaiting_primary_vehicle", reply: askPrimaryVehicle(), collectedData, finalize: false };
-    if (!collectedData.plateAsked) return { nextState: "awaiting_plate", reply: askPlate(), collectedData, finalize: false };
-    if (!collectedData.vehicleType) return { nextState: "awaiting_vehicle_configuration", reply: askVehicleConfiguration(), collectedData, finalize: false };
+    if (!collectedData.plate) return { nextState: "awaiting_plate", reply: askPlate(), collectedData, finalize: false };
+    if (!collectedData.vehicleSetup?.complete) return { nextState: "awaiting_vehicle_configuration", reply: askVehicleConfiguration(), collectedData, finalize: false };
     if (!collectedData.bodyType) return { nextState: "awaiting_body_type", reply: askBodyType(), collectedData, finalize: false };
     return { nextState: "awaiting_consumption", reply: askConsumption(), collectedData, finalize: false };
   }
@@ -515,41 +388,14 @@ function processOnboardingStep(
       }
       const { city, state: uf } = parseBaseLocation(incomingText);
       const updated = { ...collectedData, baseCity: city, baseState: uf };
-      return { nextState: "awaiting_region", reply: askRegion(), collectedData: updated, finalize: false };
-    }
-
-    case "awaiting_region": {
-      if (!incomingText.trim()) {
-        return { nextState: state, reply: askRegion(), collectedData, finalize: false };
-      }
-      const updated = { ...collectedData, region: resolverRegiao(incomingText) };
-      return { nextState: "awaiting_fixed_route", reply: askFixedRoute(), collectedData: updated, finalize: false };
-    }
-
-    case "awaiting_fixed_route": {
-      const parsed = parseFixedRoute(incomingText);
-      if (parsed === null) {
-        return { nextState: state, reply: askFixedRoute(), collectedData, finalize: false };
-      }
-      const updated = { ...collectedData, hasFixedRoute: parsed };
-      if (parsed) {
-        return { nextState: "awaiting_primary_route", reply: askPrimaryRoute(), collectedData: updated, finalize: false };
-      }
       return { nextState: "awaiting_primary_vehicle", reply: askPrimaryVehicle(), collectedData: updated, finalize: false };
     }
 
-    case "awaiting_primary_route": {
-      if (!incomingText.trim()) {
-        return { nextState: state, reply: askPrimaryRoute(), collectedData, finalize: false };
-      }
-      const parsedRoute = parsePrimaryRoute(incomingText);
-      const updated: OnboardingCollectedData = {
-        ...collectedData,
-        primaryRouteRaw: incomingText.trim(),
-        ...(parsedRoute ? { primaryRouteOrigin: parsedRoute.origin, primaryRouteDestination: parsedRoute.destination } : {}),
-      };
-      return { nextState: "awaiting_primary_vehicle", reply: askPrimaryVehicle(), collectedData: updated, finalize: false };
-    }
+    // Retomadas legadas seguem para o veículo sem repetir perguntas removidas.
+    case "awaiting_region":
+    case "awaiting_fixed_route":
+    case "awaiting_primary_route":
+      return { nextState: "awaiting_primary_vehicle", reply: askPrimaryVehicle(), collectedData, finalize: false };
 
     case "awaiting_primary_vehicle": {
       // V1 "1 usuário + 1 veículo": marca/modelo/ano deixou de ser
@@ -563,80 +409,18 @@ function processOnboardingStep(
     }
 
     case "awaiting_plate": {
-      // Opcional: a etapa sempre avança, com ou sem placa reconhecida.
+      // Placa obrigatória: não inventa identificação nem aceita pular.
       const placa = parsePlaca(incomingText);
-      const updated: OnboardingCollectedData = { ...collectedData, plateAsked: true, ...(placa ? { plate: placa } : {}) };
+      if (!placa) return { nextState: state, reply: askPlate(), collectedData, finalize: false };
+      const updated: OnboardingCollectedData = { ...collectedData, plateAsked: true, plate: placa };
       return { nextState: "awaiting_vehicle_configuration", reply: askVehicleConfiguration(), collectedData: updated, finalize: false };
     }
 
     case "awaiting_vehicle_configuration": {
-      const tentativas = collectedData.vehicleConfigAttempts ?? 0;
-
-      // Meio da desambiguação (cavalo mecânico/carreta): esta mensagem é a
-      // escolha da lista anterior, não uma nova descrição livre.
-      if (collectedData.awaitingVehicleConfigChoice) {
-        const resolvido = resolverDesambiguacaoArticulado(incomingText);
-        if (!resolvido) {
-          // Rede de segurança (achado real — loop sem saída): depois de 2
-          // tentativas sem reconhecer a escolha, assume "só o cavalo" (eixos
-          // indefinidos) e segue — nunca trava o onboarding pra sempre.
-          if (tentativas >= 2) {
-            const updated = {
-              ...collectedData,
-              vehicleType: "cavalo_mecanico" as VehicleTypeEnum,
-              axleCount: null,
-              awaitingVehicleConfigChoice: false,
-              vehicleConfigAttempts: 0,
-            };
-            return {
-              nextState: "awaiting_body_type",
-              reply: textReply("Sem problema — vou seguir sem definir a composição exata agora. Você pode ajustar isso depois no painel ou me contando os detalhes."),
-              collectedData: updated,
-              finalize: false,
-            };
-          }
-          // Toque inválido/texto solto no meio da desambiguação: repete a
-          // mesma lista, sem sair do estado (nunca conclui sem os dois campos).
-          const classificacao = classificarConfiguracaoVeiculo("cavalo mecanico");
-          const reply = classificacao.status === "precisa_desambiguar" ? classificacao.reply : askVehicleConfiguration();
-          return { nextState: state, reply, collectedData: { ...collectedData, vehicleConfigAttempts: tentativas + 1 }, finalize: false };
-        }
-        const updated = {
-          ...collectedData,
-          vehicleType: resolvido.vehicleType,
-          axleCount: resolvido.axleCount,
-          awaitingVehicleConfigChoice: false,
-          vehicleConfigAttempts: 0,
-        };
-        return { nextState: "awaiting_body_type", reply: askBodyType(), collectedData: updated, finalize: false };
-      }
-
-      const classificacao = classificarConfiguracaoVeiculo(incomingText);
-
-      if (classificacao.status === "resolvido") {
-        const updated = { ...collectedData, vehicleType: classificacao.vehicleType, axleCount: classificacao.axleCount, vehicleConfigAttempts: 0 };
-        return { nextState: "awaiting_body_type", reply: askBodyType(), collectedData: updated, finalize: false };
-      }
-
-      if (classificacao.status === "precisa_desambiguar") {
-        const updated = { ...collectedData, awaitingVehicleConfigChoice: true, vehicleConfigAttempts: 0 };
-        return { nextState: state, reply: classificacao.reply, collectedData: updated, finalize: false };
-      }
-
-      // "nao_reconhecido": pergunta obrigatória, tenta orientar/reformular
-      // até 2 vezes — mas nunca trava pra sempre (achado real: a própria
-      // opção "Outro/não sei" da lista caía aqui sem nunca resolver). Na
-      // 3ª tentativa sem sucesso, assume vehicleType="outro" e segue.
-      if (tentativas >= 2) {
-        const updated = { ...collectedData, vehicleType: "outro" as VehicleTypeEnum, axleCount: null, vehicleConfigAttempts: 0 };
-        return {
-          nextState: "awaiting_body_type",
-          reply: textReply("Sem problema — vou seguir com a configuração como \"outro\" por enquanto. Você pode ajustar isso depois no painel ou me contando os detalhes numa conversa."),
-          collectedData: updated,
-          finalize: false,
-        };
-      }
-      return { nextState: state, reply: classificacao.reply, collectedData: { ...collectedData, vehicleConfigAttempts: tentativas + 1 }, finalize: false };
+      const setup = nextVehicleConfiguration(collectedData.vehicleSetup, incomingText);
+      const updated = { ...collectedData, vehicleSetup: setup.data };
+      if (!setup.data.complete) return { nextState: state, reply: textReply(setup.question), collectedData: updated, finalize: false };
+      return { nextState: "awaiting_body_type", reply: askBodyType(), collectedData: { ...updated, vehicleType: setup.data.kind === "cavalo" ? "cavalo_mecanico" : setup.data.motorAxles === 2 ? "toco" : "truck", axleCount: setup.data.totalAxles }, finalize: false };
     }
 
     case "awaiting_body_type": {
@@ -666,10 +450,12 @@ export function processOnboardingMessage(state: OnboardingState, collectedData: 
   const t = norm(incomingText);
   if (collectedData.pendingCombinedConfirmation) {
     if (/^(sim|confirmo|confirmado|certo|est[aá] certo|isso|isso mesmo|ok|pode)$/.test(t)) {
+      if (!collectedData.plate) return { nextState: "awaiting_plate", finalize: false, reply: askPlate(), collectedData: { ...collectedData, pendingCombinedConfirmation: false } };
+      if (!collectedData.vehicleSetup?.complete) return { nextState: "awaiting_vehicle_configuration", finalize: false, reply: askVehicleConfiguration(), collectedData: { ...collectedData, pendingCombinedConfirmation: false } };
       return { nextState: "completed", finalize: true, reply: completionMessage(), collectedData: { ...collectedData, pendingCombinedConfirmation: false } };
     }
     if (/^(n[aã]o|corrigir|errado)$/.test(t)) {
-      return { nextState: "awaiting_primary_vehicle", finalize: false, reply: textReply("Vamos corrigir o caminhão. Me diga marca, modelo e ano; pode incluir placa, configuração, carroceria e consumo."), collectedData: { ...collectedData, primaryVehicleRaw: undefined, plate: undefined, plateAsked: false, vehicleType: undefined, axleCount: undefined, bodyType: undefined, averageConsumptionKmL: undefined, consumptionAsked: false, pendingCombinedConfirmation: false } };
+      return { nextState: "awaiting_primary_vehicle", finalize: false, reply: textReply("Vamos corrigir o caminhão. Me diga marca, modelo e ano; pode incluir placa, configuração, carroceria e consumo."), collectedData: { ...collectedData, primaryVehicleRaw: undefined, vehicleSetup: undefined, plate: undefined, plateAsked: false, vehicleType: undefined, axleCount: undefined, bodyType: undefined, averageConsumptionKmL: undefined, consumptionAsked: false, pendingCombinedConfirmation: false } };
     }
     if (!/cancelar|pausar|continuar depois|depois eu continuo/.test(t)) return { nextState: state, finalize: false, reply: textReply("Está certo o resumo do caminhão? Responda sim ou corrigir."), collectedData };
     collectedData = { ...collectedData, pendingCombinedConfirmation: false };
@@ -685,9 +471,14 @@ export function processOnboardingMessage(state: OnboardingState, collectedData: 
       if (value > 0 && value <= 30) { data.averageConsumptionKmL = value; data.consumptionAsked = true; extras++; }
     }
     if (state !== "awaiting_body_type" && OPCOES_CARROCERIA.some(o => o.palavras.some(p => t.includes(p)))) { data.bodyType = resolverCarroceria(incomingText); extras++; }
-    if (state !== "awaiting_vehicle_configuration" && /\b(toco|truck|bitruck|carreta|cavalo|vuc|van|utilitario|rodotrem|bitrem|eixos)\b/.test(t)) {
-      const conf = classificarConfiguracaoVeiculo(incomingText);
-      if (conf.status === "resolvido") { data.vehicleType = conf.vehicleType; data.axleCount = conf.axleCount; extras++; }
+    if (state !== "awaiting_vehicle_configuration" && /\b(cavalo|rigido|rígido|toco|truck|bitruck)\b/.test(t)) {
+      const setup = nextVehicleConfiguration(data.vehicleSetup, incomingText);
+      data.vehicleSetup = setup.data;
+      if (setup.data.complete) {
+        data.vehicleType = setup.data.kind === "cavalo" ? "cavalo_mecanico" : setup.data.motorAxles === 2 ? "toco" : "truck";
+        data.axleCount = setup.data.totalAxles;
+      }
+      extras++;
     }
     // Placa com frase natural: o parser estrito recebe só a placa identificada.
     if (state === "awaiting_plate" && plate) incomingText = plate[1] + plate[2];
@@ -697,15 +488,15 @@ export function processOnboardingMessage(state: OnboardingState, collectedData: 
   // Nunca consome de novo uma resposta em uma etapa que está pedindo desambiguação.
   for (let i = 0; i < 5 && !result.finalize && result.nextState !== state; i++) {
     data = result.collectedData;
-    if (result.nextState === "awaiting_plate" && data.plateAsked) result = processOnboardingStep(result.nextState, data, data.plate ?? "depois");
-    else if (result.nextState === "awaiting_vehicle_configuration" && data.vehicleType && !data.awaitingVehicleConfigChoice) result = { ...result, nextState: "awaiting_body_type", reply: askBodyType() };
+    if (result.nextState === "awaiting_plate" && data.plate) result = processOnboardingStep(result.nextState, data, data.plate ?? "depois");
+    else if (result.nextState === "awaiting_vehicle_configuration" && data.vehicleSetup?.complete) result = { ...result, nextState: "awaiting_body_type", reply: askBodyType() };
     else if (result.nextState === "awaiting_body_type" && data.bodyType) result = processOnboardingStep(result.nextState, data, data.bodyType);
     else if (result.nextState === "awaiting_consumption" && data.consumptionAsked) result = processOnboardingStep(result.nextState, data, data.averageConsumptionKmL?.toString() ?? "não sei");
     else break;
   }
-  if (result.finalize && result.collectedData.usedCombinedInput) {
+  if (result.finalize) {
     const d = result.collectedData;
-    return { ...result, nextState: "awaiting_consumption", finalize: false, collectedData: { ...d, pendingCombinedConfirmation: true }, reply: textReply(`Confere o que entendi do caminhão:\n${d.primaryVehicleRaw}\nPlaca: ${d.plate ?? "não informada"}\nConfiguração: ${d.vehicleType ?? "não definida"}${d.axleCount ? `, ${d.axleCount} eixos` : ""}\nCarroceria: ${d.bodyType ?? "não informada"}\nConsumo informado: ${d.averageConsumptionKmL ? `${d.averageConsumptionKmL} km/l` : "não informado"}\n\nEstá certo? Responda sim ou corrigir.`) };
+    return { ...result, nextState: "awaiting_consumption", finalize: false, collectedData: { ...d, pendingCombinedConfirmation: true }, reply: textReply(`Confere o que entendi do caminhão:\n${d.primaryVehicleRaw}\nPlaca: ${d.plate ?? "não informada"}\nConfiguração: ${d.vehicleSetup?.label ?? d.vehicleType ?? "não definida"}\nCarroceria: ${d.bodyType ?? "não informada"}\nConsumo informado: ${d.averageConsumptionKmL ? `${d.averageConsumptionKmL} km/l` : "não informado"}\n\nEstá certo? Responda sim ou corrigir.`) };
   }
   return result;
 }

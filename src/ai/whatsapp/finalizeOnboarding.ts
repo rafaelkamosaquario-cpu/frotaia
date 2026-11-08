@@ -171,7 +171,7 @@ export async function finalizeOnboarding(
       const { brand, model, modelYear } = parseVehicleDescription(collectedData.primaryVehicleRaw);
       const veiculo = await createVehicle(admin, company.id, userId, {
         name: collectedData.primaryVehicleRaw ? truncate(collectedData.primaryVehicleRaw, 120) : undefined,
-        notes: collectedData.primaryVehicleRaw,
+        notes: [collectedData.primaryVehicleRaw, collectedData.vehicleSetup?.label].filter(Boolean).join("\n"),
         vehicleType: collectedData.vehicleType,
         axleCount: collectedData.axleCount ?? undefined,
         plate: collectedData.plate,
@@ -186,6 +186,16 @@ export async function finalizeOnboarding(
       // perguntar de novo (ver regra no system prompt). Sem isso, o
       // veículo existe no banco mas fica invisível pra IA.
       await setDefaultVehicle(admin, veiculo.id, company.id, userId);
+      if (collectedData.vehicleSetup?.complete) {
+        await saveMemory(admin, company.id, userId, {
+          memoryType: "operational",
+          key: "vehicle_configuration",
+          valueJson: { ...collectedData.vehicleSetup, vehicleId: veiculo.id },
+          summary: collectedData.vehicleSetup.label ?? "Configuração confirmada no cadastro",
+          sourceType: "user_explicit",
+          confirmedByUser: true,
+        });
+      }
 
       // Dado estruturado (saved_routes) só quando o parser conseguiu
       // separar origem/destino — a memória acima já garante que o texto
