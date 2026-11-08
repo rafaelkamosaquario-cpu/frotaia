@@ -1,6 +1,9 @@
 "use client";
 import {useEffect,useState,type FormEvent} from "react";
-import {positions,vehicleLayouts,type InventoryRow,type Customer,type Command,type Tire,type Vehicle} from "@/lib/frota/tireInventory";
+import {positions,type InventoryRow,type Customer,type Command,type Tire,type Vehicle} from "@/lib/frota/tireInventory";
+
+import {VehicleConfigurationForm} from "./VehicleConfigurationForm";
+import {VehicleMap} from "./VehicleMap";
 
 const box="rounded-xl border border-border bg-surface p-4 space-y-3";
 const field="w-full rounded-lg border border-border bg-background p-2 text-foreground";
@@ -53,11 +56,7 @@ export function TireInventoryClient(){
  {state&&row&&<>
  <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{[["Total",state.tires.length],["Montados",counts.montado],["Estoque",counts.estoque],["Em serviço",counts.servico],["Baixados",counts.baixado]].map(([label,count])=><div className={box} key={label}><div className="text-sm">{label}</div><strong className="text-2xl">{count}</strong></div>)}</div>
  <nav className="flex flex-wrap gap-2" aria-label="Mapeamento">{[["mapa","Mapa por veículo"],["pneus","Cadastro e estoque"],["veiculos","Veículos / implementos"],["historico","Histórico"],["relatorios","Relatórios"]].map(([id,label])=><button className={button+(tab===id?" bg-primary text-primary-foreground":"")} key={id} onClick={()=>setTab(id)}>{label}</button>)}</nav>
- {tab==="veiculos"&&<section className={box}><h2 className="font-semibold">Cadastrar veículo ou implemento</h2><form className="grid gap-3 md:grid-cols-2" onSubmit={async e=>{const f=form(e);await save({type:"vehicle",vehicle:{id:crypto.randomUUID(),plate:str(f,"plate"),model:str(f,"model"),layout:str(f,"layout") as Vehicle["layout"],spares:str(f,"spares")===""?null:Number(str(f,"spares")),...(str(f,"mountedDate")&&str(f,"mountedKm")?{mountingReference:{date:str(f,"mountedDate"),km:Number(str(f,"mountedKm"))}}:{})}});}}>
- <Input name="plate" label="Placa própria do veículo / implemento" required/><Input name="model" label="Marca e modelo" required/>
- <label>Configuração<select name="layout" className={field}>{Object.entries(vehicleLayouts).map(([id,c])=><option key={id} value={id}>{c.label} · {c.axes.length} eixos</option>)}</select></label>
- <label>Estepes<select className={field} name="spares"><option value="">Não informado</option><option>0</option><option>1</option><option>2</option></select></label>
- <Input name="mountedDate" label="Data de montagem informada (opcional)" type="date"/><Input name="mountedKm" label="Odômetro na montagem (opcional)" type="number"/><p className="text-sm md:col-span-2">Data e odômetro são uma referência do veículo; os pneus e suas posições são cadastrados separadamente. Preencha os dois campos para guardar essa referência.</p><p className="text-sm md:col-span-2">Confirme a configuração real. A carreta tem cadastro e placa separados do cavalo. O desenho é ilustrativo; não determina a função real de um eixo.</p><button className={button} disabled={busy}>Cadastrar veículo</button></form>
+ {tab==="veiculos"&&<section className={box}><h2 className="font-semibold">Cadastrar veículo ou implemento</h2><VehicleConfigurationForm busy={busy} onSave={async vehicle=>save({type:"vehicle",vehicle})}/>
  {state.vehicles.map(v=><p key={v.id}>{v.plate} · {v.model} · {positions(v).length} posições</p>)}</section>}
  {tab==="pneus"&&<>
  <details className={box}><summary className="font-semibold">Cadastrar lote de pneus</summary><form className="space-y-3" onSubmit={async e=>{const f=form(e);await save({type:"batch",date:str(f,"date"),product:{brand:str(f,"brand"),model:str(f,"model"),size:str(f,"size"),tread:str(f,"tread"),life:str(f,"life") as Tire["life"]},tires:Array.from({length:quantity},(_,i)=>({fire:str(f,"fire"+i),dot:str(f,"dot"+i),serial:str(f,"serial"+i),marked:f.get("marked"+i)==="on"}))});}}>
@@ -93,18 +92,3 @@ export function TireInventoryClient(){
  <style>{`@media print {body * {visibility:hidden} #tire-mapping-report {-webkit-print-color-adjust:exact;print-color-adjust:exact} #tire-mapping-report td {overflow-wrap:anywhere} #tire-mapping-report thead {display:table-header-group} #tire-mapping-report,#tire-mapping-report * {visibility:visible} #tire-mapping-report {position:absolute;left:0;top:0;width:100%;border:0} #tire-mapping-report .print\\:hidden {display:none} tr {break-inside:avoid} @page {size:A4 portrait;margin:10mm}}`}</style>
  </main>;
 }
-function VehicleMap({vehicle,tires,onPosition,onOccupied}:{vehicle:Vehicle;tires:Tire[];onPosition?:(position:string,tireId?:string)=>void;onOccupied?:(t:Tire)=>void}){
- const all=positions(vehicle),axes=vehicleLayouts[vehicle.layout].axes.length;
- return <div className="mx-auto max-w-2xl rounded-xl border border-slate-300 bg-slate-50 p-3 text-slate-900">
- <p className="text-center text-xs font-semibold">FRENTE ↑ · {vehicle.plate}</p>
- <div className="relative mt-3 space-y-4 pt-14">
- {/* Generic approved illustration; all customer information remains behind the private route. */}
- {/* eslint-disable-next-line @next/next/no-img-element */}
- <img alt={`Ilustração genérica: ${vehicleLayouts[vehicle.layout].label}`} src={vehicle.layout==="cavalo4x2"?"/images/tire-cases/truck-4x2.webp":vehicle.layout==="tanque4"?"/images/tire-cases/tanker-mapping.png":"/images/tire-cases/truck.png"} className="absolute inset-y-0 left-[32%] h-full w-[36%] object-contain"/>
- {Array.from({length:axes},(_,i)=><div key={i} className="relative"><p className="relative z-10 mx-auto w-fit rounded bg-white/90 px-2 text-xs">{`${i+1}º · ${vehicleLayouts[vehicle.layout].axes[i]}`}</p><div className="grid grid-cols-6 gap-1 sm:gap-2">{all.filter(p=>p.axis===i+1).map((p,j)=>{const t=tires.find(t=>t.vehicleId===vehicle.id&&t.position===p.id&&t.status==="montado");return <button type="button" disabled={!onPosition} key={p.id} aria-label={p.label+(t?" · fogo "+t.fire:" · sem identificação")} onDragOver={e=>{if(!t)e.preventDefault();}} onDrop={e=>{e.preventDefault();if(!t)onPosition?.(p.id,e.dataTransfer.getData("text/plain"));}} onClick={()=>t?onOccupied?.(t):onPosition?.(p.id)} className={`relative z-10 min-h-20 rounded-[40%] border-4 border-slate-700 p-1 text-xs ${t?"bg-amber-200":"bg-white"} ${all.filter(x=>x.axis===i+1).length===2?(j===1?"col-start-6":""):j===2?"col-start-5":""}`}><span className="block font-bold">{p.id}</span><span className="block">{t?"Fogo "+t.fire:"Não cadastrado"}</span>{t&&<span>{t.brand}<br/>{t.model}</span>}</button>;})}</div></div>)}
- </div>
- <div className="mt-4 flex justify-center gap-3">{all.filter(p=>p.axis===0).map(p=>{const t=tires.find(t=>t.vehicleId===vehicle.id&&t.position===p.id&&t.status==="montado");return <button key={p.id} disabled={!onPosition} onClick={()=>t?onOccupied?.(t):onPosition?.(p.id)} className={`rounded-full border-4 border-slate-700 p-3 text-xs ${t?"bg-amber-200":"bg-white"}`}>{p.label}<br/>{t?"Fogo "+t.fire:"Não cadastrado"}</button>;})}</div>
- <p className="mt-3 text-center text-xs">{vehicleLayouts[vehicle.layout].label} · {vehicle.spares===null?"Estepes não informados":`${vehicle.spares} estepe(s)`}</p>{vehicle.mountingReference&&<p className="mt-3 rounded bg-blue-100 p-3 text-sm"><strong>Montagem informada:</strong> {vehicle.mountingReference.date.split("-").reverse().join("/")} · {vehicle.mountingReference.km.toLocaleString("pt-BR")} km. Identificação e aplicação de cada pneu registradas separadamente.</p>}<p className="mt-3 text-center text-xs">TRASEIRA · desenho esquemático · lados considerados no sentido de marcha</p></div>;
-}
-
-

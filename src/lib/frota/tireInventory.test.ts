@@ -1,6 +1,14 @@
 import {describe,it,expect} from "vitest";
 import {applyCommand,emptyInventory,positions,type Command,type Inventory} from "./tireInventory";
+import {configurationCatalog,searchConfigurations} from "./vehicleConfigurations";
 const customer={name:"Cliente de teste",document:"",address:"",phone:""};
+describe("configuração salva determina posições",()=>{
+ it("8x4 possui dois eixos simples e duas trações duplas",()=>{const v={id:crypto.randomUUID(),plate:"ABC1D23",model:"8x4",layout:"personalizado" as const,spares:2,configuration:configurationCatalog["caminhao-8x4"]};expect(positions(v)).toHaveLength(14);expect(positions(v).filter(p=>p.axis===2)).toHaveLength(2);expect(positions(v).filter(p=>p.axis===4)).toHaveLength(4);});
+ it("permite rodagem simples em implemento sem criar posições internas",()=>{const c=structuredClone(configurationCatalog["semi-111"]);c.axes=c.axes.map(a=>({...a,wheels:2}));const v={id:crypto.randomUUID(),plate:"ABC1D23",model:"Semi",layout:"personalizado" as const,spares:null,configuration:c};expect(positions(v)).toHaveLength(6);expect(positions(v).some(p=>p.id==="E2-P3")).toBe(false);});
+ it("exige configuração válida e recusa eixos sem limite",()=>{const base={id:crypto.randomUUID(),plate:"ABC1D23",model:"Especial",layout:"personalizado",spares:0};expect(()=>applyCommand(emptyInventory(customer),{type:"vehicle",vehicle:base})).toThrow();expect(()=>applyCommand(emptyInventory(customer),{type:"vehicle",vehicle:{...base,configuration:{...configurationCatalog["cavalo-4x2"],axes:Array(11).fill({role:"livre",wheels:4,gap:1})}}})).toThrow();});
+ it("aceita montagem na configuração customizada e preserva o modelo do catálogo",()=>{const config=structuredClone(configurationCatalog["julieta-4"]);const v={id:crypto.randomUUID(),plate:"ABC1D23",model:"Julieta",layout:"personalizado",spares:0,configuration:config};let s=applyCommand(emptyInventory(customer),{type:"vehicle",vehicle:v});s=applyCommand(s,batch);s=applyCommand(s,{type:"move",tireId:s.tires[0].id,date:"2026-10-02",km:null,reason:"Montagem",destination:"montado",vehicleId:v.id,position:"E4-P4"});expect(s.tires[0].position).toBe("E4-P4");expect(config.axes).toHaveLength(4);});
+ it("normaliza busca digitada sem misturar tipo de veículo",()=>{expect(searchConfigurations("quatro por dois","cavalo").map(([id])=>id)).toContain("cavalo-4x2");expect(searchConfigurations("6×2","caminhao").every(([,c])=>c.kind==="caminhao")).toBe(true);});
+});
 const vehicle={id:"11111111-1111-4111-8111-111111111111",plate:"ABC1D23",model:"Cavalo",layout:"cavalo6x2" as const,spares:1};
 const batch:Command={type:"batch",date:"2026-10-01",product:{brand:"Teste",model:"Modelo",size:"295",tread:"Misto",life:"Novo"},tires:[{fire:"",dot:"2024",serial:"",marked:false},{fire:"",dot:"",serial:"",marked:false}]};
 function fixture(){return applyCommand(applyCommand(emptyInventory(customer),{type:"vehicle",vehicle}),batch);}
@@ -22,4 +30,3 @@ describe("inventário privado de pneus",()=>{
 
 
 it("4×2 guarda referência sem inventar pneus e rejeita terceiro eixo",()=>{const v={...vehicle,layout:"cavalo4x2",spares:null,mountingReference:{date:"2026-09-25",km:845501}};const s=applyCommand(emptyInventory(customer),{type:"vehicle",vehicle:v});expect(s.tires).toHaveLength(0);expect(s.vehicles[0].mountingReference).toEqual(v.mountingReference);expect(positions(s.vehicles[0])).toHaveLength(6);expect(positions(s.vehicles[0]).filter(p=>p.axis===2)).toHaveLength(4);expect(()=>move(applyCommand(s,batch),"montado","E3-P1")).toThrow("posição inválida");});
-
