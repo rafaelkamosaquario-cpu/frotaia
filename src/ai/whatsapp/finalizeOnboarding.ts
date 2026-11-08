@@ -1,3 +1,4 @@
+import { cargoSummary } from "./cargoProfile";
 import "server-only";
 import { createCompanyWithOwner, updateCompany } from "@/services/supabase/companyService";
 import { updateProfile } from "@/services/supabase/profileService";
@@ -171,7 +172,7 @@ export async function finalizeOnboarding(
       const { brand, model, modelYear } = parseVehicleDescription(collectedData.primaryVehicleRaw);
       const veiculo = await createVehicle(admin, company.id, userId, {
         name: collectedData.primaryVehicleRaw ? truncate(collectedData.primaryVehicleRaw, 120) : undefined,
-        notes: [collectedData.primaryVehicleRaw, collectedData.vehicleSetup?.label].filter(Boolean).join("\n"),
+        notes: [collectedData.primaryVehicleRaw, collectedData.vehicleSetup?.label, collectedData.cargoProfile ? cargoSummary(collectedData.cargoProfile) : undefined].filter(Boolean).join("\n"),
         vehicleType: collectedData.vehicleType,
         axleCount: collectedData.axleCount ?? undefined,
         plate: collectedData.plate,
@@ -197,6 +198,13 @@ export async function finalizeOnboarding(
         });
       }
 
+      if (collectedData.cargoProfile?.complete) {
+        await saveMemory(admin, company.id, userId, {
+          memoryType: "operational", key: "vehicle_cargo_profile",
+          valueJson: { ...collectedData.cargoProfile, vehicleId: veiculo.id },
+          summary: cargoSummary(collectedData.cargoProfile), sourceType: "user_explicit", confirmedByUser: true,
+        });
+      }
       // Dado estruturado (saved_routes) só quando o parser conseguiu
       // separar origem/destino — a memória acima já garante que o texto
       // bruto nunca se perde, mesmo quando isso não acontece.

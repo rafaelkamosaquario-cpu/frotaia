@@ -1,3 +1,4 @@
+import { runtimeAccessPrompt } from "./runtimeAccess";
 import "server-only";
 import { construirTextoAjudaCompleto, ehPedidoExatoDeApresentacao } from "@/lib/helpMenu";
 import { canExecuteFinancialTool } from "./financialAuthorization";
@@ -92,6 +93,8 @@ export interface GerarRespostaAssistenteParams {
   ferramentasPermitidas?: FrotaIaToolName[];
   /** Acrescenta o bloco de instrução de modo demo ao system prompt (ver systemPrompt.ts) — sempre usado junto de `ferramentasPermitidas`. */
   modoDemo?: boolean;
+  /** Result of the authenticated server access gate for this request. */
+  operationalAccessAllowed?: boolean;
   /** Experiência de conversa aplicada apenas ao canal WhatsApp, sem mudar o painel. */
   experienciaWhatsappV1?: boolean;
 }
@@ -146,7 +149,7 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
   });
 
   const anthropic = createAnthropicClient();
-  const system = construirSystemPrompt(customerContext, vehicleContext, new Date(), params.modoDemo, params.experienciaWhatsappV1);
+  const system = construirSystemPrompt(customerContext, vehicleContext, new Date(), params.modoDemo, params.experienciaWhatsappV1) + "\n\n" + runtimeAccessPrompt(!!params.modoDemo, params.operationalAccessAllowed);
   const todasFerramentas = construirFerramentasAnthropic();
   const ferramentasProprias = params.ferramentasPermitidas
     ? todasFerramentas.filter((f) => params.ferramentasPermitidas!.includes(f.name as FrotaIaToolName))
@@ -324,4 +327,3 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     ferramentasExecutadas,
   };
 }
-

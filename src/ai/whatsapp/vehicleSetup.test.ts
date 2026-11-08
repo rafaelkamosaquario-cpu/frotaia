@@ -57,7 +57,7 @@ describe("novo fluxo WhatsApp", () => {
   });
   it("percorre cadastro completo e exige confirmação final", () => {
     let r = step("awaiting_primary_vehicle", { companyId: "existente" }, "Iveco Stralis 400 2015");
-    for (const answer of ["ABC1D23", "4x2", "caminhão rígido", "não", "baú", "2,5 km/l"]) r = step(r.nextState, r.collectedData, answer);
+    for (const answer of ["ABC1D23", "4x2", "caminhão rígido", "não", "baú", "carga seca", "14 toneladas", "só a carga", "2,5 km/l"]) r = step(r.nextState, r.collectedData, answer);
     expect(r.finalize).toBe(false); expect(r.collectedData.pendingCombinedConfirmation).toBe(true);
     expect(r.reply.text).toContain("sem implemento engatado");
     r = step(r.nextState, r.collectedData, "sim");

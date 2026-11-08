@@ -13,7 +13,9 @@ describe("experiência V1", () => {
     expect(resolverSugestaoV1("6")).toBeUndefined(); expect(COMPORTAMENTO_WHATSAPP_V1).toContain("somente após sucesso");
   });
   it("aproveita placa, carroceria, configuração e consumo explícitos e confirma antes de finalizar", () => {
-    const r = processOnboardingMessage("awaiting_primary_vehicle", { companyId: "empresa", name: "João" }, "Atego 2426 2018, ABC1D23, caminhão rígido 6x2 sem implemento, baú, 3 km/l");
+    let r = processOnboardingMessage("awaiting_primary_vehicle", { companyId: "empresa", name: "João" }, "Atego 2426 2018, ABC1D23, caminhão rígido 6x2 sem implemento, baú, 3 km/l");
+    r = processOnboardingMessage(r.nextState, r.collectedData, "carga seca");
+    r = processOnboardingMessage(r.nextState, r.collectedData, "varia");
     expect(r.finalize).toBe(false); expect(r.collectedData).toMatchObject({ plate: "ABC1D23", averageConsumptionKmL: 3, bodyType: "bau", pendingCombinedConfirmation: true });
     const final = processOnboardingMessage(r.nextState, r.collectedData, "sim"); expect(final.finalize).toBe(true); expect(final.collectedData.companyId).toBe("empresa");
   });

@@ -74,6 +74,16 @@ beforeEach(() => {
 });
 
 describe("gerarRespostaAssistente — ferramentasPermitidas (inversão do funil, 09/2026)", () => {
+  it("envia estado atual validado mesmo quando histórico afirma demonstração", async () => {
+    listMessages.mockResolvedValue([{ role: "assistant", content: "Ainda está na demonstração; não posso registrar." }]);
+    messagesCreate.mockResolvedValueOnce(respostaTextoFinal("Acesso verificado"));
+    const { gerarRespostaAssistente } = await import("./gerarRespostaAssistente");
+    await gerarRespostaAssistente({ client: {} as never, userId: "user-1", companyId: "empresa-1",
+      conversation: CONVERSATION, customerContext: CUSTOMER_CONTEXT, vehicleContext: VEHICLE_CONTEXT,
+      mensagemUsuario: "Registre a despesa autorizada", operationalAccessAllowed: true });
+    expect(messagesCreate.mock.calls[0][0].system).toContain("TRIAL válido permite uso operacional");
+    expect(messagesCreate.mock.calls[0][0].system).toContain("não descrevem o estado atual");
+  });
   it("bloqueia execução fora da permissão mesmo quando o modelo solicita a ferramenta", async () => {
     messagesCreate.mockResolvedValueOnce(respostaToolUse("consultar_rota"));
     messagesCreate.mockResolvedValueOnce(respostaTextoFinal("vamos continuar com a análise"));

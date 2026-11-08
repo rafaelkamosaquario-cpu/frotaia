@@ -1,3 +1,4 @@
+import { nextCargoProfile, cargoQuestion, cargoSummary, type CargoProfile } from "./cargoProfile";
 import type { OnboardingState, VehicleTypeEnum, VehicleBodyTypeEnum } from "@/lib/supabase/tables";
 import type { CompanyRow } from "@/lib/supabase/tables";
 import { nextVehicleConfiguration, type VehicleSetup } from "./vehicleSetup";
@@ -10,6 +11,7 @@ export type OnboardingCompanyType = CompanyRow["company_type"];
 
 export interface OnboardingCollectedData {
   vehicleSetup?: VehicleSetup;
+  cargoProfile?: CargoProfile;
   /** Preenchido assim que a empresa mínima é criada no primeiro contato (inversão do funil, 09/2026) — presente aqui significa que `finalizeOnboarding` deve ATUALIZAR essa empresa em vez de criar uma nova. Ausente = caminho legado (ex.: lead "Empresas", que nunca passa pela demo). */
   companyId?: string;
   name?: string;
@@ -345,6 +347,7 @@ function processOnboardingStep(
     if (!collectedData.plate) return { nextState: "awaiting_plate", reply: askPlate(), collectedData, finalize: false };
     if (!collectedData.vehicleSetup?.complete) return { nextState: "awaiting_vehicle_configuration", reply: askVehicleConfiguration(), collectedData, finalize: false };
     if (!collectedData.bodyType) return { nextState: "awaiting_body_type", reply: askBodyType(), collectedData, finalize: false };
+    if (!collectedData.cargoProfile?.complete) return { nextState: "awaiting_body_type", reply: textReply(collectedData.cargoProfile?.type ? "Informe o peso habitual e se é carga, PBT ou PBTC." : cargoQuestion), collectedData, finalize: false };
     return { nextState: "awaiting_consumption", reply: askConsumption(), collectedData, finalize: false };
   }
 
@@ -424,9 +427,15 @@ function processOnboardingStep(
     }
 
     case "awaiting_body_type": {
-      // Sempre resolve (cai em "outro" se não reconhecer) — nunca repete.
-      const updated = { ...collectedData, bodyType: resolverCarroceria(incomingText) };
-      return { nextState: "awaiting_consumption", reply: askConsumption(), collectedData: updated, finalize: false };
+      if (!collectedData.bodyType) {
+        const updated = { ...collectedData, bodyType: resolverCarroceria(incomingText) };
+        return { nextState: state, reply: textReply(cargoQuestion), collectedData: updated, finalize: false };
+      }
+      const cargo = nextCargoProfile(collectedData.cargoProfile, incomingText);
+      const updated = { ...collectedData, cargoProfile: cargo.data };
+      return cargo.data.complete
+        ? { nextState: "awaiting_consumption", reply: askConsumption(), collectedData: updated, finalize: false }
+        : { nextState: state, reply: textReply(cargo.question), collectedData: updated, finalize: false };
     }
 
     case "awaiting_consumption": {
@@ -452,10 +461,11 @@ export function processOnboardingMessage(state: OnboardingState, collectedData: 
     if (/^(sim|confirmo|confirmado|certo|est[aá] certo|isso|isso mesmo|ok|pode)$/.test(t)) {
       if (!collectedData.plate) return { nextState: "awaiting_plate", finalize: false, reply: askPlate(), collectedData: { ...collectedData, pendingCombinedConfirmation: false } };
       if (!collectedData.vehicleSetup?.complete) return { nextState: "awaiting_vehicle_configuration", finalize: false, reply: askVehicleConfiguration(), collectedData: { ...collectedData, pendingCombinedConfirmation: false } };
+      if (!collectedData.cargoProfile?.complete) return { nextState: "awaiting_body_type", finalize: false, reply: textReply(cargoQuestion), collectedData: { ...collectedData, pendingCombinedConfirmation: false } };
       return { nextState: "completed", finalize: true, reply: completionMessage(), collectedData: { ...collectedData, pendingCombinedConfirmation: false } };
     }
     if (/^(n[aã]o|corrigir|errado)$/.test(t)) {
-      return { nextState: "awaiting_primary_vehicle", finalize: false, reply: textReply("Vamos corrigir o caminhão. Me diga marca, modelo e ano; pode incluir placa, configuração, carroceria e consumo."), collectedData: { ...collectedData, primaryVehicleRaw: undefined, vehicleSetup: undefined, plate: undefined, plateAsked: false, vehicleType: undefined, axleCount: undefined, bodyType: undefined, averageConsumptionKmL: undefined, consumptionAsked: false, pendingCombinedConfirmation: false } };
+      return { nextState: "awaiting_primary_vehicle", finalize: false, reply: textReply("Vamos corrigir o caminhão. Me diga marca, modelo e ano; pode incluir placa, configuração, carroceria e consumo."), collectedData: { ...collectedData, primaryVehicleRaw: undefined, vehicleSetup: undefined, cargoProfile: undefined, plate: undefined, plateAsked: false, vehicleType: undefined, axleCount: undefined, bodyType: undefined, averageConsumptionKmL: undefined, consumptionAsked: false, pendingCombinedConfirmation: false } };
     }
     if (!/cancelar|pausar|continuar depois|depois eu continuo/.test(t)) return { nextState: state, finalize: false, reply: textReply("Está certo o resumo do caminhão? Responda sim ou corrigir."), collectedData };
     collectedData = { ...collectedData, pendingCombinedConfirmation: false };
@@ -490,13 +500,13 @@ export function processOnboardingMessage(state: OnboardingState, collectedData: 
     data = result.collectedData;
     if (result.nextState === "awaiting_plate" && data.plate) result = processOnboardingStep(result.nextState, data, data.plate ?? "depois");
     else if (result.nextState === "awaiting_vehicle_configuration" && data.vehicleSetup?.complete) result = { ...result, nextState: "awaiting_body_type", reply: askBodyType() };
-    else if (result.nextState === "awaiting_body_type" && data.bodyType) result = processOnboardingStep(result.nextState, data, data.bodyType);
+    else if (result.nextState === "awaiting_body_type" && data.bodyType) { result = { ...result, reply: textReply(cargoQuestion) }; break; }
     else if (result.nextState === "awaiting_consumption" && data.consumptionAsked) result = processOnboardingStep(result.nextState, data, data.averageConsumptionKmL?.toString() ?? "não sei");
     else break;
   }
   if (result.finalize) {
     const d = result.collectedData;
-    return { ...result, nextState: "awaiting_consumption", finalize: false, collectedData: { ...d, pendingCombinedConfirmation: true }, reply: textReply(`Confere o que entendi do caminhão:\n${d.primaryVehicleRaw}\nPlaca: ${d.plate ?? "não informada"}\nConfiguração: ${d.vehicleSetup?.label ?? d.vehicleType ?? "não definida"}\nCarroceria: ${d.bodyType ?? "não informada"}\nConsumo informado: ${d.averageConsumptionKmL ? `${d.averageConsumptionKmL} km/l` : "não informado"}\n\nEstá certo? Responda sim ou corrigir.`) };
+    return { ...result, nextState: "awaiting_consumption", finalize: false, collectedData: { ...d, pendingCombinedConfirmation: true }, reply: textReply(`Confere o que entendi do caminhão:\n${d.primaryVehicleRaw}\nPlaca: ${d.plate ?? "não informada"}\nConfiguração: ${d.vehicleSetup?.label ?? d.vehicleType ?? "não definida"}\nCarroceria: ${d.bodyType ?? "não informada"}\n${cargoSummary(d.cargoProfile)}\nConsumo informado: ${d.averageConsumptionKmL ? `${d.averageConsumptionKmL} km/l` : "não informado"}\n\nEstá certo? Responda sim ou corrigir.`) };
   }
   return result;
 }

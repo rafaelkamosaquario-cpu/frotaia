@@ -106,6 +106,7 @@ export async function POST(request: Request) {
       customerContext,
       vehicleContext,
       mensagemUsuario,
+      operationalAccessAllowed: true,
       ferramentasPermitidas,
       conteudoMultimodal: conteudoMultimodal.length > 0 ? conteudoMultimodal : undefined,
     });

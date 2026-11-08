@@ -1091,6 +1091,7 @@ export async function POST(request: Request) {
       conteudoMultimodal,
       experienciaWhatsappV1: true,
       inboundMessageExtra: inboundExtra,
+      operationalAccessAllowed: isAccessAllowed(assinatura),
     });
 
     await sendWhatsappText(phoneE164, resposta.message.content);
