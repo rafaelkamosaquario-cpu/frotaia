@@ -45,7 +45,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "combustivel_custos",
     emoji: "💰",
     titulo: "Custos e despesas",
-    descricao: "Calculo consumo, gasto de combustível, custo por quilômetro rodado, custo do caminhão parado e a margem estimada do frete com base nos dados informados.",
+    descricao: "Registro receitas, despesas e abastecimentos quando confirmados. Calculo consumo, custo por quilômetro rodado e margem estimada com os dados informados. No aplicativo individual vinculado, consulte os registros salvos em Minha operação e toque em Atualizar.",
     exemplos: [
       "Meu caminhão faz 2,5 km/l, quanto vou gastar até Curitiba?",
       "Calcula meu CPK",
@@ -64,14 +64,14 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "documentos",
     emoji: "📄",
     titulo: "Documentos e vencimentos",
-    descricao: "Leio nota fiscal, CRLV, CT-e, comprovante de seguro, PDF e planilha — e gero relatório em PDF das suas análises.",
+    descricao: "Leio fotos, PDFs e planilhas compatíveis enviados pelo WhatsApp e gero relatórios em PDF das suas análises. No aplicativo, converse por texto ou voz compatível; arquivos são enviados pelo WhatsApp.",
     exemplos: ["Manda foto de nota fiscal, CRLV, CT-e ou comprovante de seguro", "Gera o relatório dessa análise em PDF", "Quais documentos eu já gerei?"],
   },
   {
     id: "alertas_agenda",
     emoji: "📅",
     titulo: "Agenda e lembretes",
-    descricao: "Crio lembretes de vencimento, cobrança e manutenção, e posso integrar com sua Agenda Google.",
+    descricao: "Crio lembretes de vencimento, cobrança e manutenção por data e horário, com confirmação do agendamento. A conexão da Agenda Google é opcional.",
     exemplos: ["Me avise 15 dias antes de vencer o seguro", "Me lembra de cobrar esse frete daqui a 30 dias", "Marca a revisão do caminhão pra semana que vem"],
   },
   {

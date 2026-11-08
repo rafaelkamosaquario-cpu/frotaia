@@ -83,7 +83,7 @@ const PARAMETROS: DefinicaoParametroFerramenta[] = [
     tipo: "enum",
     obrigatorio: true,
     descricao:
-      "Plano Individual (1 veículo, só WhatsApp), Essencial (até 3 veículos, WhatsApp + Painel) ou Pro (até 10 veículos, WhatsApp + Painel), cada um com 3 formas de cobrança (mensal recorrente, anual à vista no Pix, anual parcelado no cartão): " +
+      "Plano Individual (1 usuário, 1 veículo, WhatsApp e aplicativo individual complementar), Essencial (até 3 veículos, WhatsApp + Painel) ou Pro (até 10 veículos, WhatsApp + Painel), cada um com 3 formas de cobrança (mensal recorrente, anual à vista no Pix, anual parcelado no cartão): " +
       PLANOS_AUTOATENDIMENTO.map(descreverPlano).join(" "),
     valoresPossiveis: PLANOS_AUTOATENDIMENTO,
   },

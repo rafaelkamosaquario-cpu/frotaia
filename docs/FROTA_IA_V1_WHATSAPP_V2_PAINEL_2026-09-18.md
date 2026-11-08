@@ -1,3 +1,5 @@
+> DOCUMENTO HISTÓRICO — não usar preços, limites ou condições desta edição como oferta atual. Para WhatsApp e aplicativo Individual, consulte [a documentação vigente](FROTA_IA_INDIVIDUAL_VIGENTE.md), atualizada em 08/11/2026. As descrições históricas do painel não alteram contratos ou dados existentes.
+
 # Frota IA — V1 (WhatsApp) e V2 (Painel Web): onboarding e funcionalidades de cada versão
 
 Documento criado em 2026-09-18 pra responder uma lacuna real: os documentos existentes (`FROTA_IA_JORNADA_POR_PLANO_2026-09-10.md`, `FROTA_IA_PAINEL_WEB_ATUAL_2026-09-13.md`, `FROTA_IA_FERRAMENTAS_ATUAL_2026-09-06.md`) cobrem as duas versões, mas nenhum as apresenta lado a lado, cada uma com seu próprio onboarding e suas próprias funcionalidades. Gerado a partir do código real (`src/ai/whatsapp/demoConversation.ts`, `src/ai/whatsapp/onboardingConversation.ts`, `src/app/frota-ativacao/*`, `src/app/frota/**`) e cruzado com o banco de produção (Supabase MCP, `kqquswdrtcqicyfcvvuv`) em 2026-09-18.

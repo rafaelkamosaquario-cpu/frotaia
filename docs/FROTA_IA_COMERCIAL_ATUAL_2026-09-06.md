@@ -1,3 +1,5 @@
+> DOCUMENTO HISTÓRICO — não usar preços, limites ou condições desta edição como oferta atual. Para WhatsApp e aplicativo Individual, consulte [a documentação vigente](FROTA_IA_INDIVIDUAL_VIGENTE.md), atualizada em 08/11/2026. As descrições históricas do painel não alteram contratos ou dados existentes.
+
 # Frota IA — Como vender hoje (2026-09-06, preços atualizados em 10/09/2026, reconferido em 18/09/2026)
 
 Documento comercial calibrado pelo que o produto **realmente entrega hoje**, sem exagero — pensado pra Rafael usar em conversa de venda, landing page ou material de apresentação.

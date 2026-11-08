@@ -41,7 +41,7 @@ async function executar(entrada: VincularPainelEntrada): Promise<VincularPainelR
   }
 
   if (!isWhatsappConfigured()) {
-    return respostaFalha(["O vínculo com o painel ainda não está disponível neste ambiente."]);
+    return respostaFalha(["O vínculo do acesso à operação do WhatsApp ainda não está disponível neste ambiente."]);
   }
 
   try {
@@ -52,7 +52,7 @@ async function executar(entrada: VincularPainelEntrada): Promise<VincularPainelR
       premissas: [],
       dadosFaltantes: [],
       linkVinculo,
-      mensagemResumo: "Link de vínculo com o painel gerado — expira em 15 minutos.",
+      mensagemResumo: "Link seguro de acesso à sua operação gerado — expira em 15 minutos. No Individual, abre o aplicativo; no plano empresarial, o painel.",
     };
   } catch {
     return respostaFalha(["Não foi possível gerar o link de vínculo agora. Tente novamente em instantes."]);
@@ -68,7 +68,7 @@ export const ferramentaVincularPainel: DefinicaoFerramenta<VincularPainelEntrada
   nome: "vincular_painel",
   descricao: "Gera um link seguro (válido por 15 minutos) para vincular o login Google à MESMA operação do WhatsApp. Plano individual abre o aplicativo assistente; plano com painel abre o painel. Use também para 'quero vincular meu aplicativo' ou 'quero instalar o aplicativo'. Não cria nova empresa nem libera assinatura.",
   objetivo:
-    "Resolver o pedido 'quero acessar pelo computador'/'tem painel?' sem o cliente precisar se cadastrar do zero — ele abre o link já logado com Google, e a empresa do painel vira a mesma do WhatsApp.",
+    "Resolver o pedido 'quero acessar pelo computador'/'tem painel?' sem o cliente precisar se cadastrar do zero — ele abre o link já logado com Google, e vincula seu acesso à operação do WhatsApp, conforme o plano.",
   parametros: PARAMETROS,
   executar,
 };

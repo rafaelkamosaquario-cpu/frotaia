@@ -1,3 +1,5 @@
+> DOCUMENTO HISTÓRICO — não usar preços, limites ou condições desta edição como oferta atual. Para WhatsApp e aplicativo Individual, consulte [a documentação vigente](FROTA_IA_INDIVIDUAL_VIGENTE.md), atualizada em 08/11/2026. As descrições históricas do painel não alteram contratos ou dados existentes.
+
 # FROTA IA — Posicionamento Comercial e Como Vender o Produto
 
 Baseado nos Documentos 1 (Arquitetura Técnica) e 2 (Funcionalidades e Fluxos), auditados em 2026-08-28 diretamente no código, branch `claude/frota-ia-assistente-setup-qlrbac`, commit `dc5903d`. Todo preço/limite citado aqui foi confirmado em `src/lib/mercadopago/catalog.ts` — nenhum valor é herdado de material comercial antigo.
