@@ -9,9 +9,20 @@ export function normalizeDirectPhone(value: string) {
   if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
   return /^55[1-9]\d{9,10}$/.test(digits) ? `+${digits}` : null;
 }
+// Alias only Brazilian mobile numbers; never remove a digit from a landline.
+export function directPhoneVariants(value: string): string[] {
+  const phone = normalizeDirectPhone(value);
+  if (!phone) return [];
+  const national = phone.slice(3);
+  const subscriber = national.slice(2);
+  if (/^9[6-9]\d{7}$/.test(subscriber)) return [phone, `+55${national.slice(0,2)}${subscriber.slice(1)}`];
+  if (/^[6-9]\d{7}$/.test(subscriber)) return [phone, `+55${national.slice(0,2)}9${subscriber}`];
+  return [phone];
+}
+export const pixReferencePattern = /^(?:[0-9]{6,30}|E[0-9]{16}[A-Z0-9]{15})$/;
 export const directPaymentCommand = z.object({
   requestId: z.string().uuid(), companyId: z.string().uuid(), phone: z.string().transform(normalizeDirectPhone).refine(v => v !== null),
-  plan: z.enum(DIRECT_PLANS), reference: z.string().trim().regex(/^\d{6,30}$/),
+  plan: z.enum(DIRECT_PLANS), reference: z.string().trim().toUpperCase().regex(pixReferencePattern),
   amountCents: z.number().int().positive(), paidAt: z.string().datetime({ offset: true }),
   confirmed: z.literal(true),
 }).strict().superRefine((v, ctx) => {

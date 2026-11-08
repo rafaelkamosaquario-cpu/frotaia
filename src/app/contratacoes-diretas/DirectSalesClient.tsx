@@ -17,10 +17,10 @@ export function DirectSalesClient(){
  async function run(fn:()=>Promise<void>){setBusy(true);setError("");try{await fn();}catch(e){setError(e instanceof Error?e.message:"Falha de conexão. Repita com os mesmos dados.");}finally{setBusy(false);}}
  async function api(url:string,body?:unknown){const r=await fetch(url,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{cache:"no-store"});const d=await r.json();if(!r.ok)throw new Error(d.error);return d;}
  return <main className="min-h-dvh bg-background p-4 text-foreground sm:p-8"><div className="mx-auto max-w-3xl space-y-6">
- <header><a href="/empresas" className="underline">Voltar às empresas</a><h1 className="mt-4 text-3xl font-semibold">Contratações diretas / Pix</h1><p className="mt-3">Copie a mensagem de pagamento. Depois confira o recebimento no Mercado Pago antes de liberar. Sem validação automática de comprovantes ou renovação automática.</p></header>
+ <header><a href="/empresas" className="underline">Voltar às empresas</a><h1 className="mt-4 text-3xl font-semibold">Contratações diretas / Pix</h1><p className="mt-3">Copie a mensagem de pagamento. Depois confira o recebimento na conta bancária antes de liberar. Sem validação automática de comprovantes ou renovação automática.</p></header>
  <PreparedPix plan={plan} onPlanChange={p=>{setPlan(p);}}/>
  <h2 className="text-xl font-semibold">2. Conferir recebimento e liberar acesso</h2>
- <p className="rounded-lg border p-4">Novo cliente: peça que envie “Olá” ao <a className="underline" href="https://wa.me/5541997454382" target="_blank" rel="noopener noreferrer">WhatsApp do Frota IA</a> usando o número que utilizará no sistema. Depois localize esse número abaixo. Não crie uma empresa de consultoria para vender este plano.</p>
+ <p className="rounded-lg border p-4">Novo cliente: peça que envie “Olá” ao <a className="underline" href="https://wa.me/5541997454382" target="_blank" rel="noopener noreferrer">WhatsApp do Frota IA</a> usando o número que utilizará no sistema. A conexão do WhatsApp precisa estar ativa para criar esse vínculo. Depois localize esse número abaixo; a busca aceita celular com ou sem o nono dígito. Não crie uma empresa de consultoria para vender este plano.</p>
  {error&&<p role="alert" className="border border-red-500 rounded-lg p-4">{error}</p>}
  <form className="space-y-3" onSubmit={e=>{e.preventDefault();run(async()=>{setShare("");setCompanyId("");setCompanies([]);setHistory([]);const d=await api(`/api/contratacoes-diretas?phone=${encodeURIComponent(phone)}`);setMatchedPhone(d.phone);setCompanies(d.companies);setHistory(d.history??[]);if(!d.companies.length)throw new Error("Número ainda não vinculado a uma empresa. Peça o primeiro contato no Frota IA e tente novamente.");});}}>
  <label>WhatsApp de uso do cliente, com DDD<input className={field} type="tel" required value={phone} disabled={busy} onChange={e=>{setPhone(e.target.value);setCompanyId("");setCompanies([]);setShare("");}}/></label><button className={button} disabled={busy}>Localizar cliente</button></form>
@@ -34,8 +34,8 @@ export function DirectSalesClient(){
  {blocked&&<p role="alert">Empresa com liberação especial ou vínculo Mercado Pago. Reconcilie o acesso existente antes de vender; esta tela não altera nem cancela essa liberação.</p>}
  <label>Plano e período<select className={field} value={plan} disabled={busy} onChange={e=>{setPlan(e.target.value as DirectPlan);setShare("");}}>{DIRECT_PLANS.map(p=><option key={p} value={p}>{CATALOGO_OFERTAS[p].label} · {p.includes("ANUAL")?"Anual (365 dias)":"Mensal"} · {formatarReais(CATALOGO_OFERTAS[p].precoCentavos)}</option>)}</select></label>
  <p>{offer.limiteVeiculos} veículo(s) · {offer.painel?"WhatsApp + painel":"WhatsApp"}. Sem renovação automática. Mensal: um mês-calendário; anual: 365 dias. Renovação do mesmo plano soma ao vencimento se ainda ativo.</p>
- <label>ID numérico da transação no Mercado Pago<input className={field} name="reference" required pattern="[0-9]{6,30}" maxLength={30} disabled={busy}/></label>
- <label>Valor efetivamente recebido (R$)<input className={field} name="amount" inputMode="decimal" placeholder="89,90" required disabled={busy}/></label>
+ <label>Identificador da transação: ID Mercado Pago ou EndToEnd Pix<input className={field} name="reference" required pattern="([0-9]{6,30}|[Ee][0-9]{16}[A-Za-z0-9]{15})" maxLength={32} disabled={busy}/></label>
+ <p className="text-sm text-muted-foreground">Copie o ID real do recebimento: ID numérico do Mercado Pago ou identificador EndToEnd Pix (32 caracteres, começando com E). Não use o código Pix Copia e Cola, a chave ou uma referência inventada.</p><label>Valor efetivamente recebido (R$)<input className={field} name="amount" inputMode="decimal" placeholder="89,90" required disabled={busy}/></label>
  <label>Data e hora do pagamento<input className={field} name="paidAt" type="datetime-local" required disabled={busy}/></label>
  <label className="flex gap-3"><input type="checkbox" required disabled={busy}/>Conferi o dinheiro recebido na conta, o plano, a empresa e o WhatsApp. Não estou usando somente um print de comprovante.</label>
  <button className={`${button} bg-primary text-primary-foreground`} disabled={busy||!company||!!blocked||!!share}>Confirmar recebimento e liberar plano</button>
@@ -44,4 +44,3 @@ export function DirectSalesClient(){
  {!!history.length&&<section className="space-y-3"><h2 className="text-xl">Últimas liberações deste cliente</h2>{history.map(r=><article key={r.id} className="rounded-lg border p-3"><p>{r.plan} · {formatarReais(r.amount_cents)}</p><p>Transação {r.reference} · acesso até {new Date(r.access_until).toLocaleString("pt-BR")}</p></article>)}</section>}
  </div></main>;
 }
-

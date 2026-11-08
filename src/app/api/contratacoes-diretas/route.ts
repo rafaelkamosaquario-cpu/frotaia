@@ -2,16 +2,21 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isConsultant, sameOrigin } from "@/lib/frota/consultancy";
-import { directPaymentCommand, normalizeDirectPhone } from "@/lib/mercadopago/directSales";
+import { directPaymentCommand, normalizeDirectPhone, directPhoneVariants } from "@/lib/mercadopago/directSales";
 const reply = (data:unknown,status=200) => NextResponse.json(data,{status,headers:{"Cache-Control":"no-store"}});
 export async function GET(request:Request) {
  const db=await createClient(); const {data:{user}}=await db.auth.getUser();
  if(!isConsultant(user)) return reply({error:"Acesso restrito ao administrador."},403);
- const phone=normalizeDirectPhone(new URL(request.url).searchParams.get("phone")??"");
+ let phone=normalizeDirectPhone(new URL(request.url).searchParams.get("phone")??"");
  if(!phone) return reply({error:"Informe o WhatsApp com DDD."},400);
  const admin=createAdminClient();
- const {data:channels,error}=await admin.from("user_channels").select("company_id,user_id,display_name").eq("phone_e164",phone).eq("active",true).eq("channel_type","whatsapp");
+ const {data:channels,error}=await admin.from("user_channels").select("company_id,user_id,display_name,phone_e164").in("phone_e164",directPhoneVariants(phone)).eq("active",true).eq("channel_type","whatsapp");
  if(error) return reply({error:"Consulta indisponível."},503);
+ // Never silently resolve two distinct owners/operations as one phone identity.
+ const identities=new Set((channels??[]).filter(c=>c.company_id).map(c=>`${c.company_id}:${c.user_id}`));
+ if(identities.size>1) return reply({error:"Há mais de um vínculo para as variantes deste número. Confira os cadastros antes de liberar; nenhum acesso foi alterado."},409);
+ const matched=(channels??[]).find(c=>c.company_id && c.phone_e164===phone) ?? (channels??[]).find(c=>c.company_id);
+ if(matched?.phone_e164) phone=matched.phone_e164;
  const ids=[...new Set((channels??[]).map(c=>c.company_id).filter((id):id is string=>!!id))];
  if(!ids.length) return reply({phone,companies:[]});
  const [companies,subscriptions,history]=await Promise.all([
