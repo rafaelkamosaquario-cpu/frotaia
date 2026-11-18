@@ -12,13 +12,13 @@ import { firstOnboardingMessage, processOnboardingMessage, type OnboardingCollec
 describe("firstOnboardingMessage", () => {
   it("explica o valor do produto antes de pedir o nome", () => {
     const texto = firstOnboardingMessage();
-    expect(texto.toLowerCase()).toContain("frete");
-    expect(texto).toContain("Qual é o seu nome?");
+    expect(texto.toLowerCase()).toContain("transporte");
+    expect(texto).toContain("Como posso te chamar?");
   });
 
   it("pergunta o nome da pessoa antes do perfil", () => {
     const texto = firstOnboardingMessage();
-    expect(texto).toContain("Qual é o seu nome?");
+    expect(texto).toContain("Como posso te chamar?");
   });
 });
 
@@ -66,3 +66,4 @@ describe("awaiting_intent", () => {
     expect(resultado.collectedData.intentId).toBeUndefined();
   });
 });
+

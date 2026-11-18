@@ -575,7 +575,7 @@ describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 pergu
 
     expect(criarEmpresaMinima).not.toHaveBeenCalled();
     expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("atendimento comercial direto"));
-    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Qual é o seu nome?"));
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Como posso te chamar?"));
   });
 
   it("awaiting_demo_choice: tocar 'Analisar um frete' transiciona pra awaiting_demo_input com o track salvo", async () => {
@@ -774,7 +774,7 @@ describe("V1 conversacional — demonstração, mídia e checkout preservado", (
   it("Olá após pagamento abre boas-vindas, sem gravar Olá como nome",async()=>{
     getOnboardingSession.mockResolvedValue({state:"awaiting_name",collected_data:{companyId:EMPRESA}});
     await chamarWebhook(mensagemTexto("Olá"))();
-    expect(sendWhatsappText).toHaveBeenCalledWith(expect.anything(),expect.stringContaining("Parabéns pela sua assinatura"));
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.anything(),expect.stringContaining("Parabéns pela assinatura"));
     expect(processOnboardingMessage).not.toHaveBeenCalled();
   });
   it("atalho de documentos solicita foto sem chamar análise vazia", async()=>{
@@ -834,3 +834,4 @@ describe("V1 conversacional — demonstração, mídia e checkout preservado", (
     expect(sendWhatsappOptionList).toHaveBeenCalled(); expect(gerarRespostaAssistente).toHaveBeenCalled();
   });
 });
+

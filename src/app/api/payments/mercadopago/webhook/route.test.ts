@@ -484,7 +484,7 @@ describe("Inversão do funil (09/2026) — pagamento confirmado dispara o cadast
     expect(listChannelsForCompany).toHaveBeenCalledWith(expect.anything(), "empresa-1");
     expect(updateOnboardingSession).toHaveBeenCalledWith(expect.anything(), "user-1", { state: "awaiting_name" });
     expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Pagamento confirmado"));
-    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Qual é o seu nome?"));
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Como posso te chamar?"));
   });
 
   it("preapproval mensal autorizado (Individual/Essencial/Pro) também dispara o cadastro completo", async () => {
@@ -532,3 +532,4 @@ describe("Inversão do funil (09/2026) — pagamento confirmado dispara o cadast
     expect(atualizarAssinaturaPorPagamento).toHaveBeenCalled(); // a assinatura já foi confirmada antes do gatilho de onboarding rodar
   });
 });
+

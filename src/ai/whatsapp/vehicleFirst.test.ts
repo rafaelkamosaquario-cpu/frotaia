@@ -27,7 +27,7 @@ describe("cadastro do veículo antes da operação",()=>{
   expect(r.collectedData.pendingCombinedConfirmation).toBe(true);
  });
  it("saudação de assinatura depende de pagamento e perfil vai para a marca",()=>{
-  expect(firstOnboardingMessage(true)).toContain("Parabéns pela sua assinatura");
+  expect(firstOnboardingMessage(true)).toContain("Parabéns pela assinatura");
   expect(firstOnboardingMessage()).not.toContain("assinatura");
   expect(journey(["Ana","dono_empresa"]).nextState).toBe("awaiting_primary_vehicle");
  });
@@ -35,3 +35,4 @@ describe("cadastro do veículo antes da operação",()=>{
   expect(journey(["Ana","dono_empresa","DAF","XF 480 2022","123"]).nextState).toBe("awaiting_plate");
  });
 });
+

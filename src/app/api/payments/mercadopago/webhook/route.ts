@@ -44,7 +44,7 @@ async function dispararOnboardingPosPagamento(admin: SupabaseDbClient, companyId
     if (session && !["awaiting_demo_input", "awaiting_demo_choice", "awaiting_payment", "awaiting_plan_choice"].includes(session.state)) return;
 
     await updateOnboardingSession(admin, canal.user_id, { state: "awaiting_name" });
-    await sendWhatsappText(canal.phone_e164, "Pagamento confirmado! 🎉\n\nAgora vamos configurar sua operação — são só algumas perguntas rápidas.");
+    await sendWhatsappText(canal.phone_e164, "Pagamento confirmado! 🎉\n\nAbra o WhatsApp para cadastrar seu caminhão: https://wa.me/5541997454382");
     await sendWhatsappText(canal.phone_e164, firstOnboardingMessage(true));
   } catch (erro) {
     captureError({ event: "mercadopago_onboarding_pos_pagamento_falhou", route: ROTA, company_id: companyId, error: erro });
@@ -318,3 +318,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+

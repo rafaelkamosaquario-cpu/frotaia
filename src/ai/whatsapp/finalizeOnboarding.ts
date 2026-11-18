@@ -2,7 +2,7 @@ import { cargoSummary } from "./cargoProfile";
 import "server-only";
 import { createCompanyWithOwner, updateCompany } from "@/services/supabase/companyService";
 import { updateProfile } from "@/services/supabase/profileService";
-import { createVehicle, setDefaultVehicle } from "@/services/supabase/vehicleService";
+import { createVehicle, setDefaultVehicle, listVehicles, updateVehicle } from "@/services/supabase/vehicleService";
 import { createRoute } from "@/services/supabase/savedRouteService";
 import { saveMemory } from "@/services/supabase/memoryService";
 import { setOperatingRegion } from "@/services/supabase/companyPreferencesService";
@@ -170,18 +170,20 @@ export async function finalizeOnboarding(
   if (collectedData.vehicleType) {
     try {
       const { brand, model, modelYear } = parseVehicleDescription(collectedData.primaryVehicleRaw);
-      const veiculo = await createVehicle(admin, company.id, userId, {
+      const vehicleInput = {
         name: collectedData.primaryVehicleRaw ? truncate(collectedData.primaryVehicleRaw, 120) : undefined,
-        notes: [collectedData.primaryVehicleRaw, collectedData.vehicleSetup?.label, collectedData.cargoProfile ? cargoSummary(collectedData.cargoProfile) : undefined].filter(Boolean).join("\n"),
+        notes: [collectedData.primaryVehicleRaw, collectedData.vehicleSetup?.label, collectedData.individualBase?.body ? `Carroceria: ${collectedData.individualBase.body}` : undefined, collectedData.cargoProfile ? cargoSummary(collectedData.cargoProfile) : undefined].filter(Boolean).join("\n"),
         vehicleType: collectedData.vehicleType,
         axleCount: collectedData.axleCount ?? undefined,
         plate: collectedData.plate,
         bodyType: collectedData.bodyType,
         averageConsumptionKmL: collectedData.averageConsumptionKmL,
-        brand,
-        model,
+        brand: collectedData.individualBase ? collectedData.vehicleBrand : brand,
+        model: collectedData.individualBase?.model ?? model,
         modelYear,
-      });
+      };
+      const existing = collectedData.individualBase ? (await listVehicles(admin, company.id)).find(v => v.plate === collectedData.plate) : undefined;
+      const veiculo = existing ? await updateVehicle(admin, existing.id, company.id, userId, vehicleInput) : await createVehicle(admin, company.id, userId, vehicleInput);
       // Nesta V1 é sempre o único veículo da conta — marcar como padrão
       // agora é o que faz a IA reaproveitar tipo/eixos/marca depois, sem
       // perguntar de novo (ver regra no system prompt). Sem isso, o
@@ -222,7 +224,8 @@ export async function finalizeOnboarding(
           // falha aqui não pode travar a conclusão do onboarding.
         }
       }
-    } catch {
+    } catch (error) {
+      if (collectedData.individualBase) throw error;
       // Onboarding já concluiu do ponto de vista do usuário — se a
       // gravação do veículo falhar (ex.: texto livre não passa no schema
       // estrito), não trava a conclusão. O cliente pode cadastrar o
@@ -261,3 +264,4 @@ export async function criarEmpresaMinima(admin: SupabaseDbClient, userId: string
   await setCompanyForUserChannels(admin, userId, company.id);
   return company;
 }
+

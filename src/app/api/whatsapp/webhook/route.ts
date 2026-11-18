@@ -634,7 +634,7 @@ export async function POST(request: Request) {
     );
 
     await updateOnboardingSession(admin, userId, {
-      state: resultado.nextState,
+      state: resultado.finalize ? session.state : resultado.nextState,
       collectedData: {
         ...(resultado.collectedData as Record<string, unknown>),
         ...(body.messageId ? { __lastMessageId: body.messageId } : {}),
@@ -645,6 +645,7 @@ export async function POST(request: Request) {
       let empresaFinalizada;
       try {
         empresaFinalizada = await finalizeOnboarding(admin, userId, resultado.collectedData, phoneE164);
+        await updateOnboardingSession(admin, userId, {state: "completed"});
       } catch {
         await sendWhatsappText(
           phoneE164,
@@ -664,7 +665,7 @@ export async function POST(request: Request) {
       // abaixo no fluxo pós-onboarding).
       const collectedDataAtual = resultado.collectedData as Record<string, unknown>;
       if (!collectedDataAtual.suggestionsMenuSentAt) {
-        const mensagem = construirMensagemPosCadastro(collectedDataAtual.intentId, collectedDataAtual.intentLabel);
+        const mensagem = resultado.collectedData.individualBase ? "Cadastro salvo! Você já pode pedir uma análise de frete ou custo. Para corrigir seus dados, diga o que deseja alterar." : construirMensagemPosCadastro(collectedDataAtual.intentId, collectedDataAtual.intentLabel);
         await sendWhatsappText(phoneE164, mensagem).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_mensagem_pos_cadastro"));
         await enviarSugestoesIniciais(admin, userId, phoneE164, collectedDataAtual);
 
@@ -1145,3 +1146,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+

@@ -1,3 +1,4 @@
+import { processIndividualBase, type IndividualBase } from "./individualBaseOnboarding";
 import {BRANDS,brandQuestion,kindQuestion,cargoTypeQuestion,routeQuestion,payloadQuestion} from "./onboardingQuestions";
 import { nextCargoProfile, cargoQuestion, cargoSummary, type CargoProfile } from "./cargoProfile";
 import type { OnboardingState, VehicleTypeEnum, VehicleBodyTypeEnum } from "@/lib/supabase/tables";
@@ -11,6 +12,7 @@ import { ajudaConversacionalV1 } from "./conversationExperience";
 export type OnboardingCompanyType = CompanyRow["company_type"];
 
 export interface OnboardingCollectedData {
+  individualBase?: IndividualBase;
   vehicleFirst?: boolean;
   vehicleBrand?: string;
   brandManual?: boolean;
@@ -97,7 +99,7 @@ function textReply(text: string): OnboardingReply {
  * cobrir os dois casos sem virar pergunta nova.
  */
 export function firstOnboardingMessage(paid=false): string {
- return (paid ? "Parabéns pela sua assinatura! Vamos começar. 🚛" : "Bem-vindo ao Frota IA! Vamos começar. 🚛")+"\n\nPrimeiro vamos cadastrar você e seu caminhão para analisar fretes e custos com seus dados. Pode responder por texto ou áudio.\n\nQual é o seu nome?";
+ return (paid ? "Parabéns pela assinatura! " : "Olá! ")+"Eu sou o Frota IA, seu assistente de inteligência artificial para o transporte. Como posso te chamar?";
 }
 
 const OPCOES_PERFIL: Array<{ id: string; title: string; companyType: OnboardingCompanyType; label: string }> = [
@@ -476,6 +478,7 @@ function processOnboardingStep(
 
 /** Aproveita campos explícitos em uma fala, mantendo a validação e os estados existentes. */
 export function processOnboardingMessage(state: OnboardingState, collectedData: OnboardingCollectedData, incomingText: string): OnboardingStepResult {
+  if (collectedData.individualBase || (state === "awaiting_name" && collectedData.companyId && !collectedData.vehicleFirst)) return processIndividualBase(state, collectedData, incomingText);
   const t = norm(incomingText);
   if (collectedData.pendingCombinedConfirmation) {
     if (/^(sim|confirmo|confirmado|certo|est[aá] certo|isso|isso mesmo|ok|pode)$/.test(t)) {
@@ -530,3 +533,4 @@ export function processOnboardingMessage(state: OnboardingState, collectedData: 
   }
   return result;
 }
+

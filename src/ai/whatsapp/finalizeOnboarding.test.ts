@@ -6,6 +6,8 @@ const createCompanyWithOwner = vi.fn();
 const updateCompany = vi.fn();
 const updateProfile = vi.fn();
 const createVehicle = vi.fn();
+const listVehicles = vi.fn();
+const updateVehicle = vi.fn();
 const setDefaultVehicle = vi.fn();
 const createRoute = vi.fn();
 const saveMemory = vi.fn();
@@ -20,6 +22,8 @@ vi.mock("@/services/supabase/companyService", () => ({
 vi.mock("@/services/supabase/profileService", () => ({ updateProfile: (...a: unknown[]) => updateProfile(...a) }));
 vi.mock("@/services/supabase/vehicleService", () => ({
   createVehicle: (...a: unknown[]) => createVehicle(...a),
+  listVehicles: (...a: unknown[]) => listVehicles(...a),
+  updateVehicle: (...a: unknown[]) => updateVehicle(...a),
   setDefaultVehicle: (...a: unknown[]) => setDefaultVehicle(...a),
 }));
 vi.mock("@/services/supabase/savedRouteService", () => ({ createRoute: (...a: unknown[]) => createRoute(...a) }));
@@ -35,6 +39,8 @@ const COMPANY = { id: "empresa-1", name: "João Silva" };
 // setOperatingRegion vaza de um teste pro outro entre describes diferentes.
 beforeEach(() => {
   vi.clearAllMocks();
+  listVehicles.mockResolvedValue([]);
+  updateVehicle.mockResolvedValue({id:"veiculo-1"});
   createCompanyWithOwner.mockResolvedValue(COMPANY);
   updateCompany.mockResolvedValue(COMPANY);
   updateProfile.mockResolvedValue({});
@@ -216,3 +222,25 @@ describe("criarEmpresaMinima — inversão do funil (09/2026)", () => {
     await expect(criarEmpresaMinima({} as never, "user-1", "+5541999998888")).rejects.toThrow("falha ao criar trial");
   });
 });
+
+
+describe("cadastro base Individual: persistência",()=>{
+ const dados={companyId:"empresa-1",name:"Rafael",vehicleBrand:"Ford",primaryVehicleRaw:"Ford Cargo 2429",plate:"ABC1234",vehicleType:"truck" as const,individualBase:{version:2 as const,model:"Cargo 2429",body:"Tora"},vehicleSetup:{kind:"caminhao" as const,formula:"6x2",complete:true,label:"Rígido 6x2"},cargoProfile:{type:"Madeira",complete:true}};
+ it("salva na empresa vinculada sem criar assinatura, preserva marca e modelo livres",async()=>{
+  const {finalizeOnboarding}=await import('./finalizeOnboarding');
+  await finalizeOnboarding({} as never,"user-1",dados,"+5542998582489");
+  expect(updateCompany).toHaveBeenCalledWith(expect.anything(),"empresa-1","user-1",expect.anything());
+  expect(createCompanyWithOwner).not.toHaveBeenCalled();expect(criarAssinaturaTeste).not.toHaveBeenCalled();
+  expect(createVehicle).toHaveBeenCalledWith(expect.anything(),"empresa-1","user-1",expect.objectContaining({brand:"Ford",model:"Cargo 2429",plate:"ABC1234",notes:expect.stringContaining("Carroceria: Tora")}));
+ });
+ it("propaga falha no veículo para não declarar cadastro salvo",async()=>{
+  createVehicle.mockRejectedValueOnce(new Error("banco indisponível"));const {finalizeOnboarding}=await import('./finalizeOnboarding');
+  await expect(finalizeOnboarding({} as never,"user-1",dados,"+5542998582489")).rejects.toThrow("banco indisponível");
+ });
+ it("retentativa reutiliza placa da própria empresa",async()=>{
+  listVehicles.mockResolvedValue([{id:"v-existing",plate:"ABC1234"}]);const {finalizeOnboarding}=await import('./finalizeOnboarding');
+  await finalizeOnboarding({} as never,"user-1",dados,"+5542998582489");
+  expect(createVehicle).not.toHaveBeenCalled();expect(updateVehicle).toHaveBeenCalledWith(expect.anything(),"v-existing","empresa-1","user-1",expect.anything());
+ });
+});
+
