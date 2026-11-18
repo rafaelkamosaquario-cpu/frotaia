@@ -1,4 +1,5 @@
 "use client";
+import { ManualCustomers } from "./ManualCustomers";
 import { useRef, useState } from "react";
 import { CATALOGO_OFERTAS, formatarReais } from "@/lib/mercadopago/catalog";
 import { DIRECT_PLANS, type DirectPlan } from "@/lib/mercadopago/directSales";
@@ -8,7 +9,8 @@ import { AppAddonPanel } from "./AppAddonPanel";
 type Company={id:string;name:string;fleet_panel_enabled:boolean;subscription:{plan:string;status:string;valido_ate:string|null;hasProviderLink:boolean}|null};
 type Receipt=DirectReceipt;
 const field="block w-full rounded-lg border border-border bg-background p-3 mt-1";
-const button="inline-block rounded-lg border border-border p-3 disabled:opacity-50";
+const button="inline-flex items-center justify-center rounded-lg border border-border px-4 py-3 font-medium disabled:opacity-50";
+const copyButton=button+" bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-400";
 export function DirectSalesClient(){
  const [phone,setPhone]=useState("");const [matchedPhone,setMatchedPhone]=useState("");const [companies,setCompanies]=useState<Company[]>([]);
  const [companyId,setCompanyId]=useState("");const [plan,setPlan]=useState<DirectPlan>("INDIVIDUAL_MENSAL");
@@ -19,10 +21,12 @@ export function DirectSalesClient(){
  const receipts=history.filter(r=>r.company_id===companyId);
  const release=receipts.find(r=>canShareRelease(r,companyId,company?.subscription??null));
  const share=release?directReleaseMessage(release,matchedPhone):"";
+ async function lookup(p:string){setPhone(p);setNotice("");setCompanyId("");setCompanies([]);setHistory([]);const d=await api(`/api/contratacoes-diretas?phone=${encodeURIComponent(p)}`);setMatchedPhone(d.phone);setCompanies(d.companies);setHistory(d.history??[]);if(d.companies.length===1)setCompanyId(d.companies[0].id);if(!d.companies.length)throw new Error("Número ainda não vinculado a uma empresa. Peça o primeiro contato no Frota IA e tente novamente.");}
  async function run(fn:()=>Promise<void>){setBusy(true);setError("");try{await fn();}catch(e){setError(e instanceof Error?e.message:"Falha de conexão. Repita com os mesmos dados.");}finally{setBusy(false);}}
  async function api(url:string,body?:unknown){const r=await fetch(url,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{cache:"no-store"});const d=await r.json();if(!r.ok)throw new Error(d.error);return d;}
  return <main className="min-h-dvh bg-background p-4 text-foreground sm:p-8"><div className="mx-auto max-w-3xl space-y-6">
- <header><a href="/empresas" className="underline">Voltar às empresas</a><h1 className="mt-4 text-3xl font-semibold">Contratações diretas / Pix</h1><p className="mt-3">Copie a mensagem de pagamento. Depois confira o recebimento na conta bancária antes de liberar. Sem validação automática de comprovantes ou renovação automática.</p></header>
+ <header><a href="/empresas" className="underline">Voltar às empresas</a><h1 className="mt-4 text-3xl font-semibold">Contratações Frota IA WhatsApp</h1><p className="mt-3">Copie a mensagem de pagamento. Depois confira o recebimento na conta bancária antes de liberar. Sem validação automática de comprovantes ou renovação automática.</p></header>
+ <ManualCustomers busy={busy} refreshKey={history} onSelect={p=>run(()=>lookup(p))}/>
  <PreparedPix plan={plan} onPlanChange={p=>{setPlan(p);}}/>
  <h2 className="text-xl font-semibold">2. Conferir recebimento e liberar acesso</h2>
  <p className="rounded-lg border p-4">Novo cliente: peça que envie “Olá” ao <a className="underline" href="https://wa.me/5541997454382" target="_blank" rel="noopener noreferrer">WhatsApp do Frota IA</a> usando o número que utilizará no sistema. A conexão do WhatsApp precisa estar ativa para criar esse vínculo. Depois localize esse número abaixo; a busca aceita celular com ou sem o nono dígito. Não crie uma empresa de consultoria para vender este plano.</p>
@@ -49,8 +53,8 @@ export function DirectSalesClient(){
  <label className="flex gap-3"><input type="checkbox" required disabled={busy}/>Conferi o dinheiro recebido na conta, o plano, a empresa e o WhatsApp. Não estou usando somente um print de comprovante.</label>
  <button className={`${button} bg-primary text-primary-foreground`} disabled={busy||!company||!!blocked}>Confirmar recebimento e liberar plano</button></details>
  </form>}
- {share&&<section className="space-y-3 rounded-lg border border-emerald-500 p-4"><h2 className="text-xl" role="status">Liberação confirmada</h2><p>Mensagem recuperada do pagamento salvo. Ela continua disponível ao atualizar e localizar o cliente novamente. Copie e envie pelo WhatsApp.</p><textarea aria-label="Mensagem de plano liberado" className={`${field} min-h-56`} readOnly value={share}/><button className={button} onClick={()=>run(()=>navigator.clipboard.writeText(share))}>Copiar mensagem de liberação</button></section>}
- {!!receipts.length&&<section className="space-y-3"><h2 className="text-xl">Últimas liberações deste cliente</h2>{receipts.map(r=><article key={r.id} className="rounded-lg border p-3"><p>{r.plan} · {formatarReais(r.amount_cents)}</p><p>Transação {r.reference} · acesso até {new Date(r.access_until).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"})}</p>{canShareRelease(r,companyId,company?.subscription??null)&&<button type="button" className={button} onClick={()=>run(async()=>{await navigator.clipboard.writeText(directReleaseMessage(r,matchedPhone));setNotice("Mensagem recuperada do histórico e copiada. Nenhum pagamento foi registrado novamente.");})}>Copiar liberação deste pagamento</button>}</article>)}</section>}
+ {share&&<section className="space-y-3 rounded-lg border border-emerald-500 p-4"><h2 className="text-xl" role="status">Liberação confirmada</h2><p>Mensagem recuperada do pagamento salvo. Ela continua disponível ao atualizar e localizar o cliente novamente. Copie e envie pelo WhatsApp.</p><textarea aria-label="Mensagem de plano liberado" className={`${field} min-h-56`} readOnly value={share}/><button className={copyButton} onClick={()=>run(async()=>{await navigator.clipboard.writeText(share);setNotice("Mensagem de liberação copiada. Cole na conversa do cliente.");})}>Copiar mensagem de liberação</button></section>}
+ {!!receipts.length&&<section className="space-y-3"><h2 className="text-xl">Últimas liberações deste cliente</h2>{receipts.map(r=><article key={r.id} className="rounded-lg border p-3"><p>{r.plan} · {formatarReais(r.amount_cents)}</p><p>Transação {r.reference} · acesso até {new Date(r.access_until).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"})}</p>{canShareRelease(r,companyId,company?.subscription??null)&&<button type="button" className={copyButton} onClick={()=>run(async()=>{await navigator.clipboard.writeText(directReleaseMessage(r,matchedPhone));setNotice("Mensagem recuperada do histórico e copiada. Nenhum pagamento foi registrado novamente.");})}>Copiar liberação deste pagamento</button>}</article>)}</section>}
  {company&&<details className="rounded-xl border p-4"><summary className="cursor-pointer font-semibold">3. Opcional — adicional do aplicativo · R$ 9,90</summary><p className="my-3">Abra somente se o cliente quiser contratar o aplicativo. O WhatsApp funciona com o plano principal, sem este adicional.</p><AppAddonPanel key={company.id+String(!!share)} companyId={company.id} phone={matchedPhone} name={company.name}/></details>}
  </div></main>;
 }

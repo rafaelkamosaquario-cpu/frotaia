@@ -29,11 +29,8 @@ export function FrotaShell({ companyId, companyName, role, canExpandNavigation =
     <FrotaNavigationProvider key={`${companyId}:${enabledModules?.join(",")}`} companyId={companyId} canExpand={canExpandNavigation} enabledModules={enabledModules}>
     <AssistantNoticesProvider key={companyId}>
     <div className="frota-panel frota-refined flex h-dvh flex-col bg-background">
-      <FrotaHeader companyName={companyName} role={role} />
-      {canExpandNavigation && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-2 text-sm">
-        <span>Empresa em atendimento: <strong>{companyName}</strong></span>
-        <a href="/empresas" className="font-medium text-primary underline">Trocar empresa / gerenciar acessos</a>
-      </div>}
+      <FrotaHeader companyName={companyName} role={role} master={canExpandNavigation} />
+
       <div className="flex min-h-0 flex-1">
         <FrotaSidebar />
         <FrotaMobileSidebar open={isMoreOpen} onClose={() => setIsMoreOpen(false)} />
@@ -43,7 +40,7 @@ export function FrotaShell({ companyId, companyName, role, canExpandNavigation =
       </div>
       <FrotaBottomNav onOpenMore={() => setIsMoreOpen(true)} />
       {(canExpandNavigation || enabledModules === null || enabledModules.includes("assistente")) && <FrotaAiWidget />}
-      {enabledModules === null && <PanelTour />}
+      {!canExpandNavigation && enabledModules === null && <PanelTour />}
     </div>
     </AssistantNoticesProvider>
     </FrotaNavigationProvider>

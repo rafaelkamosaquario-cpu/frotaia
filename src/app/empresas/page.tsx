@@ -1,3 +1,4 @@
+import { RodoCoreAdminShell } from "@/components/frota/RodoCoreAdminShell";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CompanyAccessClient } from "./CompanyAccessClient";
@@ -10,5 +11,5 @@ export default async function EmpresasPage(){
   if(state.error||(state.data as {pending?:boolean}|null)?.pending)redirect("/acesso-cliente");
   if(!isConsultant(user))redirect("/acesso-cliente");
  }
- return <CompanyAccessClient canProvision={isConsultant(user)} />;
+ return isConsultant(user) ? <RodoCoreAdminShell><CompanyAccessClient canProvision /></RodoCoreAdminShell> : <CompanyAccessClient />;
 }

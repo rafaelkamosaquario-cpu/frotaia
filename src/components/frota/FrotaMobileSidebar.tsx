@@ -1,5 +1,6 @@
 "use client";
 
+import { useFrotaNavigation } from "./FrotaNavigationContext";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -14,6 +15,7 @@ interface FrotaMobileSidebarProps {
 }
 
 export function FrotaMobileSidebar({ open, onClose }: FrotaMobileSidebarProps) {
+  const { master } = useFrotaNavigation();
   const hasMounted = useHasMounted();
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export function FrotaMobileSidebar({ open, onClose }: FrotaMobileSidebarProps) {
         aria-label="Mais módulos do painel"
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-          <FrotaBrand compact />
+          <FrotaBrand compact master={master} />
           <button
             type="button"
             onClick={onClose}

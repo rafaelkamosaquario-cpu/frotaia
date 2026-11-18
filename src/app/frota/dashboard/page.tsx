@@ -1,3 +1,5 @@
+import { isConsultant } from "@/lib/frota/consultancy";
+import { CompanyAccessClient } from "@/app/empresas/CompanyAccessClient";
 import { createClient } from "@/lib/supabase/server";
 import { loadFleetPanelAccess } from "@/services/supabase/fleetPanelAccess";
 import { listVehiclesForPanel } from "@/services/supabase/vehicleService";
@@ -14,6 +16,8 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const access = await loadFleetPanelAccess(supabase);
   if (!access.ok) return null;
+  const {data:{user}}=await supabase.auth.getUser();
+  if(isConsultant(user) && access.company.id===process.env.TIRE_CASES_COMPANY_ID) return <CompanyAccessClient canProvision dashboard/>;
   // Consultant permissions do not select a different customer-facing layout.
   const enabled = access.moduleConfig?.enabled ?? null;
   const allows = (path: string) => modulePathAllowed(enabled, path);

@@ -13,6 +13,7 @@ import type { CompanyMemberRole } from "@/lib/supabase/tables";
 interface FrotaHeaderProps {
   companyName: string;
   role: CompanyMemberRole;
+  master?: boolean;
 }
 
 const ROLE_LABEL: Record<CompanyMemberRole, string> = {
@@ -22,7 +23,7 @@ const ROLE_LABEL: Record<CompanyMemberRole, string> = {
   viewer: "Visualizador",
 };
 
-export function FrotaHeader({ companyName, role }: FrotaHeaderProps) {
+export function FrotaHeader({ companyName, role, master = false }: FrotaHeaderProps) {
   const router = useRouter();
   const [accountOpen, setAccountOpen] = useState(false);
 
@@ -34,8 +35,8 @@ export function FrotaHeader({ companyName, role }: FrotaHeaderProps) {
 
   return (
     <header className="relative flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/80 px-3 backdrop-blur-md sm:px-4">
-      <FrotaBrand compact className="lg:hidden" />
-      <FrotaBrand className="hidden lg:flex" />
+      <FrotaBrand master={master} compact className="lg:hidden" />
+      <FrotaBrand master={master} className="hidden lg:flex" />
 
       {/* Desktop/tablet: tudo visível lado a lado — sem aperto de espaço a partir de lg. */}
       <div className="hidden items-center gap-3 lg:flex">
