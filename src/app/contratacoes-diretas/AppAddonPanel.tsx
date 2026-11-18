@@ -1,18 +1,19 @@
 "use client";
 import {useEffect,useState} from "react";
 import {APP_ADDON_CENTS} from "@/lib/individual/addon";
+import {PixOptions} from "./PixOptions";
 import {staticPixCode} from "@/lib/mercadopago/manualPix";
 export function AppAddonPanel({companyId,phone,name}:{companyId:string;phone:string;name:string}) {
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(""),[error,setError]=useState("");
  const [status,setStatus]=useState<{baseActive:boolean;preserved:boolean;until:string|null}|null>(null);
  const [history,setHistory]=useState<{id:string;reference:string;status:string;access_until:string}[]>([]);
  useEffect(()=>{let cancelled=false;fetch("/api/contratacoes-diretas/adicional?companyId="+encodeURIComponent(companyId),{cache:"no-store"}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error);if(!cancelled){setStatus(d.state);setHistory(d.history);}}).catch(e=>{if(!cancelled)setError(e.message);});return()=>{cancelled=true;};},[companyId,message]);
- const paymentMessage="Frota IA — adicional do aplicativo. R$ 9,90 por um mês-calendário, sem renovação automática. Requer plano WhatsApp ativo. Não renova o plano-base. Pix Copia e Cola:\n"+staticPixCode(APP_ADDON_CENTS)+"\nConfira valor e recebedor no banco. Após pagar, informe seu WhatsApp de uso. A liberação ocorre após conferência do recebimento.";
+ const paymentMessage="Frota IA — adicional do aplicativo. R$ 9,90 por um mês-calendário, sem renovação automática. Requer plano WhatsApp ativo. Não renova o plano-base. Vou enviar o Pix Copia e Cola, QR Code ou chave em uma mensagem separada. Confira valor e recebedor no banco. Após pagar, informe seu WhatsApp de uso. A liberação ocorre após conferência do recebimento.";
  return <section className="space-y-4 rounded-xl border p-5">
  <h2 className="text-xl font-semibold">Adicional do aplicativo · R$ 9,90 por mês</h2>
  <p>{!status?"Consultando condições de acesso…":status.preserved?"Aplicativo já incluído: não cobre adicional.":!status.baseActive?"Ative primeiro o plano WhatsApp.":status.until?"Prazo do adicional: "+new Date(status.until).toLocaleString("pt-BR"):"Adicional não contratado."}</p>
  {status?.baseActive&&!status.preserved&&<><textarea aria-label="Mensagem de cobrança do adicional" className="min-h-40 w-full rounded border p-3" readOnly value={paymentMessage}/>
- <button onClick={()=>navigator.clipboard.writeText(paymentMessage).catch(()=>setError("Selecione e copie o texto manualmente."))}>Copiar cobrança Pix do adicional</button></>}
+ <button onClick={()=>navigator.clipboard.writeText(paymentMessage).catch(()=>setError("Selecione e copie o texto manualmente."))}>Copiar cobrança Pix do adicional</button><PixOptions code={staticPixCode(APP_ADDON_CENTS)} cents={APP_ADDON_CENTS}/></>}
  <p>Cliente: {name} · {phone}. Requer plano WhatsApp ativo. Um mês-calendário, sem renovação automática. Esta liberação não substitui o plano principal. Clientes com aplicativo já incluído não devem pagar novamente.</p>
  <form className="space-y-3" onSubmit={async e=>{
  e.preventDefault();const form=new FormData(e.currentTarget);

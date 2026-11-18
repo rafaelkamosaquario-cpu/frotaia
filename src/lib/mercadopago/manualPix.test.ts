@@ -19,7 +19,7 @@ describe("Pix estático para compartilhamento manual", () => {
   expect(f["54"]).toBe((CATALOGO_OFERTAS[plan].precoCentavos/100).toFixed(2));
   expect(fields(f["26"])["01"]).toBe(MANUAL_PIX_KEY);expect(fields(f["62"])["05"]).toBe("***");
   expect(f["63"]).toBe(pixCrc16(code.slice(0,-4)));
-  const message=manualPixMessage(plan);expect(message).toContain(code);expect(message).toContain(formatarReais(CATALOGO_OFERTAS[plan].precoCentavos));expect(message).toContain("Vou conferir o recebimento e liberar");
+  const message=manualPixMessage(plan);expect(message).not.toContain(code);expect(message).not.toContain(MANUAL_PIX_KEY);expect(message).toContain(formatarReais(CATALOGO_OFERTAS[plan].precoCentavos));expect(message).toContain("Vou conferir o recebimento e liberar");
  });
  it("rejects unsupported plans",()=>expect(()=>manualPixCode("TRIAL" as typeof DIRECT_PLANS[number])).toThrow("Plano inválido"));
 });
