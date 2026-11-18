@@ -1,3 +1,4 @@
+import { registrationSummary } from "@/ai/whatsapp/registrationSummary";
 import "server-only";
 import { FREIGHT_DEMO_GUIDE } from "@/ai/whatsapp/freightDemoGuide";
 import { COMMUNICATION_GUIDE } from "@/lib/frota/communication";
@@ -125,6 +126,10 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
     experienciaWhatsappV1 ? ajudaConversacionalV1() : construirTextoAjudaCompleto(),
   ];
 
+  if (customer.profile?.full_name) linhas.push(`Nome da pessoa/motorista: ${customer.profile.full_name}. Não confundir com o nome do veículo ou da empresa.`);
+  if (experienciaWhatsappV1 && !modoDemo) {
+    linhas.push("RESUMO DO CADASTRO INDIVIDUAL (dados salvos):", registrationSummary(customer, vehicle), "Quando o cliente perguntar o que foi cadastrado, inclusive por áudio, apresente este resumo de forma curta. Comece pelo nome da pessoa; marca e modelo são do caminhão. Mostre a placa destacada em monoespaçado. Não liste campos vazios ou opcionais como pendências. Não diga que o modelo está ausente quando só o ano/modelo estiver vazio: modelo e ano do modelo são campos distintos. Consumo, velocidade, capacidade, odômetro, seguro e licenciamento serão complementados conforme a conversa; pergunte somente se necessários à solicitação atual. Termine com: Quer analisar um frete ou calcular uma rota? Pode mandar um print, áudio ou escrever. Não deduza S10 ou S500 quando o cliente informou somente diesel. Dados estruturados atuais prevalecem sobre respostas antigas do histórico.");
+  }
   if (customer.company) {
     linhas.push("", `Empresa: ${customer.company.name} (${customer.company.company_type}).`);
   }
@@ -139,8 +144,13 @@ export function construirSystemPrompt(customer: CustomerContext, vehicle: Vehicl
   if (vehicle.vehicle) {
     const v = vehicle.vehicle;
     const detalhes = [
-      v.name ? `nome/apelido: ${v.name}` : null,
+      v.name ? `identificação/apelido do VEÍCULO (não é nome da pessoa): ${v.name}` : null,
       v.plate ? `placa: ${v.plate}` : null,
+      v.brand ? `marca do caminhão: ${v.brand}` : null,
+      v.model ? `modelo do caminhão: ${v.model}` : null,
+      v.model_year ? `ano do modelo: ${v.model_year}` : null,
+      v.body_type ? `carroceria: ${v.body_type}` : null,
+      v.notes ? `observações cadastradas: ${v.notes}` : null,
       `tipo: ${v.vehicle_type ?? "NÃO INFORMADO AINDA"}`,
       `número de eixos: ${v.axle_count ?? "NÃO INFORMADO AINDA"}`,
       v.fuel_type ? `combustível: ${v.fuel_type}` : null,

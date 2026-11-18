@@ -17,3 +17,11 @@ describe("estilo conversacional isolado para WhatsApp V1", () => {
     expect(prompt).toContain("COLE O TEXTO");
   });
 });
+
+it("injeta identidade pessoal e campos estruturados do veículo",()=>{
+ const c={...customer,profile:{full_name:"Rafael"}} as CustomerContext;
+ const v={...vehicle,vehicle:{name:"Scania P310",brand:"Scania",model:"P310",plate:"ABC0125",vehicle_type:"truck"}} as VehicleContext;
+ const p=construirSystemPrompt(c,v,new Date(),false,true);
+ expect(p).toContain("Nome da pessoa/motorista: Rafael");expect(p).toContain("marca do caminhão: Scania");expect(p).toContain("modelo do caminhão: P310");expect(p).toContain("Não liste campos vazios");expect(p).toContain("Quer analisar um frete ou calcular uma rota?");
+});
+
