@@ -15,6 +15,7 @@ import { resolveOrCreateUserByPhone } from "@/services/supabase/userIdentityServ
 import { getOnboardingSession, createOnboardingSession, updateOnboardingSession } from "@/services/supabase/onboardingSessionService";
 import { firstOnboardingMessage, processOnboardingMessage, type OnboardingCollectedData, type OnboardingReply } from "@/ai/whatsapp/onboardingConversation";
 import { finalizeOnboarding, criarEmpresaMinima } from "@/ai/whatsapp/finalizeOnboarding";
+import {resolveDemoAction,documentDemoButtons,routeDemoButtons} from "@/ai/whatsapp/demoActions";
 import { askDemoChoice, resolverEscolhaDemo, ehAtalhoDemo, demoEntregouValor, TRANSICAO_POR_TRACK, FERRAMENTAS_POR_TRACK, type DemoTrack } from "@/ai/whatsapp/demoConversation";
 import { loadCustomerContext, loadVehicleContext } from "@/ai/context/customerContext";
 import { getOrCreateOpenConversation, appendMessage } from "@/services/supabase/conversationService";
@@ -455,7 +456,7 @@ export async function POST(request: Request) {
   if (session.state === "awaiting_demo_choice" && !pedidoComercialDemo) {
     const collectedDataAtual = (session.collected_data ?? {}) as Record<string, unknown>;
     const temMidia = Boolean(body.image || body.document || body.audio);
-    const escolha = resolverEscolhaDemo(entradaOnboarding ?? "") ?? (temMidia ? "livre" : null);
+    const escolha = resolverEscolhaDemo(entradaOnboarding ?? "") ?? (body.image || body.document ? "documentos" : temMidia ? "livre" : null);
     if (!escolha) {
       await enviarRespostaOnboarding(phoneE164, askDemoChoice());
       return NextResponse.json({ ok: true });
@@ -484,7 +485,7 @@ export async function POST(request: Request) {
     const collectedDataAtual = (session.collected_data ?? {}) as Record<string, unknown>;
     const companyIdDemo = collectedDataAtual.companyId as string | undefined;
     const trackSalvo = collectedDataAtual.demoTrack;
-    const demoTrack = typeof trackSalvo === "string" && Object.hasOwn(FERRAMENTAS_POR_TRACK, trackSalvo) ? trackSalvo as DemoTrack : undefined;
+    let demoTrack = typeof trackSalvo === "string" && Object.hasOwn(FERRAMENTAS_POR_TRACK, trackSalvo) ? trackSalvo as DemoTrack : undefined;
 
     // Estado inconsistente (não deveria acontecer — companyId sempre é
     // gravado junto com a transição pra este estado) — recomeça o menu em
@@ -496,6 +497,12 @@ export async function POST(request: Request) {
     }
 
     const botaoTocado = body.buttonsResponseMessage?.buttonId ?? botaoComercial(body);
+    const demoAction=resolveDemoAction(botaoTocado ?? entradaOnboarding ?? undefined);
+    if(demoAction){
+      demoTrack=demoAction.track;
+      await updateOnboardingSession(admin,userId,{collectedData:{...collectedDataAtual,demoTrack}});
+      if((botaoTocado ?? entradaOnboarding)==="demo_doc_escolher"){await sendWhatsappText(phoneE164,demoAction.text);return NextResponse.json({ok:true});}
+    }
     const ofertaEscolhida = BOTOES_PLANO.find(b => b.id === botaoTocado)?.oferta
       ?? resolverIntencaoComercialLanding(textoDireto);
 
@@ -556,7 +563,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const entradaDemo = await prepararEntradaDemo(body);
+    const entradaDemo = await prepararEntradaDemo(demoAction ? {text:{message:demoAction.text}} : body);
     if (!entradaDemo.ok) {
       await sendWhatsappText(phoneE164, entradaDemo.mensagem);
       return NextResponse.json({ ok: true });
@@ -579,7 +586,11 @@ export async function POST(request: Request) {
       modoDemo: true,
     });
 
-    if (resposta && demoEntregouValor(demoTrack, resposta.ferramentasExecutadas)) {
+    if(resposta && (body.image || body.document)){
+      await enviarRespostaOnboarding(phoneE164,documentDemoButtons(resposta.message.content)).catch(err=>logZapiSendFailure(err,phoneE164,"demo_documento_opcoes"));
+    } else if(resposta && demoTrack==="rota" && resposta.ferramentasExecutadas?.includes("consultar_rota")){
+      await enviarRespostaOnboarding(phoneE164,routeDemoButtons()).catch(err=>logZapiSendFailure(err,phoneE164,"demo_rota_opcoes"));
+    } else if (resposta && demoEntregouValor(demoTrack, resposta.ferramentasExecutadas)) {
       await enviarRespostaOnboarding(phoneE164, buildCtaPosDemo()).catch((err) => logZapiSendFailure(err, phoneE164, "demo_cta_pos_resultado"));
     }
 

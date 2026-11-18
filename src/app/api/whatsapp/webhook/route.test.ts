@@ -771,6 +771,24 @@ describe("V1 conversacional — demonstração, mídia e checkout preservado", (
     await chamarWebhook(mensagemTexto("Quanto gasto de diesel em 600 km?"))();
     expect(gerarRespostaAssistente).toHaveBeenCalledWith(expect.objectContaining({ modoDemo: true, experienciaWhatsappV1: true, ferramentasPermitidas: ["consultar_rota", "calcular_combustivel", "calcular_custo_viagem"] }));
   });
+  it("atalho de documentos solicita foto sem chamar análise vazia", async()=>{
+    await chamarWebhook(mensagemTexto("documentos"))();
+    expect(updateOnboardingSession).toHaveBeenCalledWith(expect.anything(),USER_ID,expect.objectContaining({collectedData:expect.objectContaining({demoTrack:"documentos"})}));
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.anything(),expect.stringContaining("foto legível"));
+    expect(gerarRespostaAssistente).not.toHaveBeenCalled();
+  });
+  it("botão depois da rota permite calcular combustível sem bloqueio por track", async()=>{
+    getOnboardingSession.mockResolvedValue({state:"awaiting_demo_input",collected_data:{companyId:EMPRESA,demoTrack:"rota"}});
+    await chamarWebhook({phone:"5541999998888",buttonsResponseMessage:{buttonId:"demo_rota_combustivel"}})();
+    expect(prepararEntradaDemo).toHaveBeenCalledWith({text:{message:expect.stringContaining("rota de ida consultada")}});
+    expect(gerarRespostaAssistente).toHaveBeenCalledWith(expect.objectContaining({ferramentasPermitidas:expect.arrayContaining(["calcular_combustivel"])}));
+  });
+  it("escolher informação pede objetivo sem analisar nem registrar",async()=>{
+    getOnboardingSession.mockResolvedValue({state:"awaiting_demo_input",collected_data:{companyId:EMPRESA,demoTrack:"documentos"}});
+    await chamarWebhook({phone:"5541999998888",buttonsResponseMessage:{buttonId:"demo_doc_escolher"}})();
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.anything(),expect.stringContaining("Qual informação"));
+    expect(gerarRespostaAssistente).not.toHaveBeenCalled();
+  });
   it.each(["image", "audio", "document"])("mídia %s já no menu segue para análise restrita", async (tipo) => {
     prepararEntradaDemo.mockResolvedValue({ ok: true, texto: "arquivo", conteudoMultimodal: [{ type: "image" }], extra: { content_type: tipo } });
     await chamarWebhook({ phone: "5541999998888", messageId: "media-1", [tipo]: {} })();

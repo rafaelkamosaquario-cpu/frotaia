@@ -3,12 +3,13 @@ import type { OnboardingReply } from "./onboardingConversation";
 import { APRESENTACAO_V1 } from "./conversationExperience";
 
 // IDs antigos permanecem válidos para sessões e listas já enviadas.
-export type DemoTrack = "frete" | "rota" | "custo" | "combustivel" | "manutencao" | "pneus" | "livre";
+export type DemoTrack = "frete" | "rota" | "custo" | "combustivel" | "manutencao" | "pneus" | "livre" | "documentos";
 export function askDemoChoice(): OnboardingReply {
   return { kind: "list", text: APRESENTACAO_V1, title: "Experimente na prática", buttonLabel: "Escolher assunto", options: [
     { id: "frete", title: "Analisar um frete" },
     { id: "rota", title: "Calcular uma rota" },
     { id: "custo", title: "Calcular um custo" },
+    { id: "documentos", title: "Ler foto ou documento" },
     { id: "funcionalidades", title: "O que o Frota IA faz?" },
     { id: "demo_ver_planos", title: "Conhecer os planos" },
   ] };
@@ -18,6 +19,7 @@ export function resolverEscolhaDemo(texto: string): DemoTrack | "funcionalidades
   const t = norm(texto);
   if (Object.hasOwn(FERRAMENTAS_POR_TRACK, t)) return t as DemoTrack;
   if (/funcionalidades|conhecer.*fun|o que.*faz|ver tudo/.test(t)) return "funcionalidades";
+  if (/documento|nota fiscal|comprovante|ct-?e|ler foto/.test(t)) return "documentos";
   if (/\b(pneu|pneus|recapar|recapagem|recapado)\b/.test(t)) return "pneus";
   if (/\b(manutencao|revisao|oficina|oleo|barulho)\b/.test(t)) return "manutencao";
   if (/\b(frete|fretes|carga|retorno|oportunidades)\b/.test(t)) return "frete";
@@ -27,9 +29,10 @@ export function resolverEscolhaDemo(texto: string): DemoTrack | "funcionalidades
   return null;
 }
 export function ehAtalhoDemo(texto: string): boolean {
-  return /^(frete|fretes e oportunidades|rota|custo|combustivel|manutencao|pneus|livre|analisar um frete|calcular uma rota|calcular um custo|calcular custo de viagem)$/.test(norm(texto));
+  return /^(documentos|ler foto ou documento|frete|fretes e oportunidades|rota|custo|combustivel|manutencao|pneus|livre|analisar um frete|calcular uma rota|calcular um custo|calcular custo de viagem)$/.test(norm(texto));
 }
 export const TRANSICAO_POR_TRACK: Record<DemoTrack, string> = {
+  documentos: "Mande uma foto legível do CT-e, da nota fiscal ou do comprovante. Se já souber, diga o que quer conferir. Vou ler os dados sem registrar lançamentos neste teste.",
   frete: "De onde sai a carga, para onde vai e qual é o valor oferecido? Pode mandar a oferta por texto, áudio, foto ou documento. Vou consultar a distância de ida para começar.",
   rota: "De onde você sai e para onde vai? Vou consultar a distância e o tempo estimado.",
   custo: "Qual a origem e o destino da viagem? Vou consultar a distância. Se souber, diga também o consumo do caminhão.",
@@ -40,6 +43,7 @@ export const TRANSICAO_POR_TRACK: Record<DemoTrack, string> = {
 };
 // Demonstração só usa ferramentas sem escrita operacional.
 export const FERRAMENTAS_POR_TRACK: Record<DemoTrack, FrotaIaToolName[]> = {
+  documentos: ["consultar_rota", "calcular_combustivel", "calcular_custo_viagem", "analisar_frete", "verificar_piso_minimo_antt"],
   frete: ["consultar_rota", "calcular_combustivel", "analisar_frete", "calcular_margem", "calcular_valor_minimo_frete", "verificar_piso_minimo_antt"],
   rota: ["consultar_rota"], custo: ["consultar_rota", "calcular_custo_viagem", "calcular_combustivel"],
   combustivel: ["consultar_rota", "calcular_combustivel", "calcular_custo_viagem"],
@@ -48,6 +52,7 @@ export const FERRAMENTAS_POR_TRACK: Record<DemoTrack, FrotaIaToolName[]> = {
   livre: ["analisar_frete", "calcular_combustivel", "calcular_custo_viagem", "calcular_cpk", "calcular_margem", "calcular_valor_minimo_frete", "comparar_pneus", "consultar_rota", "consultar_conhecimento_operacional", "verificar_piso_minimo_antt"],
 };
 export const FERRAMENTA_ALVO_POR_TRACK: Record<DemoTrack, FrotaIaToolName> = {
+  documentos: "analisar_frete",
   frete: "analisar_frete", rota: "consultar_rota", custo: "calcular_custo_viagem",
   combustivel: "calcular_combustivel", manutencao: "consultar_conhecimento_operacional", pneus: "comparar_pneus", livre: "analisar_frete",
 };
