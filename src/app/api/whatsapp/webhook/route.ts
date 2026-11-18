@@ -664,6 +664,9 @@ export async function POST(request: Request) {
       // reabertura manual é só via "ajuda"/"menu"/"opções"/"sugestões" mais
       // abaixo no fluxo pós-onboarding).
       const collectedDataAtual = resultado.collectedData as Record<string, unknown>;
+      if (resultado.collectedData.replayRegistration) {
+        await sendWhatsappText(phoneE164, "Cadastro atualizado! Sua assinatura e os lançamentos foram preservados. Você já pode pedir uma análise de frete ou custo.");
+      }
       if (!collectedDataAtual.suggestionsMenuSentAt) {
         const mensagem = resultado.collectedData.individualBase ? "Cadastro salvo! Você já pode pedir uma análise de frete ou custo. Para corrigir seus dados, diga o que deseja alterar." : construirMensagemPosCadastro(collectedDataAtual.intentId, collectedDataAtual.intentLabel);
         await sendWhatsappText(phoneE164, mensagem).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_mensagem_pos_cadastro"));

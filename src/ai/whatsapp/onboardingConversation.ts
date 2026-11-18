@@ -13,6 +13,8 @@ export type OnboardingCompanyType = CompanyRow["company_type"];
 
 export interface OnboardingCollectedData {
   individualBase?: IndividualBase;
+  existingVehicleId?: string;
+  replayRegistration?: boolean;
   vehicleFirst?: boolean;
   vehicleBrand?: string;
   brandManual?: boolean;

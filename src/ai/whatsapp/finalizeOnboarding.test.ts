@@ -244,3 +244,19 @@ describe("cadastro base Individual: persistência",()=>{
  });
 });
 
+
+describe("recadastro preserva identidade do veículo",()=>{
+ it("corrigir placa atualiza ID original sem criar veículo ou assinatura",async()=>{
+  listVehicles.mockResolvedValue([{id:"original",plate:"ABC0125"}]);
+  const {finalizeOnboarding}=await import('./finalizeOnboarding');
+  await finalizeOnboarding({} as never,"user-1",{companyId:"empresa-1",existingVehicleId:"original",replayRegistration:true,individualBase:{version:2,model:"P310"},vehicleType:"truck",plate:"ABC1D23"},"+554298006380");
+  expect(updateVehicle).toHaveBeenCalledWith(expect.anything(),"original","empresa-1","user-1",expect.objectContaining({plate:"ABC1D23"}));
+  expect(createVehicle).not.toHaveBeenCalled();expect(criarAssinaturaTeste).not.toHaveBeenCalled();
+ });
+ it("não cria substituto se o ID não pertence à empresa",async()=>{
+  const {finalizeOnboarding}=await import('./finalizeOnboarding');
+  await expect(finalizeOnboarding({} as never,"user-1",{companyId:"empresa-1",existingVehicleId:"other-company",individualBase:{version:2},vehicleType:"truck"},"+554298006380")).rejects.toThrow("não encontrado");
+  expect(createVehicle).not.toHaveBeenCalled();expect(updateVehicle).not.toHaveBeenCalled();
+ });
+});
+

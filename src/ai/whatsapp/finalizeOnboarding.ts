@@ -182,7 +182,8 @@ export async function finalizeOnboarding(
         model: collectedData.individualBase?.model ?? model,
         modelYear,
       };
-      const existing = collectedData.individualBase ? (await listVehicles(admin, company.id)).find(v => v.plate === collectedData.plate) : undefined;
+      const existing = collectedData.individualBase ? (await listVehicles(admin, company.id)).find(v => collectedData.existingVehicleId ? v.id === collectedData.existingVehicleId : v.plate === collectedData.plate) : undefined;
+      if (collectedData.existingVehicleId && !existing) throw new Error("Veículo vinculado ao recadastro não encontrado nesta empresa.");
       const veiculo = existing ? await updateVehicle(admin, existing.id, company.id, userId, vehicleInput) : await createVehicle(admin, company.id, userId, vehicleInput);
       // Nesta V1 é sempre o único veículo da conta — marcar como padrão
       // agora é o que faz a IA reaproveitar tipo/eixos/marca depois, sem
