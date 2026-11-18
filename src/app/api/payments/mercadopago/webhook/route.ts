@@ -45,7 +45,7 @@ async function dispararOnboardingPosPagamento(admin: SupabaseDbClient, companyId
 
     await updateOnboardingSession(admin, canal.user_id, { state: "awaiting_name" });
     await sendWhatsappText(canal.phone_e164, "Pagamento confirmado! 🎉\n\nAgora vamos configurar sua operação — são só algumas perguntas rápidas.");
-    await sendWhatsappText(canal.phone_e164, firstOnboardingMessage());
+    await sendWhatsappText(canal.phone_e164, firstOnboardingMessage(true));
   } catch (erro) {
     captureError({ event: "mercadopago_onboarding_pos_pagamento_falhou", route: ROTA, company_id: companyId, error: erro });
   }

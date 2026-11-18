@@ -18,11 +18,11 @@ export function nextVehicleConfiguration(previous: VehicleSetup = {}, input: str
   const data = { ...previous };
   const t = input.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (/cavalo/.test(t)) data.kind = "cavalo";
-  else if (/rigido|toco|truck|trucado|bitruck|tres.quartos/.test(t)) data.kind = "caminhao";
+  else if (/rigido|toco|truck|truque|trucado|bitruck|bitruque|tres.quartos|3\/4/.test(t)) data.kind = "caminhao";
   const formula = t.match(/\b(4|6|8|10)\s*(?:x|×|por)\s*(2|4|6)\b/);
   if (formula) data.formula = `${formula[1]}x${formula[2]}`;
   const ask = (question: string) => ({ data, question });
-  if (!data.kind) return ask("É um caminhão rígido, com carroceria no chassi, ou um cavalo mecânico? A tração sozinha não distingue os dois.");
+  if (!data.kind) return ask("É cavalo mecânico (puxa carreta), toco, truck/trucado ou bitruck? Pode escrever como você conhece o caminhão.");
   if (!data.formula) return ask("Qual a tração do caminhão? Ex.: 4x2, 6x2, 6x4 ou 8x4.");
   const id = `${data.kind}-${data.formula}`;
   const configuration = configurationCatalog[id];
@@ -31,10 +31,10 @@ export function nextVehicleConfiguration(previous: VehicleSetup = {}, input: str
   data.motorAxles = configuration.axes.length;
   // Separate towing vehicle from attached equipment; never assume trailer axle count.
   if (/sem (carreta|implemento|reboque)|nao (esta )?(engatado|atrelado)|^(nao|não)$/.test(t)) data.attached = false;
-  const implement = t.match(/rodotrem|bitrem|julieta|semirreboque|semi.reboque|carreta|reboque/);
+  const implement = t.match(/rodotrem|bitrem|julieta|semirreboque|semi.reboque|carreta|reboque|\bls\b/);
   if (implement && data.attached !== false) { data.attached = true; data.implement = implement[0]; }
   if (/^(sim|engatado|atrelado)$/.test(t)) data.attached = true;
-  if (data.attached === undefined) return ask("Está engatado a uma carreta, Julieta ou outro implemento? Responda não, ou informe o tipo e quantos eixos têm os implementos, sem contar o caminhão.");
+  if (data.attached === undefined) return ask("Trabalha puxando alguma carreta ou reboque? Se não, responda não. Se sim, diga se é carreta/LS, bitrem, rodotrem ou Julieta e quantos eixos têm os implementos, sem contar o caminhão.");
   if (data.attached) {
     if (!data.implement) return ask("Qual o implemento engatado: semirreboque/carreta, Julieta, bitrem ou rodotrem? Informe também o total de eixos dos implementos, incluindo dolly se houver, sem contar o caminhão.");
     const axes = t.match(/\b(\d{1,2})\s*eixos?\b/) ?? (/^\d{1,2}$/.test(t) ? [t, t] : null);

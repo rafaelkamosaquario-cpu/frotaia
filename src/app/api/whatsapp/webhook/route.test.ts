@@ -575,7 +575,7 @@ describe("Inversão do funil (09/2026) — demo pré-cadastro antes das 11 pergu
 
     expect(criarEmpresaMinima).not.toHaveBeenCalled();
     expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("atendimento comercial direto"));
-    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Como posso chamar você"));
+    expect(sendWhatsappText).toHaveBeenCalledWith("+5541999998888", expect.stringContaining("Qual é o seu nome?"));
   });
 
   it("awaiting_demo_choice: tocar 'Analisar um frete' transiciona pra awaiting_demo_input com o track salvo", async () => {
@@ -770,6 +770,12 @@ describe("V1 conversacional — demonstração, mídia e checkout preservado", (
   it("pedido natural completo segue direto sem pedir reenvio", async () => {
     await chamarWebhook(mensagemTexto("Quanto gasto de diesel em 600 km?"))();
     expect(gerarRespostaAssistente).toHaveBeenCalledWith(expect.objectContaining({ modoDemo: true, experienciaWhatsappV1: true, ferramentasPermitidas: ["consultar_rota", "calcular_combustivel", "calcular_custo_viagem"] }));
+  });
+  it("Olá após pagamento abre boas-vindas, sem gravar Olá como nome",async()=>{
+    getOnboardingSession.mockResolvedValue({state:"awaiting_name",collected_data:{companyId:EMPRESA}});
+    await chamarWebhook(mensagemTexto("Olá"))();
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.anything(),expect.stringContaining("Parabéns pela sua assinatura"));
+    expect(processOnboardingMessage).not.toHaveBeenCalled();
   });
   it("atalho de documentos solicita foto sem chamar análise vazia", async()=>{
     await chamarWebhook(mensagemTexto("documentos"))();

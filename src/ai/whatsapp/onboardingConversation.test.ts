@@ -13,19 +13,19 @@ describe("firstOnboardingMessage", () => {
   it("explica o valor do produto antes de pedir o nome", () => {
     const texto = firstOnboardingMessage();
     expect(texto.toLowerCase()).toContain("frete");
-    expect(texto.toLowerCase()).toContain("radar de fretes");
+    expect(texto).toContain("Qual é o seu nome?");
   });
 
-  it("a pergunta do nome cobre pessoa E empresa/operação (fechamento 08/2026) — mesma resposta vira profiles.full_name e companies.name, e a pergunta acontece antes de saber se é motorista autônomo ou dono de empresa", () => {
+  it("pergunta o nome da pessoa antes do perfil", () => {
     const texto = firstOnboardingMessage();
-    expect(texto).toContain("Como posso chamar você (ou sua empresa/operação)?");
+    expect(texto).toContain("Qual é o seu nome?");
   });
 });
 
 describe("awaiting_profile → awaiting_intent", () => {
-  it("depois de escolher o perfil, a próxima pergunta é a de intenção, não a de cidade", () => {
+  it("depois de escolher o perfil, a próxima pergunta é a marca do caminhão", () => {
     const resultado = processOnboardingMessage("awaiting_profile", { name: "Rafael" }, "motorista_autonomo");
-    expect(resultado.nextState).toBe("awaiting_intent");
+    expect(resultado.nextState).toBe("awaiting_primary_vehicle");
     expect(resultado.reply.kind).toBe("list");
   });
 });

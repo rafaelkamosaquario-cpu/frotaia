@@ -1,0 +1,9 @@
+import type {OnboardingReply} from "./onboardingConversation";
+export const BRANDS=["Scania","Volvo","Mercedes-Benz","DAF","Volkswagen","Iveco","Ford"];
+export function brandQuestion():OnboardingReply{return {kind:"list",text:"Vamos cadastrar seu caminhão primeiro. Qual é a marca? Escolha abaixo ou escreva.",title:"Marca do caminhão",buttonLabel:"Escolher marca",options:[...BRANDS.map(title=>({id:title,title})),{id:"digitar_marca",title:"Outra / digitar"}]};}
+export function kindQuestion():OnboardingReply{return {kind:"list",text:"Qual é o tipo do caminhão? Pode escolher ou escrever. Cavalo mecânico é a parte que puxa a carreta.",title:"Tipo do caminhão",buttonLabel:"Escolher tipo",options:[
+ {id:"cavalo",title:"Cavalo mecânico"},{id:"truck",title:"Truck / trucado"},{id:"toco",title:"Toco / três-quartos"},{id:"bitruck",title:"Bitruck"},{id:"outro",title:"Outro / vou descrever"}
+]};}
+export function cargoTypeQuestion():OnboardingReply{return {kind:"list",text:"O que você costuma transportar? Aqui é a mercadoria, não a carroceria. Pode escolher ou escrever outra carga.",title:"Tipo de carga",buttonLabel:"Escolher carga",options:["Carga paletizada","Carga fracionada","Madeira / compensado","Grãos","Cimento / construção","Móveis / eletrodomésticos","Alimentos","Combustíveis","Outros líquidos","Diversos / variável"].map(title=>({id:title,title}))};}
+export function routeQuestion():OnboardingReply{return {kind:"buttons",text:"Esse caminhão costuma fazer uma rota fixa ou trabalha com rotas variadas?",options:[{id:"fixa",label:"Rota fixa"},{id:"variadas",label:"Rotas variadas"}]};}
+export const payloadQuestion="Em média, quantas toneladas de CARGA você transporta? Informe só a mercadoria, sem o peso do caminhão e da carreta. Ex.: 14 toneladas. Se não souber ou variar muito, pode dizer.";

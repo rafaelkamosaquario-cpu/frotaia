@@ -621,6 +621,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    if(session.state==="awaiting_name" && /^(ol[aá]|oi|bom dia|boa tarde|boa noite|começar|comecar|vamos começar|vamos comecar|paguei|assinei)[!.\s]*$/i.test(entradaOnboarding.trim())){
+      const companyIdCadastro=(session.collected_data as Record<string,unknown>|null)?.companyId;
+      const subscription=typeof companyIdCadastro==="string"?await getSubscription(admin,companyIdCadastro):null;
+      await sendWhatsappText(phoneE164,firstOnboardingMessage(subscription?.status==="ATIVA"&&isAccessAllowed(subscription)));
+      return NextResponse.json({ok:true});
+    }
     const resultado = processOnboardingMessage(
       session.state,
       (session.collected_data ?? {}) as OnboardingCollectedData,
