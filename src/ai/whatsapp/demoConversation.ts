@@ -6,9 +6,11 @@ import { APRESENTACAO_V1 } from "./conversationExperience";
 export type DemoTrack = "frete" | "rota" | "custo" | "combustivel" | "manutencao" | "pneus" | "livre";
 export function askDemoChoice(): OnboardingReply {
   return { kind: "list", text: APRESENTACAO_V1, title: "Experimente na prática", buttonLabel: "Escolher assunto", options: [
-    { id: "combustivel", title: "Combustível" }, { id: "manutencao", title: "Manutenção" },
-    { id: "pneus", title: "Pneus" }, { id: "frete", title: "Fretes e oportunidades" },
-    { id: "funcionalidades", title: "O que mais você faz?" },
+    { id: "frete", title: "Analisar um frete" },
+    { id: "rota", title: "Calcular uma rota" },
+    { id: "custo", title: "Calcular um custo" },
+    { id: "funcionalidades", title: "O que o Frota IA faz?" },
+    { id: "demo_ver_planos", title: "Conhecer os planos" },
   ] };
 }
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -25,7 +27,7 @@ export function resolverEscolhaDemo(texto: string): DemoTrack | "funcionalidades
   return null;
 }
 export function ehAtalhoDemo(texto: string): boolean {
-  return /^(frete|fretes e oportunidades|rota|custo|combustivel|manutencao|pneus|livre|analisar um frete|calcular uma rota|calcular custo de viagem)$/.test(norm(texto));
+  return /^(frete|fretes e oportunidades|rota|custo|combustivel|manutencao|pneus|livre|analisar um frete|calcular uma rota|calcular um custo|calcular custo de viagem)$/.test(norm(texto));
 }
 export const TRANSICAO_POR_TRACK: Record<DemoTrack, string> = {
   frete: "Me mande a oferta do frete e o que já sabe da viagem. Para carga de retorno, explico como o Radar funciona nas fontes disponíveis.",

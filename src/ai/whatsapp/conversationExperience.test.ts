@@ -3,7 +3,7 @@ import { APRESENTACAO_V1, SUGESTOES_V1, ajudaConversacionalV1, resolverSugestaoV
 import { processOnboardingMessage } from "./onboardingConversation";
 describe("experiência V1", () => {
   it("apresenta valor e mídia antes do plano, sem preço novo", () => {
-    expect(APRESENTACAO_V1).toContain("antes de escolher um plano");
+    expect(APRESENTACAO_V1).toContain("Quer experimentar?");
     expect(APRESENTACAO_V1).toContain("áudio, foto ou documento");
     expect(APRESENTACAO_V1).not.toContain("R$");
     expect(ajudaConversacionalV1()).toContain("fontes disponíveis");

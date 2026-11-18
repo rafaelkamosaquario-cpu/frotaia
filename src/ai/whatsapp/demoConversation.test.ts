@@ -6,8 +6,8 @@ describe("askDemoChoice — menu pequeno pré-cadastro (inversão do funil, 09/2
     const reply = askDemoChoice();
     expect(reply.kind).toBe("list");
     if (reply.kind !== "list") throw new Error("esperava list");
-    expect(reply.options.map((o) => o.id)).toEqual(["combustivel", "manutencao", "pneus", "frete", "funcionalidades"]);
-    expect(reply.text).toContain("antes de escolher um plano");
+    expect(reply.options.map((o) => o.id)).toEqual(["frete", "rota", "custo", "funcionalidades", "demo_ver_planos"]);
+    expect(reply.text).toContain("Quer experimentar?");
   });
 
   it("nunca pede nome/perfil/cidade — não é o onboarding completo", () => {
