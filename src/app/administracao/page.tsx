@@ -3,6 +3,7 @@ import {createClient} from "@/lib/supabase/server";
 import {isConsultant} from "@/lib/frota/consultancy";
 import {RodoCoreAdminShell} from "@/components/frota/RodoCoreAdminShell";
 import {CompanyAccessClient} from "@/app/empresas/CompanyAccessClient";
+export const metadata = {title:"RodoCore Sistemas · Painel mestre"};
 export default async function Page(){
   const db=await createClient();const {data:{user}}=await db.auth.getUser();
   if(!user)redirect("/login?next=/administracao");

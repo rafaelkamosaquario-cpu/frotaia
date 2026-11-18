@@ -17,7 +17,7 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
   const pathname = usePathname();
   const { master, compact, canExpand, expanded, toggle, allows } = useFrotaNavigation();
   const supportItems = FROTA_NAV_ITEMS.filter(item => !TIMBER_PRIMARY.some(primary => primary.href === item.href) && allows(item.href));
-  const renderCompactLink = (item: { href: string; label: string }) => <Link key={item.href} href={item.href} onClick={onNavigate} data-tour-href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={cn("flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors", pathname === item.href ? "border-primary/30 bg-primary/10 font-medium text-foreground" : "border-transparent text-muted-foreground hover:bg-primary/5 hover:text-foreground")}><FrotaNavIcon href={item.href} /><span>{item.label}</span></Link>;
+  const renderCompactLink = (item: { href: string; label: string }) => <Link key={item.href} href={item.href} onClick={onNavigate} data-tour-href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={cn("flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors", pathname === item.href ? "border-primary/30 bg-primary/10 font-medium text-foreground" : "border-transparent text-muted-foreground hover:bg-primary/5 hover:text-foreground")}><FrotaNavIcon href={item.href} /><span>{master && item.href === "/frota/dashboard" ? "Visão da empresa selecionada" : item.label}</span></Link>;
 
   if (compact) return <nav aria-label="Menu da operação" className="frota-menu flex-1 space-y-2 overflow-y-auto p-3">
     {master && <RodoCoreAdminNav onNavigate={onNavigate}/>}
@@ -41,7 +41,7 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
         return (
           <div key={group} className="mb-1.5 last:mb-0">
             <p className="px-2.5 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 first:pt-1">
-              {group}
+              {master && group === "Visão geral" ? "Empresa selecionada" : group}
             </p>
             <ul className="flex flex-col gap-0.5">
               {items.map((item) => {
@@ -61,7 +61,7 @@ export function FrotaSidebarContent({ onNavigate }: FrotaSidebarContentProps) {
                       )}
                     >
                       <FrotaNavIcon href={item.href} />
-                      <span className="flex-1 truncate">{item.label}</span>
+                      <span className="flex-1 truncate">{master && item.href === "/frota/dashboard" ? "Visão da empresa selecionada" : item.label}</span>
                       {!item.disponivel && (
                         <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                           em breve
