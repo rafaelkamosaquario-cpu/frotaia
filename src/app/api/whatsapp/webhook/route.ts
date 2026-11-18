@@ -1,3 +1,4 @@
+import { interactiveReply } from "@/lib/whatsapp/interactiveReply";
 import { NextResponse } from "next/server";
 import type Anthropic from "@anthropic-ai/sdk";
 import { timingSafeEqual } from "node:crypto";
@@ -89,6 +90,7 @@ interface ZApiWebhookBody {
   listResponseMessage?: { selectedRowId?: string; title?: string; message?: string };
   buttonsResponseMessage?: { buttonId?: string; message?: string };
   buttonReply?: Record<string, unknown>;
+  quickReplyButton?: {id?: string; displayText?: string};
 }
 
 const TIPOS_IMAGEM_SUPORTADOS = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -120,14 +122,9 @@ function logZapiSendFailure(error: unknown, phoneE164: string, contexto: string)
  * prioridade, já que uma mesma mensagem nunca traz mais de um desses tipos.
  */
 function resolverEntradaOnboarding(body: ZApiWebhookBody): string | undefined {
-  return body.listResponseMessage?.selectedRowId ?? body.buttonsResponseMessage?.buttonId ?? botaoComercial(body) ?? body.text?.message?.trim();
+  return interactiveReply(body) ?? body.text?.message?.trim();
 }
 
-function botaoComercial(body: ZApiWebhookBody): string | undefined {
-  const permitidos = new Set(["demo_ver_planos", "demo_conhecer_funcoes", "demo_agora_nao", "demo_plano_individual", "demo_plano_essencial", "demo_plano_pro"]);
-  const valores = Object.values(body.buttonReply ?? {}).filter((v): v is string => typeof v === "string" && permitidos.has(v));
-  return new Set(valores).size === 1 ? valores[0] : undefined;
-}
 
 /** Envia a `reply` estruturada do onboarding usando o método certo da Z-API conforme o `kind`. */
 async function enviarRespostaOnboarding(phoneE164: string, reply: OnboardingReply): Promise<void> {
@@ -496,7 +493,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    const botaoTocado = body.buttonsResponseMessage?.buttonId ?? botaoComercial(body);
+    const botaoTocado = interactiveReply(body);
     const demoAction=resolveDemoAction(botaoTocado ?? entradaOnboarding ?? undefined);
     if(demoAction){
       demoTrack=demoAction.track;

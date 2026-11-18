@@ -777,6 +777,14 @@ describe("V1 conversacional — demonstração, mídia e checkout preservado", (
     expect(sendWhatsappText).toHaveBeenCalledWith(expect.anything(),expect.stringContaining("Parabéns pela assinatura"));
     expect(processOnboardingMessage).not.toHaveBeenCalled();
   });
+  it.each([{buttonReply:{id:"rigido",displayText:"Rígido (truck)"}},{quickReplyButton:{id:"rigido",displayText:"Rígido (truck)"}}])("callback de rígido chega ao cadastro: %j",async reply=>{
+    const data={companyId:EMPRESA,individualBase:{version:2,step:"kind"}};
+    getOnboardingSession.mockResolvedValue({state:"awaiting_primary_vehicle",collected_data:data});
+    processOnboardingMessage.mockReturnValue({nextState:"awaiting_primary_vehicle",collectedData:{...data,individualBase:{version:2,step:"formula"}},finalize:false,reply:{kind:"text",text:"Qual é a configuração do seu caminhão?"}});
+    await chamarWebhook({phone:"5541999998888",messageId:"rigido-reply",...reply})();
+    expect(processOnboardingMessage).toHaveBeenCalledWith("awaiting_primary_vehicle",data,"rigido");
+    expect(sendWhatsappText).toHaveBeenCalledWith(expect.anything(),"Qual é a configuração do seu caminhão?");
+  });
   it("atalho de documentos solicita foto sem chamar análise vazia", async()=>{
     await chamarWebhook(mensagemTexto("documentos"))();
     expect(updateOnboardingSession).toHaveBeenCalledWith(expect.anything(),USER_ID,expect.objectContaining({collectedData:expect.objectContaining({demoTrack:"documentos"})}));
