@@ -30,9 +30,9 @@ export function ehAtalhoDemo(texto: string): boolean {
   return /^(frete|fretes e oportunidades|rota|custo|combustivel|manutencao|pneus|livre|analisar um frete|calcular uma rota|calcular um custo|calcular custo de viagem)$/.test(norm(texto));
 }
 export const TRANSICAO_POR_TRACK: Record<DemoTrack, string> = {
-  frete: "Me mande a oferta do frete e o que já sabe da viagem. Para carga de retorno, explico como o Radar funciona nas fontes disponíveis.",
+  frete: "De onde sai a carga, para onde vai e qual é o valor oferecido? Pode mandar a oferta por texto, áudio, foto ou documento. Vou consultar a distância de ida para começar.",
   rota: "De onde você sai e para onde vai? Vou consultar a distância e o tempo estimado.",
-  custo: "Qual o percurso total e quanto seu caminhão faz por litro? Pode mandar os dados que já tiver.",
+  custo: "Qual a origem e o destino da viagem? Vou consultar a distância. Se souber, diga também o consumo do caminhão.",
   combustivel: "Quer calcular o gasto da viagem ou conferir o consumo? Pode me contar ou mandar os dados do abastecimento.",
   manutencao: "O que você precisa ver: uma revisão, um gasto ou uma dúvida de manutenção? No teste posso orientar, sem agendar ou registrar serviços.",
   pneus: "Quer comparar pneus ou entender o custo de rodar? Me mande os preços e a duração que você conhece, se tiver.",
@@ -40,9 +40,9 @@ export const TRANSICAO_POR_TRACK: Record<DemoTrack, string> = {
 };
 // Demonstração só usa ferramentas sem escrita operacional.
 export const FERRAMENTAS_POR_TRACK: Record<DemoTrack, FrotaIaToolName[]> = {
-  frete: ["analisar_frete", "calcular_margem", "calcular_valor_minimo_frete", "verificar_piso_minimo_antt"],
-  rota: ["consultar_rota"], custo: ["calcular_custo_viagem", "calcular_combustivel"],
-  combustivel: ["calcular_combustivel", "calcular_custo_viagem"],
+  frete: ["consultar_rota", "calcular_combustivel", "analisar_frete", "calcular_margem", "calcular_valor_minimo_frete", "verificar_piso_minimo_antt"],
+  rota: ["consultar_rota"], custo: ["consultar_rota", "calcular_custo_viagem", "calcular_combustivel"],
+  combustivel: ["consultar_rota", "calcular_combustivel", "calcular_custo_viagem"],
   manutencao: ["consultar_conhecimento_operacional", "calcular_cpk"],
   pneus: ["comparar_pneus", "calcular_cpk", "consultar_conhecimento_operacional"],
   livre: ["analisar_frete", "calcular_combustivel", "calcular_custo_viagem", "calcular_cpk", "calcular_margem", "calcular_valor_minimo_frete", "comparar_pneus", "consultar_rota", "consultar_conhecimento_operacional", "verificar_piso_minimo_antt"],
@@ -52,5 +52,5 @@ export const FERRAMENTA_ALVO_POR_TRACK: Record<DemoTrack, FrotaIaToolName> = {
   combustivel: "calcular_combustivel", manutencao: "consultar_conhecimento_operacional", pneus: "comparar_pneus", livre: "analisar_frete",
 };
 export function demoEntregouValor(track: DemoTrack, executadas: string[] = []): boolean {
-  return executadas.some(nome => FERRAMENTAS_POR_TRACK[track].includes(nome as FrotaIaToolName));
+  return executadas.some(nome => FERRAMENTAS_POR_TRACK[track].includes(nome as FrotaIaToolName) && (nome !== "consultar_rota" || track === "rota"));
 }

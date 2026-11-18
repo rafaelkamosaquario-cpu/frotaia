@@ -769,7 +769,7 @@ describe("V1 conversacional — demonstração, mídia e checkout preservado", (
   });
   it("pedido natural completo segue direto sem pedir reenvio", async () => {
     await chamarWebhook(mensagemTexto("Quanto gasto de diesel em 600 km?"))();
-    expect(gerarRespostaAssistente).toHaveBeenCalledWith(expect.objectContaining({ modoDemo: true, experienciaWhatsappV1: true, ferramentasPermitidas: ["calcular_combustivel", "calcular_custo_viagem"] }));
+    expect(gerarRespostaAssistente).toHaveBeenCalledWith(expect.objectContaining({ modoDemo: true, experienciaWhatsappV1: true, ferramentasPermitidas: ["consultar_rota", "calcular_combustivel", "calcular_custo_viagem"] }));
   });
   it.each(["image", "audio", "document"])("mídia %s já no menu segue para análise restrita", async (tipo) => {
     prepararEntradaDemo.mockResolvedValue({ ok: true, texto: "arquivo", conteudoMultimodal: [{ type: "image" }], extra: { content_type: tipo } });

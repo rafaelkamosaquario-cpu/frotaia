@@ -46,6 +46,7 @@ export interface ConsultarRotaEntrada {
    * outro cálculo.
    */
   enviarMapaVisual?: boolean;
+  incluirAlternativas?: boolean;
 }
 
 export interface ConsultarRotaResultado extends ResultadoFerramentaBase {
@@ -58,6 +59,8 @@ export interface ConsultarRotaResultado extends ResultadoFerramentaBase {
 
   origemFormatada?: string;
   destinoFormatado?: string;
+  linkMapa?: string;
+  alternativas?: Array<{descricao:string;distanciaKm:number;duracaoMinutos:number}>;
   distanciaKm?: number;
   duracaoMinutos?: number;
   /**
@@ -210,7 +213,8 @@ async function executar(entrada: ConsultarRotaEntrada): Promise<ConsultarRotaRes
 
     const rota = await calcularRota(
       { latitude: origemGeo.latitude, longitude: origemGeo.longitude },
-      { latitude: destinoGeo.latitude, longitude: destinoGeo.longitude }
+      { latitude: destinoGeo.latitude, longitude: destinoGeo.longitude },
+      entrada.incluirAlternativas ?? false
     );
 
     const distanciaKm = arredondar(rota.distanciaMetros / 1000, 1);
@@ -248,6 +252,8 @@ async function executar(entrada: ConsultarRotaEntrada): Promise<ConsultarRotaRes
       mensagemResumo: `Distância: ${distanciaKm} km — duração estimada: ${duracaoMinutos} min.${mapaVisualEnviado ? " Mapa da rota enviado pelo WhatsApp." : ""}`,
       origemFormatada: origemGeo.enderecoFormatado,
       destinoFormatado: destinoGeo.enderecoFormatado,
+      linkMapa: "https://www.google.com/maps/dir/?api=1&origin="+encodeURIComponent(origemGeo.enderecoFormatado)+"&destination="+encodeURIComponent(destinoGeo.enderecoFormatado)+"&travelmode=driving",
+      alternativas: rota.alternativas?.map(r=>({descricao:r.descricao,distanciaKm:arredondar(r.distanciaMetros/1000,1),duracaoMinutos:arredondar(r.duracaoSegundos/60,0)})),
       distanciaKm,
       duracaoMinutos,
       polylineCodificada: rota.polylineCodificada,
@@ -268,6 +274,7 @@ async function executar(entrada: ConsultarRotaEntrada): Promise<ConsultarRotaRes
 }
 
 const PARAMETROS: DefinicaoParametroFerramenta[] = [
+  {nome:"incluirAlternativas",tipo:"boolean",obrigatorio:false,descricao:"Consulte também alternativas reais do Google. Compare distância e duração apenas das rotas retornadas. Não garante rotas próprias para caminhões nem ausência de pedágios."},
   {
     nome: "modo",
     tipo: "enum",

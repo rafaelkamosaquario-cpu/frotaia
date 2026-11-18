@@ -69,6 +69,7 @@ export async function geocodificarEndereco(endereco: string): Promise<Coordenada
 }
 
 export interface RotaCalculada {
+  alternativas?: Array<{distanciaMetros:number;duracaoSegundos:number;descricao:string;polylineCodificada?:string}>;
   distanciaMetros: number;
   duracaoSegundos: number;
   /**
@@ -84,7 +85,8 @@ export interface RotaCalculada {
 
 export async function calcularRota(
   origem: { latitude: number; longitude: number },
-  destino: { latitude: number; longitude: number }
+  destino: { latitude: number; longitude: number },
+  incluirAlternativas = false
 ): Promise<RotaCalculada> {
   const { GOOGLE_MAPS_API_KEY } = getGoogleMapsConfig();
 
@@ -93,11 +95,12 @@ export async function calcularRota(
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
-      "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline",
+      "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.description",
     },
     body: JSON.stringify({
       origin: { location: { latLng: { latitude: origem.latitude, longitude: origem.longitude } } },
       destination: { location: { latLng: { latitude: destino.latitude, longitude: destino.longitude } } },
+      computeAlternativeRoutes: incluirAlternativas,
       travelMode: "DRIVE",
       routingPreference: "TRAFFIC_AWARE",
       languageCode: "pt-BR",
@@ -110,7 +113,7 @@ export async function calcularRota(
   }
 
   const body = (await response.json()) as {
-    routes?: Array<{ distanceMeters: number; duration: string; polyline?: { encodedPolyline?: string } }>;
+    routes?: Array<{ description?:string; distanceMeters: number; duration: string; polyline?: { encodedPolyline?: string } }>;
   };
 
   if (!body.routes || body.routes.length === 0) {
@@ -120,7 +123,7 @@ export async function calcularRota(
   const [rota] = body.routes;
   const duracaoSegundos = Number(rota.duration.replace("s", ""));
 
-  return { distanciaMetros: rota.distanceMeters, duracaoSegundos, polylineCodificada: rota.polyline?.encodedPolyline };
+  return { distanciaMetros: rota.distanceMeters, duracaoSegundos, polylineCodificada: rota.polyline?.encodedPolyline, ...(incluirAlternativas ? {alternativas:body.routes.map((r,i)=>({distanciaMetros:r.distanceMeters,duracaoSegundos:Number(r.duration.replace("s","")),descricao:r.description??("Rota "+(i+1)),polylineCodificada:r.polyline?.encodedPolyline}))} : {}) };
 }
 
 /**

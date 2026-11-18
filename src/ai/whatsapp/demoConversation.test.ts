@@ -31,6 +31,11 @@ describe("conversa natural e acesso restrito", () => {
     }
   });
   it("CTA só após sucesso de ferramenta disponível", () => {
+    expect(FERRAMENTAS_POR_TRACK.frete).toContain("consultar_rota");
+    expect(FERRAMENTAS_POR_TRACK.custo).toContain("consultar_rota");
+    expect(demoEntregouValor("frete", ["consultar_rota"])).toBe(false);
+    expect(demoEntregouValor("custo", ["consultar_rota"])).toBe(false);
+    expect(demoEntregouValor("rota", ["consultar_rota"])).toBe(true);
     expect(demoEntregouValor("combustivel", ["calcular_combustivel"])).toBe(true);
     expect(demoEntregouValor("combustivel", [])).toBe(false);
     expect(demoEntregouValor("combustivel", ["registrar_despesa"])).toBe(false);
@@ -66,7 +71,7 @@ describe("TRANSICAO_POR_TRACK / FERRAMENTAS_POR_TRACK / FERRAMENTA_ALVO_POR_TRAC
 
   it("nenhum track libera as 39 ferramentas completas — cada um tem um recorte pequeno", () => {
     (["frete", "rota", "custo"] as const).forEach((track) => {
-      expect(FERRAMENTAS_POR_TRACK[track].length).toBeLessThanOrEqual(4);
+      expect(FERRAMENTAS_POR_TRACK[track].length).toBeLessThanOrEqual(6);
     });
   });
 });
