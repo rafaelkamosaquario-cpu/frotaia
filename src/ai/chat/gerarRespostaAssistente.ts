@@ -1,3 +1,5 @@
+import {getAppAddonState} from "@/services/supabase/appAddonService";
+import {addonToolAllowed} from "@/lib/individual/addon";
 import { runtimeAccessPrompt } from "./runtimeAccess";
 import "server-only";
 import { construirTextoAjudaCompleto, ehPedidoExatoDeApresentacao } from "@/lib/helpMenu";
@@ -113,6 +115,8 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     await client.from("conversations").update({ title: truncate(mensagemUsuario, 48) }).eq("id", conversation.id);
   }
 
+  const appState = params.modoDemo ? {allowed:false,baseActive:false,preserved:false,until:null} : customerContext.profile?.is_admin ? {allowed:true,baseActive:true,preserved:true,until:null} : await getAppAddonState(companyId);
+  const appInstruction = appState.preserved ? "" : "\nOFERTA VERIFICADA: WhatsApp registra receitas/despesas e analisa fretes/custos. Aplicativo adicional R$9,90/mês em https://frotaia.up.railway.app/adicional-aplicativo, requer plano-base ativo. Avisos, Agenda Google, notícias e relatórios são funções do aplicativo; no WhatsApp oriente abrir o aplicativo. Não prometa agendamento nem PDF sem ferramenta autorizada. Instalação não ativa acesso. Situação do adicional: "+(appState.allowed?"ativo":"não ativo")+".";
   const historico = await listMessages(client, conversation.id, 0, 30);
   const mensagensAnthropic: Anthropic.MessageParam[] = historico
     .slice()
@@ -149,8 +153,8 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
   });
 
   const anthropic = createAnthropicClient();
-  const system = construirSystemPrompt(customerContext, vehicleContext, new Date(), params.modoDemo, params.experienciaWhatsappV1) + "\n\n" + runtimeAccessPrompt(!!params.modoDemo, params.operationalAccessAllowed);
-  const todasFerramentas = construirFerramentasAnthropic();
+  const system = construirSystemPrompt(customerContext, vehicleContext, new Date(), params.modoDemo, params.experienciaWhatsappV1) + "\n\n" + runtimeAccessPrompt(!!params.modoDemo, params.operationalAccessAllowed) + appInstruction;
+  const todasFerramentas = construirFerramentasAnthropic().filter(f=>addonToolAllowed(f.name,appState,!!params.experienciaWhatsappV1));
   const ferramentasProprias = params.ferramentasPermitidas
     ? todasFerramentas.filter((f) => params.ferramentasPermitidas!.includes(f.name as FrotaIaToolName))
     : todasFerramentas;
@@ -218,9 +222,9 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     const resultadosFerramentas: Anthropic.ToolResultBlockParam[] = [];
 
     for (const bloco of blocosFerramenta) {
-      if (params.ferramentasPermitidas && !params.ferramentasPermitidas.includes(bloco.name as FrotaIaToolName)) {
+      if (!addonToolAllowed(bloco.name,appState,!!params.experienciaWhatsappV1) || (params.ferramentasPermitidas && !params.ferramentasPermitidas.includes(bloco.name as FrotaIaToolName))) {
         resultadosFerramentas.push({ type: "tool_result", tool_use_id: bloco.id,
-          content: "Esta ferramenta não está disponível nesta demonstração. Não foi executada.", is_error: true });
+          content: "Esta ferramenta não está disponível neste canal ou acesso. Não foi executada. Consulte as condições do adicional em https://frotaia.up.railway.app/adicional-aplicativo.", is_error: true });
         continue;
       }
       const ferramenta = FERRAMENTAS_FROTA_IA.find((f) => f.nome === bloco.name);

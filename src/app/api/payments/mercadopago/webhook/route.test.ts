@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
+const addonRpc=vi.hoisted(()=>vi.fn());
+vi.mock("@/services/supabase/appAddonService",()=>({addonDb:()=>({rpc:addonRpc})}));
 
 /**
  * Testa o branching da rota (config ausente, assinatura inválida, tipo de
@@ -73,6 +75,17 @@ function chamarWebhook(opts: { body?: unknown; dataId?: string; type?: string; x
 }
 
 describe("POST /api/payments/mercadopago/webhook", () => {
+  it.each(["approved","refunded","charged_back"])("adicional %s não altera nem cancela plano principal",async(status)=>{
+    addonRpc.mockResolvedValue({error:null});
+    buscarPagamento.mockResolvedValue({status,externalReference:"12345678-1234-1234-1234-123456789012|APP_INDIVIDUAL_1M",valorCentavos:990,currency:"BRL",approvedAt:"2026-11-18T10:00:00Z"});
+    expect((await chamarWebhook({dataId:"123456789",type:"payment"})()).status).toBe(200);
+    expect(addonRpc).toHaveBeenCalledWith("confirm_individual_app_payment",expect.objectContaining({p_status:status,p_amount:990}));
+    expect(atualizarAssinaturaPorPagamento).not.toHaveBeenCalled();expect(cancelarAssinatura).not.toHaveBeenCalled();expect(updateOnboardingSession).not.toHaveBeenCalled();
+  });
+  it("adicional com valor errado não libera",async()=>{
+    addonRpc.mockClear();buscarPagamento.mockResolvedValue({status:"approved",externalReference:"12345678-1234-1234-1234-123456789012|APP_INDIVIDUAL_1M",valorCentavos:1,currency:"BRL"});
+    expect((await chamarWebhook({dataId:"123456789",type:"payment"})()).status).toBe(422);expect(addonRpc).not.toHaveBeenCalled();
+  });
   it("ativa mensal avulso por um mês e limpa vínculo recorrente", async () => {
     buscarPagamento.mockResolvedValue({ status: "approved", externalReference: "empresa-1|INDIVIDUAL_MENSAL|AVULSO", valorCentavos: 8990, approvedAt: "2026-09-24T10:00:00Z" });
     expect((await chamarWebhook({ dataId: "monthly-pix", type: "payment" })()).status).toBe(200);

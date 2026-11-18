@@ -19,7 +19,11 @@ export function pixCrc16(value: string) {
 }
 export function manualPixCode(plan: DirectPlan) {
   if (!DIRECT_PLANS.includes(plan)) throw new Error("Plano inválido.");
-  const amount = (CATALOGO_OFERTAS[plan].precoCentavos / 100).toFixed(2);
+  return staticPixCode(CATALOGO_OFERTAS[plan].precoCentavos);
+}
+export function staticPixCode(cents:number) {
+  if(!Number.isInteger(cents)||cents<=0)throw new Error("Valor inválido.");
+  const amount = (cents / 100).toFixed(2);
   const payload = field("00", "01") + field("26", field("00", "br.gov.bcb.pix") + field("01", MANUAL_PIX_KEY))
     + field("52", "0000") + field("53", "986") + field("54", amount) + field("58", "BR")
     + field("59", MANUAL_PIX_NAME) + field("60", "Sao Paulo") + field("62", field("05", "***")) + "6304";

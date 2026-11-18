@@ -1,7 +1,7 @@
 import { construirTextoAjudaCompleto } from "@/lib/helpMenu";
 
 /** Experiência exclusiva do WhatsApp V1; ferramentas e painel continuam disponíveis. */
-export const APRESENTACAO_V1 = "Olá! Sou o *Frota IA*, seu assistente de inteligência artificial para o seu caminhão e sua operação. 🚛\n\nAjudo você a *entender seus custos, analisar fretes e organizar a rotina*, aqui no WhatsApp.\n\nPosso ajudar com combustível, manutenção, pneus, rotas e jornadas. No plano Individual, você também pode registrar despesas e receitas, organizar lembretes e consultar sua operação no aplicativo opcional.\n\n*Pode escrever, mandar áudio, foto ou documento.*\n\nQuer experimentar? *Vamos analisar um frete, uma rota ou um custo da sua viagem. Por onde começamos?*";
+export const APRESENTACAO_V1 = "Olá! Sou o *Frota IA*, seu assistente de inteligência artificial para o seu caminhão e sua operação. 🚛\n\nAjudo você a *entender seus custos, analisar fretes e organizar a rotina*, aqui no WhatsApp.\n\nPosso ajudar com combustível, manutenção, pneus, rotas e jornadas. No plano WhatsApp, você também pode registrar despesas e receitas. O aplicativo é um adicional para consultar sua operação, relatórios, notícias e organizar avisos e lembretes.\n\n*Pode escrever, mandar áudio, foto ou documento.*\n\nQuer experimentar? *Vamos analisar um frete, uma rota ou um custo da sua viagem. Por onde começamos?*";
 export function ajudaConversacionalV1(): string {
   return construirTextoAjudaCompleto();
 }

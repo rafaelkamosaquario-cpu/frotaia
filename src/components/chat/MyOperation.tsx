@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import {currentOperationMonth,type OperationData} from "@/lib/individual/operation";
 import styles from "./MyOperation.module.css";
+import {AppNews} from "./AppNews";
 const money=(value:number)=>value.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const date=(value:string)=>new Date(value.length===10?`${value}T12:00:00-03:00`:value).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo"});
 const state=(value:string,income=false)=>value==="settled"?(income?"Recebida":"Paga"):value==="pending"?"Pendente":"Baixa não informada";
@@ -75,6 +76,7 @@ export function MyOperation({revision,onAsk}:{revision:number;onAsk:(text:string
         {data.enabled.includes("pneus")&&<><h3>Pneus</h3>{!data.tires.length&&<p>Nenhum pneu cadastrado no controle operacional.</p>}{data.tires.map(r=><article key={r.id}><strong>{r.title}</strong><small>{r.position||"Posição não informada"} · {({mounted:"Montado",stock:"Estoque",scrapped:"Baixado"} as Record<string,string>)[r.status]||r.status}</small></article>)}</>}
         <button onClick={()=>onAsk("Consulte meus registros de manutenção e pneus e explique o que precisa de atenção. Não estime dados ausentes.")}>Perguntar sobre os cuidados</button>
       </details>}
+      {data.enabled.includes("noticias")&&<AppNews onAsk={onAsk}/>}
     </>}
   </section>;
 }

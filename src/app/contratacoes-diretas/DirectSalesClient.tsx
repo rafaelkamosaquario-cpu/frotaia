@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { CATALOGO_OFERTAS, formatarReais } from "@/lib/mercadopago/catalog";
 import { DIRECT_PLANS, type DirectPlan } from "@/lib/mercadopago/directSales";
 import { PreparedPix } from "./PreparedPix";
+import { AppAddonPanel } from "./AppAddonPanel";
 type Company={id:string;name:string;fleet_panel_enabled:boolean;subscription:{plan:string;status:string;valido_ate:string|null;hasProviderLink:boolean}|null};
 type Receipt={id:string;reference:string;plan:string;amount_cents:number;access_until:string};
 const field="block w-full rounded-lg border border-border bg-background p-3 mt-1";
@@ -42,5 +43,6 @@ export function DirectSalesClient(){
  </form>}
  {share&&<section className="space-y-3 rounded-lg border border-emerald-500 p-4"><h2 className="text-xl" role="status">Liberação confirmada</h2><p>Copie e envie ao cliente. Nenhuma mensagem foi disparada automaticamente.</p><textarea className={`${field} min-h-56`} readOnly value={share}/><button className={button} onClick={()=>run(()=>navigator.clipboard.writeText(share))}>Copiar mensagem</button></section>}
  {!!history.length&&<section className="space-y-3"><h2 className="text-xl">Últimas liberações deste cliente</h2>{history.map(r=><article key={r.id} className="rounded-lg border p-3"><p>{r.plan} · {formatarReais(r.amount_cents)}</p><p>Transação {r.reference} · acesso até {new Date(r.access_until).toLocaleString("pt-BR")}</p></article>)}</section>}
+ {company&&<AppAddonPanel key={company.id} companyId={company.id} phone={matchedPhone} name={company.name}/>}
  </div></main>;
 }

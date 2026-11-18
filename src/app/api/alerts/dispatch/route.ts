@@ -1,3 +1,4 @@
+import {getAppAddonState} from "@/services/supabase/appAddonService";
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
   let falhas = 0;
 
   for (const alerta of devidos) {
+    if(!alerta.company_id || !(await getAppAddonState(alerta.company_id)).allowed)continue;
     const canais = await listChannelsForUser(admin, alerta.user_id);
     const canalWhatsapp = canais.find((c) => c.channel_type === "whatsapp" && c.phone_e164);
 

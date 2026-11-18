@@ -1,3 +1,4 @@
+import {getAppAddonState} from "@/services/supabase/appAddonService";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildAuthorizationUrl } from "@/lib/google/calendarClient";
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appOrigin}/?calendar_erro=sem_empresa`);
   }
 
+  if(!(await getAppAddonState(companyId)).allowed)return NextResponse.redirect(`${appOrigin}/adicional-aplicativo`);
   const state = createSignedToken({ userId, companyId }, STATE_TTL_SECONDS);
   return NextResponse.redirect(buildAuthorizationUrl(state));
 }

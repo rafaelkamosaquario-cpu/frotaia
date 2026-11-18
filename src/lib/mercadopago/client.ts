@@ -274,3 +274,20 @@ export function validarAssinaturaWebhook(input: ValidarWebhookInput): boolean {
   const bufHash = Buffer.from(hash);
   return bufComputed.length === bufHash.length && timingSafeEqual(bufComputed, bufHash);
 }
+
+
+/** Separate prepaid add-on; never overwrites or cancels the base subscription. */
+export async function criarPagamentoAdicional(companyId: string, method: "pix" | "credito"): Promise<LinkPagamentoResultado> {
+ const response = await fetch(MP_API_BASE+"/checkout/preferences", {
+  method:"POST",signal:AbortSignal.timeout(20000),headers:authHeaders(),
+  body:JSON.stringify({
+   items:[{title:"Frota IA — adicional aplicativo, 1 mês sem renovação automática",quantity:1,unit_price:9.90,currency_id:"BRL"}],
+   external_reference:companyId+"|APP_INDIVIDUAL_1M",
+   payment_methods:paymentMethods(method,"INDIVIDUAL_MENSAL"),
+   notification_url:urlPadraoRetorno()+"/api/payments/mercadopago/webhook",
+   back_urls:{success:urlPadraoRetorno()+"/adicional-aplicativo",pending:urlPadraoRetorno()+"/adicional-aplicativo",failure:urlPadraoRetorno()+"/adicional-aplicativo"},
+  }),
+ });
+ if(!response.ok)return parseErrorSafely(response);
+ return validarLinkPagamento(await response.json());
+}

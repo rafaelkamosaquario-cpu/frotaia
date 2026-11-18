@@ -1,3 +1,4 @@
+import {getAppAddonState} from "@/services/supabase/appAddonService";
 import type Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Seu acesso ao assistente precisa ser ativado ou renovado." }, { status: 403 });
     }
   }
+  if(!customerContext.profile?.is_admin && !(await getAppAddonState(companyId)).allowed) return NextResponse.json({error:"Ative o adicional do aplicativo em /adicional-aplicativo."},{status:403});
   const vehicleContext = await loadVehicleContext(supabase, companyId);
 
   const conversation = body.conversationId

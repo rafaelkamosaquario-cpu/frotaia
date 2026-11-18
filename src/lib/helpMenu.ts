@@ -64,14 +64,14 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "documentos",
     emoji: "📄",
     titulo: "Documentos e vencimentos",
-    descricao: "Leio fotos, PDFs e planilhas compatíveis enviados pelo WhatsApp e gero relatórios em PDF das suas análises. No aplicativo, converse por texto ou voz compatível; arquivos são enviados pelo WhatsApp.",
+    descricao: "Leio fotos, PDFs e planilhas compatíveis enviados pelo WhatsApp. A geração e consulta de relatórios são funções do adicional do aplicativo. No aplicativo, converse por texto ou voz compatível; arquivos são enviados pelo WhatsApp.",
     exemplos: ["Manda foto de nota fiscal, CRLV, CT-e ou comprovante de seguro", "Gera o relatório dessa análise em PDF", "Quais documentos eu já gerei?"],
   },
   {
     id: "alertas_agenda",
     emoji: "📅",
     titulo: "Agenda e lembretes",
-    descricao: "Crio lembretes de vencimento, cobrança e manutenção por data e horário, com confirmação do agendamento. A conexão da Agenda Google é opcional.",
+    descricao: "No adicional do aplicativo, crio lembretes de vencimento, cobrança e manutenção por data e horário, com confirmação do agendamento. A conexão da Agenda Google depende da sua autorização.",
     exemplos: ["Me avise 15 dias antes de vencer o seguro", "Me lembra de cobrar esse frete daqui a 30 dias", "Marca a revisão do caminhão pra semana que vem"],
   },
   {
@@ -99,7 +99,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     id: "noticias",
     emoji: "📰",
     titulo: "Notícias do transporte",
-    descricao: "Busco notícia e informação atualizada do setor em fontes como ANTT, ANP, PRF e imprensa especializada — e posso mandar um resumo todo dia, se você quiser.",
+    descricao: "No adicional do aplicativo, consulte notícias e informações do setor em fontes como ANTT, ANP, PRF e imprensa especializada. O resumo disponível informa a data; você também pode pedir uma busca atualizada.",
     exemplos: ["Quero receber notícias do setor todo dia", "Pode desativar as notícias diárias"],
   },
 ];
@@ -192,6 +192,6 @@ export function construirTextoAjudaCompleto(): string {
   const categorias = CATEGORIAS_AJUDA.map((categoria) =>
     `${categoria.titulo}\n${categoria.descricao}`
   ).join("\n\n");
-  return `${intro}\n\n${categorias}`;
+  return `${intro}\n\n${categorias}\n\nO plano WhatsApp e o adicional do aplicativo são contratados separadamente. Adicional: R$ 9,90 por um mês, sem renovação automática; requer plano WhatsApp ativo. Clientes com acesso já incluído mantêm sua condição. Instalar o aplicativo não ativa as funções pagas. Conheça: https://frotaia.up.railway.app/adicional-aplicativo`;
 }
 

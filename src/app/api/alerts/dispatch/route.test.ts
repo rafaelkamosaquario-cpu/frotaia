@@ -30,7 +30,7 @@ vi.mock("@/services/supabase/channelIdentityService", () => ({
 }));
 
 function fakeAlert(overrides: Partial<ScheduledAlertRow> = {}): ScheduledAlertRow {
-  return { id: "alert-1", user_id: "user-1", title: "Vencimento do seguro", notes: null, ...overrides } as ScheduledAlertRow;
+  return { id: "alert-1", company_id:"company-a", user_id: "user-1", title: "Vencimento do seguro", notes: null, ...overrides } as ScheduledAlertRow;
 }
 
 function fakeChannel(overrides: Partial<UserChannelRow> = {}): UserChannelRow {
@@ -49,6 +49,8 @@ describe("GET /api/alerts/dispatch", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    const query={eq:()=>query,maybeSingle:async()=>({data:null,error:null})};
+    from.mockImplementation(()=>({select:()=>query}));
     process.env.ALERTS_DISPATCH_SECRET = SECRET;
     isWhatsappConfigured.mockReturnValue(true);
   });
@@ -132,3 +134,4 @@ describe("GET /api/alerts/dispatch", () => {
     expect(corpo).toEqual({ ok: true, verificados: 1, enviados: 0, falhas: 1 });
   });
 });
+vi.mock("@/services/supabase/appAddonService",()=>({getAppAddonState:async()=>({allowed:true,baseActive:true,preserved:true,until:null})}));

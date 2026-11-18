@@ -1,3 +1,4 @@
+import {getAppAddonState} from "@/services/supabase/appAddonService";
 import { NextResponse } from "next/server";
 import { verifySignedToken } from "@/lib/google/signedToken";
 import { connectGoogleCalendar } from "@/services/google/googleCalendarService";
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appOrigin}/?calendar_erro=sem_empresa`);
   }
 
+  if(!(await getAppAddonState(payload.companyId)).allowed)return NextResponse.redirect(`${appOrigin}/adicional-aplicativo`);
   try {
     await connectGoogleCalendar({ userId: payload.userId, companyId: payload.companyId, code });
   } catch (err) {

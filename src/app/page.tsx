@@ -1,3 +1,4 @@
+import {getAppAddonState} from "@/services/supabase/appAddonService";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadCustomerContext } from "@/ai/context/customerContext";
@@ -77,6 +78,7 @@ export default async function Home({
     return <main className="mx-auto max-w-lg p-8"><h1 className="text-2xl font-bold">Ative seu Frota IA</h1><p className="my-5">Seu acesso precisa ser ativado ou renovado. Se já pagou por Pix, aguarde a conferência do responsável. Não faça outro pagamento sem conferir.</p><a className="underline" href={directSalesUrl("INDIVIDUAL_MENSAL")}>Falar com Rafael sobre o Pix</a></main>;
   }
 
+  if (!context.profile?.is_admin && !(await getAppAddonState(context.company.id)).allowed) redirect("/adicional-aplicativo");
   // Veiculo e opcional (mesmo principio do onboarding via WhatsApp: coleta
   // progressiva, perguntada sob demanda pela IA quando uma ferramenta
   // precisar — ver systemPrompt.ts). Nunca gatear a entrada no painel por

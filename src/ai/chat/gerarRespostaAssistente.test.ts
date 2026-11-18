@@ -217,3 +217,4 @@ describe("gerarRespostaAssistente — ferramentasExecutadas no retorno", () => {
     expect(resposta.ferramentasExecutadas).toEqual([]);
   });
 });
+vi.mock("@/services/supabase/appAddonService",()=>({getAppAddonState:async()=>({allowed:true,baseActive:true,preserved:true,until:null})}));

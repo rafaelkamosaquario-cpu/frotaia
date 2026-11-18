@@ -155,3 +155,4 @@ describe("GET /api/news/dispatch", () => {
     expect(corpo).toEqual({ ok: true, empresas: 1, enviados: 1, falhas: 1 });
   });
 });
+vi.mock("@/services/supabase/appAddonService",()=>({getAppAddonState:async()=>({allowed:true,baseActive:true,preserved:true,until:null})}));

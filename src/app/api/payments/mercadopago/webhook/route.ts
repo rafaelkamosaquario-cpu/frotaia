@@ -1,3 +1,5 @@
+import { parseAddonReference, addonPaymentValid } from "@/lib/individual/addon";
+import { addonDb } from "@/services/supabase/appAddonService";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isMercadoPagoConfigured, getMercadoPagoWebhookSecret } from "@/lib/mercadopago/config";
@@ -150,6 +152,17 @@ export async function POST(request: Request) {
   try {
     if (tipo === "payment") {
       const pagamento = await buscarPagamento(resourceId);
+      const addonCompany = parseAddonReference(pagamento.externalReference);
+      if (addonCompany) {
+        if (!["approved","refunded","charged_back","cancelled"].includes(pagamento.status)) return NextResponse.json({ok:true});
+        if (!addonPaymentValid(pagamento.valorCentavos,pagamento.currency)) return NextResponse.json({error:"Valor do adicional inválido."},{status:422});
+        const {error} = await addonDb().rpc("confirm_individual_app_payment", {
+          p_company:addonCompany,p_source:"mercadopago",p_reference:resourceId,
+          p_amount:pagamento.valorCentavos,p_paid_at:pagamento.approvedAt ?? new Date().toISOString(),p_status:pagamento.status
+        });
+        if(error) return NextResponse.json({error:"Adicional não confirmado. Requer nova tentativa/conferência."},{status:503});
+        return NextResponse.json({ok:true,addon:true});
+      }
       const referencia = pagamento.externalReference ? decodificarReferenciaExterna(pagamento.externalReference) : null;
       const pagamentoAvulso = referencia && (referencia.avulso || CATALOGO_OFERTAS[referencia.plano].cobranca === "unica");
       if (pagamentoAvulso && pagamento.status === "approved" && (pagamento.valorCentavos !== CATALOGO_OFERTAS[referencia.plano].precoCentavos || (pagamento.currency !== undefined && pagamento.currency !== "BRL"))) {

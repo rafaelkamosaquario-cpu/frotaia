@@ -1,6 +1,8 @@
 import {describe,it,expect,vi,beforeEach} from "vitest";
 const m=vi.hoisted(()=>({user:vi.fn(),context:vi.fn(),subscription:vi.fn(),allowed:vi.fn(),modules:vi.fn()}));
 vi.mock("server-only",()=>({}));
+const addon=vi.hoisted(()=>vi.fn(async()=>({allowed:true})));
+vi.mock("./appAddonService",()=>({getAppAddonState:addon}));
 vi.mock("@/lib/supabase/server",()=>({createClient:async()=>({auth:{getUser:m.user}})}));
 vi.mock("@/ai/context/customerContext",()=>({loadCustomerContext:m.context}));
 vi.mock("./subscriptionService",()=>({getSubscription:m.subscription,isAccessAllowed:m.allowed}));
@@ -14,4 +16,6 @@ describe("acesso individual",()=>{
  it("nega assinatura inativa",async()=>{m.allowed.mockReturnValue(false);expect((await individualAccess()).ok).toBe(false);});
  it("preserva módulos limitados",async()=>{m.modules.mockResolvedValue({enabled:["assistente"]});const r=await individualAccess();expect(r.ok&&r.enabled).toEqual(["assistente"]);});
  it("permite cliente individual ativo",async()=>{expect((await individualAccess()).ok).toBe(true);});
+ it("nega aplicativo quando adicional não está ativo",async()=>{addon.mockResolvedValueOnce({allowed:false});expect(await individualAccess()).toEqual({ok:false,status:403});});
+ it("preserva ADM sem exigir adicional",async()=>{m.context.mockResolvedValue({company:{id:"c"},role:"owner",profile:{is_admin:true}});expect((await individualAccess()).ok).toBe(true);});
 });
