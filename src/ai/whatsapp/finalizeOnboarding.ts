@@ -1,3 +1,4 @@
+import { getActiveCostProfile, replaceCostProfile } from "@/services/supabase/vehicleCostProfileService";
 import { cargoSummary } from "./cargoProfile";
 import "server-only";
 import { createCompanyWithOwner, updateCompany } from "@/services/supabase/companyService";
@@ -172,11 +173,12 @@ export async function finalizeOnboarding(
       const { brand, model, modelYear } = parseVehicleDescription(collectedData.primaryVehicleRaw);
       const vehicleInput = {
         name: collectedData.primaryVehicleRaw ? truncate(collectedData.primaryVehicleRaw, 120) : undefined,
-        notes: [collectedData.primaryVehicleRaw, collectedData.vehicleSetup?.label, collectedData.individualBase?.body ? `Carroceria: ${collectedData.individualBase.body}` : undefined, collectedData.cargoProfile ? cargoSummary(collectedData.cargoProfile) : undefined].filter(Boolean).join("\n"),
+        notes: [collectedData.primaryVehicleRaw, collectedData.vehicleSetup?.label, collectedData.individualBase?.manufactureYear ? `Ano de fabricação informado: ${collectedData.individualBase.manufactureYear}` : undefined, collectedData.individualBase?.fuelConfirmed ? `Uso de Arla: ${collectedData.individualBase.usesArla ? "sim" : "não"}` : undefined, collectedData.individualBase?.body ? `Carroceria: ${collectedData.individualBase.body}` : undefined, collectedData.cargoProfile ? cargoSummary(collectedData.cargoProfile) : undefined].filter(Boolean).join("\n"),
         vehicleType: collectedData.vehicleType,
         axleCount: collectedData.axleCount ?? undefined,
         plate: collectedData.plate,
         bodyType: collectedData.bodyType,
+        fuelType: collectedData.individualBase?.fuelConfirmed ? collectedData.individualBase.fuelType : undefined,
         averageConsumptionKmL: collectedData.averageConsumptionKmL,
         brand: collectedData.individualBase ? collectedData.vehicleBrand : brand,
         model: collectedData.individualBase?.model ?? model,
@@ -190,6 +192,14 @@ export async function finalizeOnboarding(
       // perguntar de novo (ver regra no system prompt). Sem isso, o
       // veículo existe no banco mas fica invisível pra IA.
       await setDefaultVehicle(admin, veiculo.id, company.id, userId);
+      if(collectedData.individualBase?.version===3){
+        const b=collectedData.individualBase;
+        await saveMemory(admin, company.id, userId, {memoryType:"vehicle",key:"vehicle_registration_details",valueJson:{vehicleId:veiculo.id,manufactureYear:b.manufactureYear,fuelType:b.fuelType,usesArla:b.usesArla},summary:`Ano de fabricação: ${b.manufactureYear}. Diesel: ${b.fuelType}. Usa Arla: ${b.usesArla ? "sim" : "não"}.`,sourceType:"user_explicit",confirmedByUser:true});
+        if(b.fuelPrice!==undefined){
+          const current=await getActiveCostProfile(admin,veiculo.id);
+          if(Number(current?.fuel_price_per_liter)!==b.fuelPrice)await replaceCostProfile(admin,company.id,userId,{vehicleId:veiculo.id,fuelPricePerLiter:b.fuelPrice});
+        }
+      }
       if (collectedData.vehicleSetup?.complete) {
         await saveMemory(admin, company.id, userId, {
           memoryType: "operational",

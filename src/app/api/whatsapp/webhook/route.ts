@@ -662,10 +662,10 @@ export async function POST(request: Request) {
       // abaixo no fluxo pós-onboarding).
       const collectedDataAtual = resultado.collectedData as Record<string, unknown>;
       if (resultado.collectedData.replayRegistration) {
-        await sendWhatsappText(phoneE164, "Cadastro atualizado! Sua assinatura e os lançamentos foram preservados. Você já pode pedir uma análise de frete ou custo.");
+        await sendWhatsappText(phoneE164, "✅ Cadastro atualizado! Sua assinatura e os lançamentos foram preservados. Quer analisar um frete ou calcular uma rota? Pode mandar print, áudio ou texto.");
       }
       if (!collectedDataAtual.suggestionsMenuSentAt) {
-        const mensagem = resultado.collectedData.individualBase ? "Cadastro salvo! Você já pode pedir uma análise de frete ou custo. Para corrigir seus dados, diga o que deseja alterar." : construirMensagemPosCadastro(collectedDataAtual.intentId, collectedDataAtual.intentLabel);
+        const mensagem = resultado.collectedData.individualBase ? "✅ Cadastro salvo! Quer analisar um frete ou calcular uma rota? Pode mandar print, áudio ou texto. Para corrigir seus dados, diga o que deseja alterar." : construirMensagemPosCadastro(collectedDataAtual.intentId, collectedDataAtual.intentLabel);
         await sendWhatsappText(phoneE164, mensagem).catch((err) => logZapiSendFailure(err, phoneE164, "onboarding_mensagem_pos_cadastro"));
         await enviarSugestoesIniciais(admin, userId, phoneE164, collectedDataAtual);
 

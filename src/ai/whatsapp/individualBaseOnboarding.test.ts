@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {processOnboardingMessage,type OnboardingCollectedData} from './onboardingConversation';
 import type {OnboardingState} from '@/lib/supabase/tables';
-function start(){let state:OnboardingState='awaiting_name';let data:OnboardingCollectedData={companyId:'subscriber-company'};return (input:string)=>{const r=processOnboardingMessage(state,JSON.parse(JSON.stringify(data)),input);state=r.nextState;data=r.collectedData;return r;};}
+function start(){let state:OnboardingState='awaiting_name';let data:OnboardingCollectedData={companyId:'subscriber-company',individualBase:{version:2}};return (input:string)=>{const r=processOnboardingMessage(state,JSON.parse(JSON.stringify(data)),input);state=r.nextState;data=r.collectedData;return r;};}
 describe('cadastro individual em nove etapas',()=>{
  it('segue a ordem, aceita aliases, separa carroceria e carga, sem inferir eixos do conjunto',()=>{
   const go=start();let r=go('Rafael');expect(r.reply.kind).toBe('list');if(r.reply.kind==='list')expect(r.reply.options.map(o=>o.title)).toEqual(['Volvo','Scania','Mercedes-Benz','Volkswagen','DAF','Iveco','Outra']);

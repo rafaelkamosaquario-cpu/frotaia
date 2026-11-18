@@ -5,6 +5,9 @@ vi.mock("server-only", () => ({}));
 const createCompanyWithOwner = vi.fn();
 const updateCompany = vi.fn();
 const updateProfile = vi.fn();
+const getActiveCostProfile=vi.fn();
+const replaceCostProfile=vi.fn();
+vi.mock("@/services/supabase/vehicleCostProfileService",()=>({getActiveCostProfile:(...a:unknown[])=>getActiveCostProfile(...a),replaceCostProfile:(...a:unknown[])=>replaceCostProfile(...a)}));
 const createVehicle = vi.fn();
 const listVehicles = vi.fn();
 const updateVehicle = vi.fn();
@@ -39,6 +42,8 @@ const COMPANY = { id: "empresa-1", name: "João Silva" };
 // setOperatingRegion vaza de um teste pro outro entre describes diferentes.
 beforeEach(() => {
   vi.clearAllMocks();
+  getActiveCostProfile.mockResolvedValue(null);
+  replaceCostProfile.mockResolvedValue({});
   listVehicles.mockResolvedValue([]);
   updateVehicle.mockResolvedValue({id:"veiculo-1"});
   createCompanyWithOwner.mockResolvedValue(COMPANY);
@@ -258,5 +263,18 @@ describe("recadastro preserva identidade do veículo",()=>{
   await expect(finalizeOnboarding({} as never,"user-1",{companyId:"empresa-1",existingVehicleId:"other-company",individualBase:{version:2},vehicleType:"truck"},"+554298006380")).rejects.toThrow("não encontrado");
   expect(createVehicle).not.toHaveBeenCalled();expect(updateVehicle).not.toHaveBeenCalled();
  });
+});
+
+it("cadastro ampliado salva diesel, Arla, fabricação e preço sem trocar ano-modelo",async()=>{
+ const {finalizeOnboarding}=await import('./finalizeOnboarding');
+ await finalizeOnboarding({} as never,"user-1",{companyId:"empresa-1",vehicleType:"truck",primaryVehicleRaw:"Scania P310",individualBase:{version:3,manufactureYear:2019,fuelType:"diesel_s10",usesArla:true,fuelConfirmed:true,fuelPrice:6.5}},"+554298006380");
+ expect(createVehicle).toHaveBeenCalledWith(expect.anything(),"empresa-1","user-1",expect.objectContaining({fuelType:"diesel_s10",modelYear:undefined,notes:expect.stringContaining("Ano de fabricação informado: 2019")}));
+ expect(replaceCostProfile).toHaveBeenCalledWith(expect.anything(),"empresa-1","user-1",{vehicleId:"veiculo-1",fuelPricePerLiter:6.5});
+ expect(saveMemory).toHaveBeenCalledWith(expect.anything(),"empresa-1","user-1",expect.objectContaining({key:"vehicle_registration_details",valueJson:expect.objectContaining({usesArla:true,manufactureYear:2019})}));
+});
+it("preço desconhecido preserva perfil de custos existente",async()=>{
+ const {finalizeOnboarding}=await import('./finalizeOnboarding');
+ await finalizeOnboarding({} as never,"user-1",{companyId:"empresa-1",vehicleType:"truck",individualBase:{version:3,fuelPriceAsked:true}},"+554298006380");
+ expect(replaceCostProfile).not.toHaveBeenCalled();
 });
 

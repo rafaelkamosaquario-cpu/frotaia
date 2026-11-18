@@ -16,6 +16,8 @@ export function registrationSummary(customer:CustomerContext, context:VehicleCon
   if(v.body_type&&v.body_type!=='outro')lines.push(`Carroceria: ${bodies[v.body_type]??v.body_type}`);
   else {const body=v.notes?.match(/^Carroceria: (.+)$/m)?.[1];if(body)lines.push(`Carroceria: ${body}`);}
   const cargo=v.notes?.match(/^Carga: ([^;\n]+)/m)?.[1];if(cargo)lines.push(`Carga habitual: ${cargo}`);
+  const manufacture=v.notes?.match(/Ano de fabricação informado: (\d{4})/)?.[1];if(manufacture)lines.push(`Ano de fabricação: ${manufacture}`);
+  const arla=v.notes?.match(/Uso de Arla: (sim|não)/)?.[1];if(arla)lines.push(`Usa Arla: ${arla}`);
   if(v.fuel_type)lines.push(`Combustível: ${v.fuel_type.replaceAll('_',' ')}`);
   else if(v.notes?.includes('Combustível informado: diesel'))lines.push('Combustível: diesel');
  }
