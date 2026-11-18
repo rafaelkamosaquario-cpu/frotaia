@@ -1,3 +1,4 @@
+import {isRegistrationSummaryRequest,registrationReply} from '@/ai/whatsapp/registrationSummary';
 import {getAppAddonState} from "@/services/supabase/appAddonService";
 import {addonToolAllowed} from "@/lib/individual/addon";
 import { runtimeAccessPrompt } from "./runtimeAccess";
@@ -133,6 +134,16 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     content: mensagemUsuario,
     ...params.inboundMessageExtra,
   });
+
+  // Use current scoped data for standalone registration reads, including transcribed audio.
+  if (params.experienciaWhatsappV1 && !params.modoDemo && params.operationalAccessAllowed === true && vehicleContext.vehicle && !params.conteudoMultimodal?.length && isRegistrationSummaryRequest(mensagemUsuario)) {
+    const content = registrationReply(customerContext, vehicleContext);
+    const saved = await appendMessage(client, {
+      conversation_id: conversation.id, company_id: companyId, user_id: userId,
+      role: 'assistant', direction: 'outbound', content,
+    });
+    return {conversationId: conversation.id, message: {id: saved.id, content, createdAt: saved.created_at}, ferramentasExecutadas: []};
+  }
 
   // A apresentação aprovada é conteúdo fixo, não uma resposta livre do modelo.
   // Mantém a persistência normal e não intercepta imagens ou pedidos compostos.
@@ -331,3 +342,4 @@ export async function gerarRespostaAssistente(params: GerarRespostaAssistentePar
     ferramentasExecutadas,
   };
 }
+
