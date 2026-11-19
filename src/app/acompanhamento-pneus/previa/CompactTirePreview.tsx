@@ -1,0 +1,38 @@
+"use client";
+import {useEffect,useState} from "react";
+import {treadProjection,type TireCaseRow} from "@/lib/frota/tireCases";
+import styles from "./preview.module.css";
+const number=(v:number|null|undefined,d=0)=>v==null?"—":v.toLocaleString("pt-BR",{maximumFractionDigits:d});
+const date=(v:string|undefined)=>v?v.split("-").reverse().join("/"):"Sem leitura";
+export function CompactTirePreview(){
+ const [rows,setRows]=useState<TireCaseRow[]>([]),[id,setId]=useState(""),[error,setError]=useState(""),[loaded,setLoaded]=useState(false),[page,setPage]=useState(0),[focus,setFocus]=useState(false);
+ useEffect(()=>{const controller=new AbortController();fetch("/api/frota/pneus/cases",{cache:"no-store",signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);setRows(d.cases);setId((d.cases as TireCaseRow[]).find(r=>r.data.client.name.toUpperCase().includes("HMYL"))?.id??d.cases[0]?.id??"");setLoaded(true);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});return()=>controller.abort();},[]);
+ useEffect(()=>{if(!focus)return;const close=(e:KeyboardEvent)=>{if(e.key==="Escape")setFocus(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[focus]);
+ const row=rows.find(r=>r.id===id),c=row?.data;
+ const group=c?.tires.slice(page*4,page*4+4)??[];
+ const vehicle=c?.vehicle.toLowerCase()??"";
+ const truck=/6\s*[x×]\s*2/.test(vehicle)?"/images/tire-cases/truck.png":/4\s*[x×]\s*2/.test(vehicle)?"/images/tire-cases/truck-4x2.webp":null;
+ const pages=Math.ceil((c?.tires.length??0)/4);
+ const readingDates=[...new Set(group.map(t=>treadProjection(t,c!.events).reading?.date).filter(Boolean))];
+ function tireCard(t:typeof group[number]){const r=treadProjection(t,c!.events);return <div key={t.id} className={styles.tire}><b><span className={styles.wheel}>◉</span> {t.code}</b><span>{r.reading?.position||t.position}</span><strong>{[t.brand,t.model,t.size].filter(Boolean).join(" · ")||t.product}</strong><span>{t.life}</span><span>Aplicação {date(t.mountedAt)}</span><span>{number(t.mountedKm)} km → {number(r.reading?.km)} km</span></div>;}
+ return <div className={styles.page}>
+ <h1>Prévia · ficha compacta de acompanhamento</h1><p>Exemplo com dados salvos. Esta tela não altera o cadastro.</p>
+ {error&&<p role="alert">{error}</p>}{!loaded&&!error&&<p>Carregando clientes…</p>}
+ <div className={styles.actions}><label>Cliente <select value={id} onChange={e=>{setId(e.target.value);setPage(0);}}>{rows.map(r=><option key={r.id} value={r.id}>{r.data.client.name} · {r.data.plate}</option>)}</select></label><a href="/acompanhamento-pneus">Cadastro e edição</a><a href="/acompanhamento-pneus/mapeamento">Pré-cadastro e mapeamento</a>{c&&<button onClick={()=>setFocus(true)}>Abrir só a ficha para print</button>}</div>
+ {loaded&&!c&&<p>Nenhum acompanhamento salvo.</p>}
+ {c&&row&&<><div className={styles.actions}>{pages>1&&<><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Ficha {page+1} de {pages}</span><button disabled={page===pages-1} onClick={()=>setPage(p=>p+1)}>Próxima</button></>}</div>
+ <div className={focus?styles.overlay:undefined} role={focus?"dialog":undefined} aria-modal={focus||undefined} aria-label={focus?"Ficha para captura de tela":undefined}>
+ {focus&&<button className={styles.close} onClick={()=>setFocus(false)}>Voltar · Esc</button>}
+ <article className={styles.sheet}>
+ <header className={styles.brand}><div><b>RODOCORE</b><span>CONSULTORIA · ACOMPANHAMENTO DE PNEUS</span></div><div><strong>FROTA IA</strong><span>PAINEL WEB</span></div></header>
+ <div className={styles.content}>
+ <h2>{c.client.name}</h2><p className={styles.vehicle}><b>{c.plate}</b> · {c.vehicle}</p><p className={styles.operation}>{c.operation}</p>
+ <div className={styles.ribbon}>MONITORAMENTO EM ANDAMENTO · {readingDates.length===1?`INSPEÇÃO ${date(readingDates[0])}`:"LEITURAS INDICADAS POR PNEU"}</div>
+ <div className={styles.map}><div>{group.filter(t=>/esquer/i.test(t.position)).map(tireCard)}</div><figure>{truck?<svg viewBox="0 0 220 330" role="img" aria-label={`Ilustração da configuração ${c.vehicle}`}><image href={truck} width="220" height="330"/>{/6\s*[x×]\s*2/.test(vehicle)&&group.map(t=>{const p=(treadProjection(t,c.events).reading?.position||t.position).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();const left=p.includes("esquer"),right=p.includes("direit"),inner=/intern|dentro/.test(p),outer=/extern|fora/.test(p);if(!p.includes("tracao")||(!left&&!right)||(!inner&&!outer))return null;return <ellipse key={t.id} cx={220*(left?(inner ? .33 : .25):(inner ? .67 : .75))} cy={330*.72} rx="9" ry="17" fill="#f4c952" stroke="#936c10" strokeWidth="2"><title>{t.code} · {t.position}</title></ellipse>;})}</svg>:<div className={styles.pending}>Desenho da configuração a confirmar</div>}<figcaption>Frente ↑ · desenho ilustrativo</figcaption></figure><div>{group.filter(t=>!/esquer/i.test(t.position)).map(tireCard)}</div></div>
+ <h3>Resultado registrado por pneu</h3>
+ <div className={styles.results}>{group.map(t=>{const r=treadProjection(t,c.events);return <section key={t.id}><b>{t.code} · {date(r.reading?.date)}</b><div className={styles.metrics}><span>Rodagem<strong>{number(r.distance)} km</strong></span><span>Sulco inicial → atual<strong>{number(t.initialDepth,1)} → {number(r.reading?.depth,1)} mm</strong></span><span>Período acompanhado<strong>{number(r.days)} dias · ≈ {number(r.days==null?null:r.days/30,1)} meses</strong></span><span>Rendimento<strong>{number(r.kmPerMm)} km/mm</strong></span></div><p>Desgaste: {number(r.wear,1)} mm · Compra: R$ {number(t.cost,2)} · Custo parcial: {r.distance&&r.distance>0?`R$ ${number(t.cost/r.distance,4)}/km`:"sem base"} · Sulco {r.reading?.depthBasis==="conjunto"?"informado para o conjunto":"individual / origem conforme registro"}</p><div className={styles.projection}><b>Projeção: mais {number(r.remaining)} km · {number(r.months,2)} meses</b><span>Total estimado: {number(r.total)} km · Referência comercial: {number(t.projectedLifeKm)} km · Retirada de referência: {number(r.limit,1)} mm</span></div></section>;})}</div>
+ <footer>Projeções lineares a partir da inspeção, mantendo o ritmo observado. Não são resultado final nem garantia de duração. Revisão {row.version} · Ficha {page+1}/{pages}. Códigos provisórios não substituem números de fogo. Confira autorização do cliente antes de publicar.</footer>
+ </div></article></div>
+ <p>Os campos completos e o PDF continuam em “Cadastro e edição”. A ficha usa as medições registradas de cada pneu; dados ausentes aparecem como “—”.</p></>}
+ </div>;
+}
