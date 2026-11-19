@@ -1,5 +1,2 @@
-import {notFound} from "next/navigation";
-import {tireCaseAccess} from "@/services/supabase/tireCaseAccess";
-import {TireInventoryClient} from "./TireInventoryClient";
-export default async function Page(){if(!await tireCaseAccess())notFound();return <TireInventoryClient/>;}
-
+import {redirect} from "next/navigation";
+export default async function Page({searchParams}:{searchParams:Promise<{cliente?:string}>}){const {cliente}=await searchParams;redirect("/acompanhamento-pneus/mapeamento"+(cliente?"?cliente="+encodeURIComponent(cliente):""));}

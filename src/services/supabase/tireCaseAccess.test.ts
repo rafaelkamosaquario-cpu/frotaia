@@ -1,0 +1,13 @@
+import {beforeEach,afterEach,it,expect,vi} from "vitest";
+const m=vi.hoisted(()=>({auth:vi.fn(),load:vi.fn(),scope:vi.fn()}));
+vi.mock("server-only",()=>({}));
+vi.mock("@/lib/supabase/server",()=>({createClient:async()=>({auth:{getUser:m.auth}})}));
+vi.mock("./fleetPanelAccess",()=>({loadFleetPanelAccess:m.load}));
+vi.mock("@/lib/frota/companyScope",()=>({attachCompanyScope:m.scope}));
+import {tireCaseAccess} from "./tireCaseAccess";
+beforeEach(()=>{vi.clearAllMocks();vi.stubEnv("TIRE_CASES_COMPANY_ID","private-adm");m.auth.mockResolvedValue({data:{user:{email:"rafaelkamosaquario@gmail.com",email_confirmed_at:"yes"}}});m.load.mockResolvedValue({ok:true,userId:"owner",company:{id:"private-adm"},role:"owner"});});
+afterEach(()=>vi.unstubAllEnvs());
+it("pins the private workspace instead of the selected customer",async()=>{expect(await tireCaseAccess()).toMatchObject({company:{id:"private-adm"}});expect(m.scope).toHaveBeenCalledWith(expect.anything(),"private-adm");expect(m.scope.mock.invocationCallOrder[0]).toBeLessThan(m.load.mock.invocationCallOrder[0]);});
+it("rejects other accounts before resolving the private workspace",async()=>{m.auth.mockResolvedValue({data:{user:{email:"client@example.com",email_confirmed_at:"yes"}}});expect(await tireCaseAccess()).toBeNull();expect(m.load).not.toHaveBeenCalled();expect(m.scope).not.toHaveBeenCalled();});
+it("requires an active owner membership and the configured company",async()=>{m.load.mockResolvedValue({ok:true,userId:"owner",company:{id:"private-adm"},role:"admin"});expect(await tireCaseAccess()).toBeNull();m.load.mockResolvedValue({ok:true,userId:"owner",company:{id:"customer"},role:"owner"});expect(await tireCaseAccess()).toBeNull();});
+it("fails closed when the private workspace is not configured",async()=>{vi.stubEnv("TIRE_CASES_COMPANY_ID","");expect(await tireCaseAccess()).toBeNull();expect(m.load).not.toHaveBeenCalled();});

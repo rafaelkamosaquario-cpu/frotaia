@@ -44,7 +44,7 @@ export function TireInventoryClient(){
  const visible=state?.tires.filter(t=>(filter==="todos"||t.status===filter)&&[t.fire,t.brand,t.model,t.serial,t.dot].join(" ").toLowerCase().includes(search.toLowerCase()))??[];
  return <main className="mx-auto max-w-7xl space-y-5 p-4 md:p-6">
  <div className="print:hidden space-y-4">
- <a href="/frota/pneus/acompanhamento" className="text-primary">← Acompanhamento e projeções / cadastro de clientes</a>
+ <a href="/acompanhamento-pneus" className="text-primary">← Acompanhamento e projeções / cadastro de clientes</a>
  <header><p className="text-sm text-primary">EXCLUSIVO ADM · RODOCORE / FROTA IA PAINEL WEB</p><h1 className="text-2xl font-bold">Mapeamento e inventário de pneus</h1><p className="text-muted-foreground">Identidade, posição e histórico. Independente das projeções de quilometragem.</p></header>
  <div role="status" aria-live="polite" className="rounded-lg border border-border p-3">{message||"Selecione um cliente para trabalhar."} <button className={button} onClick={reload} disabled={busy}>Recarregar</button></div>
  <label className="block">Empresa do cliente<select className={field} value={selected} onChange={e=>{setSelected(e.target.value);setVehicleId("");setTireId("");setReport("");}}><option value="">Selecionar…</option>{rows.map(r=><option key={r.id} value={r.id}>{r.data.customer.name} · {r.data.tires.length} pneus</option>)}</select></label>

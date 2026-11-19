@@ -1,4 +1,2 @@
-import {notFound} from "next/navigation";
-import {tireCaseAccess} from "@/services/supabase/tireCaseAccess";
-import {TireCasesClient} from "./TireCasesClient";
-export default async function Page(){if(!await tireCaseAccess())notFound();return <TireCasesClient/>;}
+import {redirect} from "next/navigation";
+export default function Page(){redirect("/acompanhamento-pneus");}
