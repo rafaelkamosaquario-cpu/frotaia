@@ -1,0 +1,16 @@
+{
+ "id":"/administracao",
+ "name":"RodoCore · Painel mestre",
+ "short_name":"RodoCore",
+ "description":"Painel mestre RodoCore: clientes, acompanhamento e operação.",
+ "lang":"pt-BR",
+ "start_url":"/administracao",
+ "scope":"/",
+ "display":"standalone",
+ "background_color":"#0b1628",
+ "theme_color":"#0b1628",
+ "icons":[
+  {"src":"/brand/rodocore/r-192-v1.png","sizes":"192x192","type":"image/png","purpose":"any"},
+  {"src":"/brand/rodocore/r-512-v1.png","sizes":"512x512","type":"image/png","purpose":"any"}
+ ]
+}
