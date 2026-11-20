@@ -1,4 +1,5 @@
 "use client";
+import {TirePdfActions} from "./TirePdfActions";
 import {rigid8x2TirePoint} from "@/lib/frota/rigid8x2TireLayout";
 import {TireSheetTimeline} from "./TireSheetTimeline";
 import {tireSheetTimeline} from "@/lib/frota/tireSheetTimeline";
@@ -46,7 +47,7 @@ export function CompactTirePreview(){
  {error&&<p role="alert">{error}</p>}{!loaded&&!error&&<p>Carregando clientes…</p>}
  <div className={styles.actions}><label>Cliente <select value={id} onChange={e=>{setId(e.target.value);setPage(0);}}>{rows.map(r=><option key={r.id} value={r.id}>{r.data.client.name} · {r.data.plate}</option>)}</select></label><a href="/acompanhamento-pneus">Cadastro e edição</a><a href="/acompanhamento-pneus/mapeamento">Pré-cadastro e mapeamento</a><a href="/acompanhamento-pneus/previa/mapeamento">Fichas dos clientes de mapeamento</a>{c&&<button onClick={()=>setFocus(true)}>Abrir só a ficha para print</button>}</div>
  {loaded&&!c&&<p>Nenhum acompanhamento salvo.</p>}
- {c&&row&&<><div className={styles.actions}>{pages>1&&<><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Ficha {page+1} de {pages}</span><button disabled={page===pages-1} onClick={()=>setPage(p=>p+1)}>Próxima</button></>}</div>
+ {c&&row&&<><TirePdfActions url={`/api/frota/pneus/cases/pdf?id=${row.id}`} plate={c.plate}/><div className={styles.actions}>{pages>1&&<><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Ficha {page+1} de {pages}</span><button disabled={page===pages-1} onClick={()=>setPage(p=>p+1)}>Próxima</button></>}</div>
  <div className={focus?styles.overlay:undefined} role={focus?"dialog":undefined} aria-modal={focus||undefined} aria-label={focus?"Ficha para captura de tela":undefined}>
  {focus&&<button className={styles.close} onClick={()=>setFocus(false)}>Voltar · Esc</button>}
  <article className={styles.sheet}>
@@ -65,6 +66,6 @@ export function CompactTirePreview(){
  </section>;})}</div></>}
  <footer>{applicationOnly?"Somente aplicação registrada. Ainda não há inspeção ou resultado de desempenho. ":""}{!applicationOnly&&<>Projeção referente à inspeção visual e à medição de sulco na data da inspeção indicada acima. O rendimento observado mostra quantos quilômetros o pneu rodou por milímetro de borracha consumido. Ainda não é o resultado final: mantendo esse ritmo de desgaste e de uso, o pneu poderá atingir o total estimado. A estimativa deve ser atualizada nas próximas inspeções.</>} Revisão {row.version} · Ficha {page+1}/{pages}. {group.some(t=>/provisório/i.test(t.code))&&"Códigos provisórios não substituem números de fogo. "}{group.some(t=>t.life==="Outra")&&"Histórico de recapagem a confirmar. "} Confira autorização do cliente antes de publicar.</footer>
  </div></article></div>
- <p>Os campos completos e o PDF continuam em “Cadastro e edição”. A ficha usa as medições registradas de cada pneu; dados ausentes aparecem como “—”.</p></>}
+ <p>O PDF da ficha está disponível nos botões acima. Os campos completos continuam em “Cadastro e edição”. A ficha usa as medições registradas de cada pneu; dados ausentes aparecem como “—”.</p></>}
  </div>;
 }
