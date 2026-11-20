@@ -1,4 +1,5 @@
 "use client";
+import {TireSheetBrand,TireSheetIdentity} from "./TireSheetHeader";
 import {useEffect,useRef,useState} from "react";
 import {treadProjection,type TireCaseRow} from "@/lib/frota/tireCases";
 import styles from "./preview.module.css";
@@ -44,9 +45,9 @@ export function CompactTirePreview(){
  <div className={focus?styles.overlay:undefined} role={focus?"dialog":undefined} aria-modal={focus||undefined} aria-label={focus?"Ficha para captura de tela":undefined}>
  {focus&&<button className={styles.close} onClick={()=>setFocus(false)}>Voltar · Esc</button>}
  <article className={styles.sheet}>
- <header className={styles.brand}><div><b>RODOCORE</b><span>CONSULTORIA · ACOMPANHAMENTO DE PNEUS</span></div><div><strong>FROTA IA</strong><span>PAINEL WEB</span></div></header>
+ <TireSheetBrand/>
  <div className={styles.content}>
- <h2>{c.client.name}</h2><p className={styles.vehicle}><b>{c.plate}</b> · {c.vehicle}</p><p className={styles.operation}>{c.operation}</p>
+ <TireSheetIdentity name={c.client.name} plate={c.plate} vehicle={c.vehicle} segment={c.operation}/>
  <div className={styles.ribbon}>SITUAÇÃO REGISTRADA · {readingDates.length===1?`INSPEÇÃO ${date(readingDates[0])}`:"LEITURAS INDICADAS POR PNEU"}</div>
  {shared&&<p className={styles.mount}><b>Aplicação: {date(group[0].mountedAt)}</b><br/>Hodômetro: {number(group[0].mountedKm)} km → {number(treadProjection(group[0],c.events).reading?.km)} km na inspeção</p>}
  <div ref={mapRef} className={styles.map}><svg className={styles.connectors} aria-hidden="true">{links.map(link=><g key={link.id}><path d={`M ${link.x1} ${link.y1} H ${link.x1+(link.x2-link.x1)*.35} L ${link.x2} ${link.y2}`}/><circle cx={link.x2} cy={link.y2} r="2.5"/></g>)}</svg><div>{group.filter(t=>/esquer/i.test(treadProjection(t,c.events).reading?.position||t.position)).map(tireCard)}</div><figure>{truck?<svg viewBox="0 0 220 330" role="img" aria-label={`Ilustração da configuração ${c.vehicle}`}><image href={truck} width="220" height="330"/>{/6\s*[x×]\s*2/.test(vehicle)&&group.map(t=>{const p=(treadProjection(t,c.events).reading?.position||t.position).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();const left=p.includes("esquer"),right=p.includes("direit"),inner=/intern|dentro/.test(p),outer=/extern|fora/.test(p);if(!p.includes("tracao")||(!left&&!right)||(!inner&&!outer))return null;return <ellipse data-tire-point={t.id} key={t.id} cx={220*(left?(inner ? .33 : .25):(inner ? .67 : .75))} cy={330*.72} rx="9" ry="17" fill="#f4c952" stroke="#936c10" strokeWidth="2"><title>{t.code} · {t.position}</title></ellipse>;})}</svg>:<div className={styles.pending}>Desenho da configuração a confirmar</div>}<figcaption>Frente ↑ · desenho ilustrativo</figcaption></figure><div>{group.filter(t=>!/esquer/i.test(treadProjection(t,c.events).reading?.position||t.position)).map(tireCard)}</div></div>
