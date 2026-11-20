@@ -6,12 +6,14 @@ const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!Number.isNaN(Date.
 const uuid=z.string().uuid();
 export const customerSchema=z.object({name:text.min(2),document:text,address:z.string().trim().max(500),phone:text}).strict();
 export const configurationSchema=z.object({label:text.min(1),kind:z.enum(["cavalo","caminhao","semirreboque","julieta","dolly"]),body:z.enum(["chassi","bau","tanque","basculante","florestal","plataforma"]),axes:z.array(z.object({role:text.min(1),wheels:z.union([z.literal(2),z.literal(4)]),gap:z.number().int().min(1).max(4)}).strict()).min(1).max(10)}).strict();
-export const vehicleSchema=z.object({id:uuid,plate:text.min(7).max(12).transform(v=>v.toUpperCase().replace(/[^A-Z0-9]/g,"")),model:text.min(1),layout:z.enum(["cavalo4x2","cavalo6x2","tanque4","personalizado"]),spares:z.number().int().min(0).max(6).nullable(),configuration:configurationSchema.optional(),mountingReference:z.object({date,km:z.number().finite().min(0).max(10000000)}).strict().optional()}).strict().refine(v=>v.layout!=="personalizado"||!!v.configuration,"Informe a configuração dos eixos");
+export const vehicleSchema=z.object({id:uuid,plate:text.min(7).max(12).transform(v=>v.toUpperCase().replace(/[^A-Z0-9]/g,"")),model:text.min(1),segment:text.optional(),layout:z.enum(["cavalo4x2","cavalo6x2","tanque4","personalizado"]),spares:z.number().int().min(0).max(6).nullable(),configuration:configurationSchema.optional(),mountingReference:z.object({date,km:z.number().finite().min(0).max(10000000)}).strict().optional()}).strict().refine(v=>v.layout!=="personalizado"||!!v.configuration,"Informe a configuração dos eixos");
 const identity=z.object({fire:text.max(30),dot:text.max(30),serial:text.max(80),marked:z.boolean()}).strict();
 const product=z.object({brand:text.min(1),model:text.min(1),size:text.min(1),tread:text,life:z.enum(["Novo","1ª recapagem","2ª recapagem","Outra"])}).strict();
 export const commandSchema=z.discriminatedUnion("type",[
  z.object({type:z.literal("customer"),customer:customerSchema}).strict(),
  z.object({type:z.literal("vehicle"),vehicle:vehicleSchema}).strict(),
+ z.object({type:z.literal("vehicleSegment"),vehicleId:uuid,segment:text}).strict(),
+ z.object({type:z.literal("correctTire"),tireId:uuid,identity,product,reason:text.min(5)}).strict(),
  z.object({type:z.literal("batch"),product,date,tires:z.array(identity).min(1).max(100)}).strict(),
  z.object({type:z.literal("identity"),tireId:uuid,identity}).strict(),
  z.object({type:z.literal("move"),tireId:uuid,date,km:z.number().finite().min(0).max(10000000).nullable(),reason:text.min(2),destination:z.enum(["estoque","montado","servico","baixado"]),vehicleId:uuid.nullable(),position:text.nullable()}).strict()
@@ -39,6 +41,7 @@ export function emptyInventory(customer:Customer):Inventory{return {customer,veh
 export function applyCommand(input:Inventory,raw:unknown,now=new Date().toISOString()):Inventory{
  const c=commandSchema.parse(raw),s=structuredClone(input);
  if(c.type==="customer"){s.customer=c.customer;return s;}
+ if(c.type==="vehicleSegment"){const v=s.vehicles.find(v=>v.id===c.vehicleId);if(!v)throw Error("Veículo não encontrado.");v.segment=c.segment;return s;}
  if(c.type==="vehicle"){
   if(s.vehicles.some(v=>v.id===c.vehicle.id||v.plate===c.vehicle.plate))throw Error("Veículo ou placa já cadastrados.");
   if(s.vehicles.length>=500)throw Error("Limite de veículos atingido.");
@@ -59,6 +62,13 @@ export function applyCommand(input:Inventory,raw:unknown,now=new Date().toISOStr
   return s;
  }
  const t=s.tires.find(t=>t.id===c.tireId);if(!t)throw Error("Pneu não pertence a este cliente.");
+ if(c.type==="correctTire"){
+ if(!c.identity.fire)throw Error("Informe o número de fogo.");
+ if(s.tires.some(x=>x.id!==t.id&&fireKey(x.fire)===fireKey(c.identity.fire)))throw Error("Número de fogo já utilizado.");
+ const before=JSON.stringify({fire:t.fire,dot:t.dot,serial:t.serial,marked:t.marked,brand:t.brand,model:t.model,size:t.size,tread:t.tread,life:t.life});
+ Object.assign(t,c.identity,c.product);
+ s.movements.push({id:crypto.randomUUID(),tireId:t.id,date:now.slice(0,10),recordedAt:now,from:t.status,to:t.status,reason:"Correção cadastral: "+c.reason+". Antes: "+before+". Depois: "+JSON.stringify({...c.identity,...c.product}),km:null,vehicleId:t.vehicleId,position:t.position});return s;
+ }
  if(c.type==="identity"){
   if(!c.identity.fire)throw Error("Informe o número de fogo.");
   if(s.tires.some(x=>x.id!==t.id&&fireKey(x.fire)===fireKey(c.identity.fire)))throw Error("Número de fogo já utilizado.");
