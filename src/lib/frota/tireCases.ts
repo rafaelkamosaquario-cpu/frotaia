@@ -7,7 +7,7 @@ export const caseSchema = z.object({
   client: z.object({ name:text.min(2), document:text, address:z.string().trim().max(500), phone:z.string().regex(/^[+\d ()-]{0,30}$/) }).strict(),
   plate:text.min(7).max(12), vehicle:text, operation:text,
   baseline:z.object({ product:text, cost:z.number().finite().min(0).max(10000000), distance:km, basis:z.enum(["medido","estimado","parcial"]), notes:z.string().max(1000) }).strict(),
-  tires:z.array(z.object({ id:z.string().uuid(), code:text.min(1), product:text.min(1), brand:text, model:text, size:text,
+  tires:z.array(z.object({ id:z.string().uuid(), code:text.min(1), product:text.min(1), brand:text, model:text, size:text, dot:text.optional(), treadBrand:text.optional(), treadModel:text.optional(),
     life:z.enum(["Novo","1ª recapagem","2ª recapagem","Outra"]), position:text.min(1), mountedAt:date, mountedKm:km,
     cost:z.number().finite().min(0).max(10000000), targetKm:km.nullable(), advice:z.string().max(2000),
     initialDepth:z.number().finite().positive().max(50).nullable().optional(), retirementDepth:z.number().finite().min(1.6).max(50).optional(), projectedLifeKm:km.nullable().optional()
