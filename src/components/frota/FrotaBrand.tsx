@@ -7,8 +7,8 @@ import { LogoMark } from "@/components/icons/Logo";
 export function FrotaBrand({ compact = false, className, master = false }: { compact?: boolean; className?: string; master?: boolean }) {
   return (
     <div className={cn("flex items-center gap-2.5 leading-none", className)}>
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#0b1628] ring-1 ring-[#243d60] dark:bg-transparent dark:ring-transparent">
-        {master ? <img src="/brand/rodocore/r-192-v1.png" alt="RodoCore" className="size-11 object-contain"/> : <LogoMark className="size-11" />}
+      <span className={cn("flex size-11 shrink-0 items-center justify-center", !master && "rounded-xl bg-[#0b1628] ring-1 ring-[#243d60] dark:bg-transparent dark:ring-transparent")}>
+        {master ? <img src="/brand/rodocore/r-transparent-v1.png" alt="RodoCore" className="size-11 object-contain"/> : <LogoMark className="size-11" />}
       </span>
       <div className="flex flex-col">
       <span className="text-base font-bold tracking-tight text-foreground">
