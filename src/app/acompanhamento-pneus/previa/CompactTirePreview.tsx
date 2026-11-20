@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {treadProjection,type TireCaseRow} from "@/lib/frota/tireCases";
 import styles from "./preview.module.css";
 const number=(v:number|null|undefined,d=0)=>v==null?"—":v.toLocaleString("pt-BR",{maximumFractionDigits:d});
@@ -8,6 +8,25 @@ export function CompactTirePreview(){
  const [rows,setRows]=useState<TireCaseRow[]>([]),[id,setId]=useState(""),[error,setError]=useState(""),[loaded,setLoaded]=useState(false),[page,setPage]=useState(0),[focus,setFocus]=useState(false);
  useEffect(()=>{const controller=new AbortController();fetch("/api/frota/pneus/cases",{cache:"no-store",signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);setRows(d.cases);setId((d.cases as TireCaseRow[]).find(r=>r.data.client.name.toUpperCase().includes("HMYL"))?.id??d.cases[0]?.id??"");setLoaded(true);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});return()=>controller.abort();},[]);
  useEffect(()=>{if(!focus)return;const close=(e:KeyboardEvent)=>{if(e.key==="Escape")setFocus(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[focus]);
+ const mapRef=useRef<HTMLDivElement>(null);
+ const [links,setLinks]=useState<{id:string;x1:number;y1:number;x2:number;y2:number}[]>([]);
+ useEffect(()=>{
+  const map=mapRef.current;if(!map)return;
+  const update=()=>{
+   const bounds=map.getBoundingClientRect();
+   const cards=Array.from(map.querySelectorAll<HTMLElement>("[data-tire-card]"));
+   const next=Array.from(map.querySelectorAll<SVGGraphicsElement>("[data-tire-point]")).flatMap(point=>{
+    const card=cards.find(card=>card.dataset.tireCard===point.dataset.tirePoint);if(!card)return [];
+    const a=card.getBoundingClientRect(),b=point.getBoundingClientRect();
+    const left=a.left<b.left;
+    return [{id:point.dataset.tirePoint!,x1:(left?a.right:a.left)-bounds.left,y1:a.top+a.height/2-bounds.top,x2:b.left+b.width/2-bounds.left,y2:b.top+b.height/2-bounds.top}];
+   });
+   setLinks(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);
+  };
+  update();const observer=new ResizeObserver(update);observer.observe(map);
+  map.querySelectorAll("[data-tire-card],figure").forEach(el=>observer.observe(el));
+  return()=>observer.disconnect();
+ },[rows,id,page,focus]);
  const row=rows.find(r=>r.id===id),c=row?.data;
  const group=c?.tires.slice(page*4,page*4+4)??[];
  const vehicle=c?.vehicle.toLowerCase()??"";
@@ -15,7 +34,7 @@ export function CompactTirePreview(){
  const shared=group.length>1&&new Set(group.map(t=>{const r=treadProjection(t,c!.events);return JSON.stringify([t.mountedAt,t.mountedKm,t.cost,t.initialDepth,t.projectedLifeKm,r.reading?.date,r.reading?.km,r.reading?.depth,r.reading?.depthBasis,r.limit,r.status]);})).size===1;
  const pages=Math.ceil((c?.tires.length??0)/4);
  const readingDates=[...new Set(group.map(t=>treadProjection(t,c!.events).reading?.date).filter(Boolean))];
- function tireCard(t:typeof group[number]){const r=treadProjection(t,c!.events);return <div key={t.id} className={styles.tire}><b><span className={styles.wheel}>◉</span> {t.code.replace(/\s*\(provisório\)/gi,"")}</b><span>{r.reading?.position||t.position}</span><strong>{[t.brand,t.model,t.size].filter(Boolean).join(" · ")||t.product}</strong>{t.life!=="Outra"&&<span>{t.life}</span>}{!shared&&<><span>Aplicação {date(t.mountedAt)}</span><span>{number(t.mountedKm)} km → {number(r.reading?.km)} km</span></>}</div>;}
+ function tireCard(t:typeof group[number]){const r=treadProjection(t,c!.events);return <div key={t.id} data-tire-card={t.id} className={styles.tire}><b><span className={styles.wheel}>◉</span> {t.code.replace(/\s*\(provisório\)/gi,"")}</b><span>{r.reading?.position||t.position}</span><strong>{[t.brand,t.model,t.size].filter(Boolean).join(" · ")||t.product}</strong>{t.life!=="Outra"&&<span>{t.life}</span>}{!shared&&<><span>Aplicação {date(t.mountedAt)}</span><span>{number(t.mountedKm)} km → {number(r.reading?.km)} km</span></>}</div>;}
  return <div className={styles.page}>
  <h1>Prévia · ficha compacta de acompanhamento</h1><p>Exemplo com dados salvos. Esta tela não altera o cadastro.</p>
  {error&&<p role="alert">{error}</p>}{!loaded&&!error&&<p>Carregando clientes…</p>}
@@ -30,7 +49,7 @@ export function CompactTirePreview(){
  <h2>{c.client.name}</h2><p className={styles.vehicle}><b>{c.plate}</b> · {c.vehicle}</p><p className={styles.operation}>{c.operation}</p>
  <div className={styles.ribbon}>SITUAÇÃO REGISTRADA · {readingDates.length===1?`INSPEÇÃO ${date(readingDates[0])}`:"LEITURAS INDICADAS POR PNEU"}</div>
  {shared&&<p className={styles.mount}><b>Aplicação: {date(group[0].mountedAt)}</b><br/>Hodômetro: {number(group[0].mountedKm)} km → {number(treadProjection(group[0],c.events).reading?.km)} km na inspeção</p>}
- <div className={styles.map}><div>{group.filter(t=>/esquer/i.test(treadProjection(t,c.events).reading?.position||t.position)).map(tireCard)}</div><figure>{truck?<svg viewBox="0 0 220 330" role="img" aria-label={`Ilustração da configuração ${c.vehicle}`}><image href={truck} width="220" height="330"/>{/6\s*[x×]\s*2/.test(vehicle)&&group.map(t=>{const p=(treadProjection(t,c.events).reading?.position||t.position).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();const left=p.includes("esquer"),right=p.includes("direit"),inner=/intern|dentro/.test(p),outer=/extern|fora/.test(p);if(!p.includes("tracao")||(!left&&!right)||(!inner&&!outer))return null;return <ellipse key={t.id} cx={220*(left?(inner ? .33 : .25):(inner ? .67 : .75))} cy={330*.72} rx="9" ry="17" fill="#f4c952" stroke="#936c10" strokeWidth="2"><title>{t.code} · {t.position}</title></ellipse>;})}</svg>:<div className={styles.pending}>Desenho da configuração a confirmar</div>}<figcaption>Frente ↑ · desenho ilustrativo</figcaption></figure><div>{group.filter(t=>!/esquer/i.test(treadProjection(t,c.events).reading?.position||t.position)).map(tireCard)}</div></div>
+ <div ref={mapRef} className={styles.map}><svg className={styles.connectors} aria-hidden="true">{links.map(link=><g key={link.id}><path d={`M ${link.x1} ${link.y1} H ${link.x1+(link.x2-link.x1)*.35} L ${link.x2} ${link.y2}`}/><circle cx={link.x2} cy={link.y2} r="2.5"/></g>)}</svg><div>{group.filter(t=>/esquer/i.test(treadProjection(t,c.events).reading?.position||t.position)).map(tireCard)}</div><figure>{truck?<svg viewBox="0 0 220 330" role="img" aria-label={`Ilustração da configuração ${c.vehicle}`}><image href={truck} width="220" height="330"/>{/6\s*[x×]\s*2/.test(vehicle)&&group.map(t=>{const p=(treadProjection(t,c.events).reading?.position||t.position).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();const left=p.includes("esquer"),right=p.includes("direit"),inner=/intern|dentro/.test(p),outer=/extern|fora/.test(p);if(!p.includes("tracao")||(!left&&!right)||(!inner&&!outer))return null;return <ellipse data-tire-point={t.id} key={t.id} cx={220*(left?(inner ? .33 : .25):(inner ? .67 : .75))} cy={330*.72} rx="9" ry="17" fill="#f4c952" stroke="#936c10" strokeWidth="2"><title>{t.code} · {t.position}</title></ellipse>;})}</svg>:<div className={styles.pending}>Desenho da configuração a confirmar</div>}<figcaption>Frente ↑ · desenho ilustrativo</figcaption></figure><div>{group.filter(t=>!/esquer/i.test(treadProjection(t,c.events).reading?.position||t.position)).map(tireCard)}</div></div>
  <h3>Resultado registrado por pneu</h3>
  <div className={`${styles.results} ${shared?styles.shared:""}`}>{(shared?group.slice(0,1):group).map(t=>{const r=treadProjection(t,c.events);return <section key={t.id}><b>{shared?`${group.length} pneus · mesmos valores registrados por pneu`:t.code} · {date(r.reading?.date)}</b><div className={styles.metrics}><span>Rodagem<strong>{number(r.distance)} km</strong></span><span>Sulco inicial → atual<strong>{number(t.initialDepth,1)} → {number(r.reading?.depth,1)} mm</strong></span><span>Período acompanhado<strong>{number(r.days)} dias · ≈ {number(r.days==null?null:r.days/30,1)} meses</strong></span><span>Rendimento<strong>{number(r.kmPerMm)} km/mm</strong></span></div><p>Desgaste: {number(r.wear,1)} mm · Compra por pneu: R$ {number(t.cost,2)} · Custo parcial: {r.distance&&r.distance>0?`R$ ${number(t.cost/r.distance,4)}/km`:"sem base"} · Sulco {r.reading?.depthBasis==="conjunto"?"informado para o conjunto":"individual / origem conforme registro"}</p><div className={styles.projection}><b>Projeção: mais {number(r.remaining)} km · {number(r.months,2)} meses</b><span>Total estimado: {number(r.total)} km · Referência comercial: {number(t.projectedLifeKm)} km · Retirada de referência: {number(r.limit,1)} mm</span></div></section>;})}</div>
  <footer>Projeções lineares a partir da inspeção, mantendo o ritmo observado. Não são resultado final nem garantia de duração. Revisão {row.version} · Ficha {page+1}/{pages}. Códigos provisórios não substituem números de fogo. Histórico de recapagem a confirmar quando não informado. Confira autorização do cliente antes de publicar.</footer>
