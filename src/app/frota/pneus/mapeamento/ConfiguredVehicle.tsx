@@ -4,7 +4,7 @@ import type {Configuration} from "@/lib/frota/vehicleConfigurations";
 export function ConfiguredVehicle({config,height,axisY,compact=false}:{config:Configuration;height:number;axisY:number[];compact?:boolean}){
  const gradient=useId();const motor=config.kind==="cavalo"||config.kind==="caminhao";
  const wheels=config.axes.map(a=>a.wheels).join(',');
- if(config.kind==='caminhao'&&config.body==='chassi'&&wheels==='2,4,4'&&/6\s*[x×]\s*4/i.test(config.label))return <img alt={`Ilustração de chassi ${config.label}`} src="/images/tire-cases/mercedes-axor-chassi-6x4.png" className="absolute inset-y-0 left-[32%] h-full w-[36%] object-contain"/>;
+ if(config.kind==='caminhao'&&config.body==='chassi'&&wheels==='2,4,4'&&/6\s*[x×]\s*4/i.test(config.label))return <img alt={`Ilustração de chassi ${config.label}`} src="/images/tire-cases/mercedes-axor-chassi-6x4-v2.png" className="absolute inset-y-0 left-[32%] h-full w-[36%] object-contain"/>;
  const approved=config.kind==='cavalo'&&config.body==='chassi'&&wheels==='2,4'?'/images/tire-cases/truck-4x2.webp':config.kind==='cavalo'&&config.body==='chassi'&&wheels==='2,4,4'?'/images/tire-cases/truck.png':config.kind==='semirreboque'&&config.body==='tanque'&&wheels==='4,4,4,4'?'/images/tire-cases/tanker-mapping.png':null;
  // Preserve approved illustrations for matching standard geometries.
  if(approved&&config.axes.every((a,i)=>a.gap===(i===1?2:1)))return <img alt={config.label} src={approved} className="absolute inset-y-0 left-[32%] h-full w-[36%] object-contain"/>;
@@ -18,4 +18,3 @@ export function ConfiguredVehicle({config,height,axisY,compact=false}:{config:Co
  {config.axes.map((a,i)=><g key={i}><path d={`M15 ${axisY[i]}H145`} stroke="#475569" strokeWidth="7"/>{(a.wheels===2?[12,134]:[5,22,122,139]).map(x=><g key={x}><rect x={x} y={axisY[i]-18} width="14" height="36" rx="5" fill="#17212e" stroke="#020617"/><path d={`M${x+4} ${axisY[i]-13}V${axisY[i]+13}M${x+9} ${axisY[i]-13}V${axisY[i]+13}`} stroke="#64748b" strokeWidth="1"/></g>)}</g>)}
  </svg>;
 }
-

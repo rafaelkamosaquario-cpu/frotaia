@@ -46,7 +46,7 @@ export async function tireSheetPdf(s:TireSheetData){
  function next(){page=doc.addPage([595.28,841.89]);header();}
  function room(h:number){if(y-h<52)next();}
  header();
- const assets={"6x4":"mercedes-axor-chassi-6x4.png","8x2":"scania-p-chassi-8x2-v2.png","6x2":"truck.png","4x2":"truck-4x2.webp",tank:"tanker-mapping.png"};
+ const assets={"6x4":"mercedes-axor-chassi-6x4-v2.png","8x2":"scania-p-chassi-8x2-v2.png","6x2":"truck.png","4x2":"truck-4x2.webp",tank:"tanker-mapping.png"};
  const image=s.layout?await doc.embedPng(await sharp(await readFile(path.join(process.cwd(),'public/images/tire-cases',assets[s.layout]))).resize({height:1000,withoutEnlargement:true}).png().toBuffer()):null;
  for(const stage of s.stages){room(78);box(28,y,539,20,'E7F3F8');text('SITUAÇÃO REGISTRADA · '+stage.label.toUpperCase(),38,y-4,9,true,col('167D98'));y-=20;box(28,y,539,stage.codes?52:32,'FAF7ED');text(`${date(stage.date)}    Odômetro: ${n(stage.km)} km${stage.depth!=null?`    Sulco: ${n(stage.depth,1)} mm`:''}`,38,y-8,10,true);y-=26;if(stage.codes)y=wrap('Pneus: '+stage.codes.join(', '),38,y,515,8)-4;y-=10;}
  const left=s.tires.filter(t=>/esquer/.test(t.position.toLowerCase())),right=s.tires.filter(t=>!/esquer/.test(t.position.toLowerCase()));
