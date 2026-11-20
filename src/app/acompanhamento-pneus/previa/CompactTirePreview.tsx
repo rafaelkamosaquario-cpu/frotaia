@@ -9,7 +9,7 @@ const number=(v:number|null|undefined,d=0)=>v==null?"—":v.toLocaleString("pt-B
 const date=(v:string|undefined)=>v?v.split("-").reverse().join("/"):"Sem leitura";
 export function CompactTirePreview(){
  const [rows,setRows]=useState<TireCaseRow[]>([]),[id,setId]=useState(""),[error,setError]=useState(""),[loaded,setLoaded]=useState(false),[page,setPage]=useState(0),[focus,setFocus]=useState(false);
- useEffect(()=>{const controller=new AbortController();fetch("/api/frota/pneus/cases",{cache:"no-store",signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);setRows(d.cases);setId((d.cases as TireCaseRow[]).find(r=>r.data.client.name.toUpperCase().includes("HMYL"))?.id??d.cases[0]?.id??"");setLoaded(true);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});return()=>controller.abort();},[]);
+ useEffect(()=>{const controller=new AbortController();fetch("/api/frota/pneus/cases",{cache:"no-store",signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);setRows(d.cases);setId((d.cases as TireCaseRow[]).find(r=>r.id===new URLSearchParams(window.location.search).get("cliente"))?.id??(d.cases as TireCaseRow[]).find(r=>r.data.client.name.toUpperCase().includes("HMYL"))?.id??d.cases[0]?.id??"");setLoaded(true);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});return()=>controller.abort();},[]);
  useEffect(()=>{if(!focus)return;const close=(e:KeyboardEvent)=>{if(e.key==="Escape")setFocus(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[focus]);
  const mapRef=useRef<HTMLDivElement>(null);
  const [links,setLinks]=useState<{id:string;x1:number;y1:number;x2:number;y2:number}[]>([]);
