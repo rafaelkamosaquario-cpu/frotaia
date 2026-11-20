@@ -9,7 +9,7 @@ export const caseSchema = z.object({
   baseline:z.object({ product:text, cost:z.number().finite().min(0).max(10000000), distance:km, basis:z.enum(["medido","estimado","parcial"]), notes:z.string().max(1000) }).strict(),
   tires:z.array(z.object({ id:z.string().uuid(), code:text.min(1), product:text.min(1), brand:text, model:text, size:text, dot:text.optional(), treadBrand:text.optional(), treadModel:text.optional(),
     life:z.enum(["Novo","1ª recapagem","2ª recapagem","Outra"]), position:text.min(1), mountedAt:date, mountedKm:km,
-    cost:z.number().finite().min(0).max(10000000), targetKm:km.nullable(), advice:z.string().max(2000),
+    cost:z.number().finite().min(0).max(10000000), costInformed:z.boolean().optional(), targetKm:km.nullable(), advice:z.string().max(2000),
     initialDepth:z.number().finite().positive().max(50).nullable().optional(), retirementDepth:z.number().finite().min(1.6).max(50).optional(), projectedLifeKm:km.nullable().optional()
   }).strict()).min(1).max(24),
   events:z.array(z.object({ id:z.string().uuid(), tireId:z.string().uuid(), date, km,
@@ -53,7 +53,7 @@ export type TireCaseRow = { id:string; company_id:string; actor_id:string; versi
 export function tireResult(t:TireCase["tires"][number],events:TireCase["events"]){
   const readings=events.filter(e=>e.tireId===t.id).sort((a,b)=>a.date.localeCompare(b.date)||a.km-b.km);
   const last=readings.at(-1); const distance=last?last.km-t.mountedKm:null;
-  return { distance, cpk:distance!==null&&distance>0?t.cost/distance:null, closed:last?.type==="Retirada", position:[...readings].reverse().find(e=>e.position)?.position||t.position,
+  return { distance, cpk:t.costInformed!==false&&distance!==null&&distance>0?t.cost/distance:null, closed:last?.type==="Retirada", position:[...readings].reverse().find(e=>e.position)?.position||t.position,
     remaining:t.targetKm!==null?t.targetKm-(last?.km??t.mountedKm):null };
 }
 export function comparison(c:TireCase,t:TireCase["tires"][number]){

@@ -1,13 +1,13 @@
 import {useId} from "react";
 import type {Configuration} from "@/lib/frota/vehicleConfigurations";
 /** Parametric diagram: no embedded tires or axles from another configuration. */
-export function ConfiguredVehicle({config,height,axisY}:{config:Configuration;height:number;axisY:number[]}){
+export function ConfiguredVehicle({config,height,axisY,compact=false}:{config:Configuration;height:number;axisY:number[];compact?:boolean}){
  const gradient=useId();const motor=config.kind==="cavalo"||config.kind==="caminhao";
  const wheels=config.axes.map(a=>a.wheels).join(',');
  const approved=config.kind==='cavalo'&&config.body==='chassi'&&wheels==='2,4'?'/images/tire-cases/truck-4x2.webp':config.kind==='cavalo'&&config.body==='chassi'&&wheels==='2,4,4'?'/images/tire-cases/truck.png':config.kind==='semirreboque'&&config.body==='tanque'&&wheels==='4,4,4,4'?'/images/tire-cases/tanker-mapping.png':null;
  // Preserve approved illustrations for matching standard geometries.
  if(approved&&config.axes.every((a,i)=>a.gap===(i===1?2:1)))return <img alt={config.label} src={approved} className="absolute inset-y-0 left-[32%] h-full w-[36%] object-contain"/>;
- return <svg role="img" aria-label={`${config.label}, ${config.axes.length} eixos, ${config.axes.reduce((n,a)=>n+a.wheels,0)} pneus`} viewBox={`0 0 160 ${height}`} preserveAspectRatio="none" className="absolute inset-y-0 left-[32%] h-full w-[36%]">
+ return <svg role="img" aria-label={`${config.label}, ${config.axes.length} eixos, ${config.axes.reduce((n,a)=>n+a.wheels,0)} pneus`} viewBox={`0 0 160 ${height}`} preserveAspectRatio="none" className={compact?"h-full w-full":"absolute inset-y-0 left-[32%] h-full w-[36%]"}>
  <defs><linearGradient id={gradient}><stop stopColor="#64748b"/><stop offset=".3" stopColor="#e2e8f0"/><stop offset=".6" stopColor="#f8fafc"/><stop offset="1" stopColor="#64748b"/></linearGradient></defs>
  <rect x="47" y="14" width="66" height={height-26} rx="7" fill="#1e293b"/>
  {!motor&&<path d="M80 0L55 30H105Z" fill="#475569"/>}

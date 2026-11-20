@@ -32,7 +32,7 @@ export async function tireCasePdf(row:TireCaseRow){
   y-=12;const r=comparison(c,t);line(`PNEU ${t.code} - ${t.product}`,true);
   line(`Marca/modelo: ${t.brand} ${t.model} | Medida: ${t.size} | Vida: ${t.life}`);
   line(`Montagem: ${t.mountedAt} | Hodômetro: ${t.mountedKm.toLocaleString("pt-BR")} km | Posição inicial: ${t.position}`);
-  line(`Custo desta vida: R$ ${t.cost.toFixed(2)} | Distância acompanhada: ${r.distance??"Sem leitura"} km`);
+  line(`Custo desta vida: ${t.costInformed===false?"Não informado":"R$ "+t.cost.toFixed(2)} | Distância acompanhada: ${r.distance??"Sem leitura"} km`);
   line(`CPK ${r.closed?"da vida encerrada":"parcial (vida em andamento)"}: ${r.cpk===null?"Não calculável":`R$ ${r.cpk.toFixed(4)}/km`}`);
   line(`Referência anterior: ${c.baseline.product||"Não informada"} | ${c.baseline.basis} | CPK: ${r.baseline===null?"Não calculável":`R$ ${r.baseline.toFixed(4)}/km`}`);
   if(r.difference!==null)line(`Diferença de CPK: ${r.difference.toFixed(1)}% ${r.comparable?"(vidas encerradas informadas; conferir equivalência da aplicação)":"(comparação provisória, não comprova economia final)"}`);
