@@ -30,3 +30,5 @@ describe("inventário privado de pneus",()=>{
 
 
 it("4×2 guarda referência sem inventar pneus e rejeita terceiro eixo",()=>{const v={...vehicle,layout:"cavalo4x2",spares:null,mountingReference:{date:"2026-09-25",km:845501}};const s=applyCommand(emptyInventory(customer),{type:"vehicle",vehicle:v});expect(s.tires).toHaveLength(0);expect(s.vehicles[0].mountingReference).toEqual(v.mountingReference);expect(positions(s.vehicles[0])).toHaveLength(6);expect(positions(s.vehicles[0]).filter(p=>p.axis===2)).toHaveLength(4);expect(()=>move(applyCommand(s,batch),"montado","E3-P1")).toThrow("posição inválida");});
+
+it("registra primeira montagem histórica somente com referência exata e sem movimentos posteriores",()=>{let s=fixture();s.vehicles[0].mountingReference={date:"2026-09-09",km:719281};const c={type:"move",tireId:s.tires[0].id,date:"2026-09-09",km:719281,reason:"Aplicação histórica informada",destination:"montado",vehicleId:vehicle.id,position:"E2-P1"};expect(applyCommand(s,c).tires[0].status).toBe("montado");expect(()=>applyCommand(s,{...c,km:1})).toThrow("data");s=move(move(s,"montado","E2-P1"),"estoque");expect(()=>applyCommand(s,c)).toThrow("data");});

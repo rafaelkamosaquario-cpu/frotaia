@@ -4,6 +4,7 @@ import Link from "next/link";
 import {caseSchema,comparison,treadProjection,type TireCase,type TireCaseRow} from "@/lib/frota/tireCases";
 import {TireCaseReport} from "./TireCaseReport";
 import {TireMappingModels} from "./TireMappingModels";
+import type {InventoryRow} from "@/lib/frota/tireInventory";
 const input="w-full rounded-lg border border-border bg-surface p-2 text-foreground";
 const button="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-40";
 function Field({label,value,onChange,type="text"}:{label:string;value:string|number;onChange:(v:string)=>void;type?:string}){return <label className="block text-sm">{label}<input className={input} type={type} step={type==="number"?"any":undefined} value={value} onChange={e=>onChange(e.target.value)}/></label>}
@@ -14,7 +15,8 @@ export function TireCasesClient(){
  const [rows,setRows]=useState<TireCaseRow[]>([]),[selected,setSelected]=useState<TireCaseRow|null>(null),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[query,setQuery]=useState("");
  const [event,setEvent]=useState<TireCase["events"][number]|null>(null);
  const [notice,setNotice]=useState("");
- async function load(){try{const res=await fetch("/api/frota/pneus/cases",{cache:"no-store"});const json=await res.json();if(!res.ok)throw Error(json.error);setRows(json.cases);}catch(e){setError(e instanceof Error?e.message:"Falha ao carregar.");}}
+ const [inventories,setInventories]=useState<InventoryRow[]>([]);
+ async function load(){setError("");try{const res=await fetch("/api/frota/pneus/cases",{cache:"no-store"});const json=await res.json();if(!res.ok)throw Error(json.error);setRows(json.cases);const inv=await fetch("/api/frota/pneus/mapeamento",{cache:"no-store"});const data=await inv.json();if(!inv.ok)throw Error(data.error);setInventories(data.rows);}catch(e){setError(e instanceof Error?e.message:"Falha ao carregar.");}}
  useEffect(()=>{void load();},[]);
  function edit(data:TireCase){setSelected(r=>r?{...r,data}:null);setDirty(true);setNotice("");}
  function choose(row:TireCaseRow){if((dirty||event)&&!confirm("Descartar alterações ou inspeção ainda não salvas?"))return false;setSelected(structuredClone(row));setDirty(false);setEvent(null);setError("");setNotice("");return true;}
@@ -32,6 +34,7 @@ export function TireCasesClient(){
   <p className="text-sm text-muted-foreground">Dois caminhos na sua área privada: acompanhamento e CPK para desempenho; mapeamento para número de fogo, DOT, série, estoque, posições e baixas. O mapeamento permite reutilizar o cliente selecionado, sem copiar pneus ou medições automaticamente.</p>
   <details className="rounded-xl border border-border p-4"><summary className="cursor-pointer font-semibold">Consultar os dois modelos de relatório aprovados</summary><TireMappingModels/></details>
   <div className="grid sm:grid-cols-2 gap-3">{rows.filter(r=>`${r.data.client.name} ${r.data.plate}`.toLowerCase().includes(query.toLowerCase())).map(r=><button className={`${button} text-left`} key={r.id} onClick={()=>choose(r)}><strong>{r.data.client.name} · {r.data.plate}</strong><br/>{r.data.tires.length} pneu(s) · revisão {r.version}</button>)}</div>
+  <div className="grid sm:grid-cols-2 gap-3">{inventories.filter(r=>r.data.tires.length>0||!r.source_case_id).filter(r=>`${r.data.customer.name} ${r.data.vehicles.map(v=>v.plate).join(' ')}`.toLowerCase().includes(query.toLowerCase())).map(r=><section key={r.id} className={`${button} text-left`}><strong>{r.data.customer.name}</strong><p>{r.data.tires.length} pneu(s) · Mapeamento · revisão {r.version}</p>{r.data.vehicles.map(v=><p key={v.id}><Link className="text-primary underline" href={`/acompanhamento-pneus/previa/mapeamento?cliente=${r.id}&veiculo=${v.id}`}>{v.plate} · {v.model} · Abrir ficha</Link></p>)}<Link className="text-primary underline" href={`/acompanhamento-pneus/mapeamento?cliente=${r.id}`}>Cadastro e posições</Link></section>)}</div>
   {c&&selected&&<>
   <div className="rounded-xl border border-border p-4 space-y-2"><b>Cadastro → Pneus e aplicação → Sulcos iniciais → Salvar e abrir ficha → Próximas inspeções</b><p className="text-sm">Quantidade monitorada: {c.tires.length} pneu(s). Cada pneu tem identificação e posição próprias. O telefone permanece no cadastro interno.</p>{selected.version>0&&<button className={button} disabled={busy||dirty||!!event} onClick={startInspection}>Registrar nova inspeção</button>}{dirty&&<p className="text-sm">Salve as alterações do cadastro antes de registrar uma inspeção.</p>}</div>
   <section className="rounded-xl border border-border p-4 space-y-4"><h2 className="text-lg font-semibold">1. Cliente e veículo</h2><div className="grid sm:grid-cols-2 gap-3">

@@ -10,7 +10,7 @@ const n=(v:number|null|undefined,d=0)=>v==null?"Não informado":v.toLocaleString
 const date=(s:string)=>s.split('-').reverse().join('/');
 type SheetTire={id:string;code:string;dot:string;position:string;product:string;size:string;tread:string};
 type Result={codes:string;date:string;distance:number|null;initial:number|null|undefined;depth:number|null|undefined;days:number|null;wear:number|null;kmPerMm:number|null;monthly:number|null;remaining:number|null;months:number|null;total:number|null;limit:number;reference:number|null|undefined;cost:number|null;basis:string};
-export type TireSheetData={name:string;plate:string;vehicle:string;segment:string;version:number;layout:"8x2"|"6x2"|"4x2"|"tank"|null;tires:SheetTire[];stages:TireSheetStage[];results:Result[];inventoryNote?:string};
+export type TireSheetData={name:string;plate:string;vehicle:string;segment:string;version:number;layout:"6x4"|"8x2"|"6x2"|"4x2"|"tank"|null;tires:SheetTire[];stages:TireSheetStage[];results:Result[];inventoryNote?:string};
 export function caseSheetData(row:TireCaseRow):TireSheetData{
  const c=row.data,v=c.vehicle.toLowerCase();const resultGroups=new Map<string,Result>();
  for(const t of c.tires){const r=treadProjection(t,c.events);if(!r.reading)continue;
@@ -21,13 +21,14 @@ export function caseSheetData(row:TireCaseRow):TireSheetData{
 }
 export function inventorySheetData(row:InventoryRow,vehicleId:string):TireSheetData{
  const s=row.data,v=s.vehicles.find(v=>v.id===vehicleId);if(!v)throw Error("Veículo não encontrado");const cfg=configurationOf(v),pp=positions(v),tt=s.tires.filter(t=>t.status==="montado"&&t.vehicleId===v.id),w=cfg.axes.map(a=>a.wheels).join(',');
- const layout=cfg.kind==="caminhao"&&w==="2,2,4,4"?"8x2":cfg.kind==="cavalo"?(w==="2,4"?"4x2":w==="2,4,4"?"6x2":null):cfg.body==="tanque"&&cfg.axes.length===4?"tank":null;
+ const layout=cfg.kind==="caminhao"&&w==="2,4,4"&&/6\s*[x×]\s*4/i.test(cfg.label)?"6x4":cfg.kind==="caminhao"&&w==="2,2,4,4"?"8x2":cfg.kind==="cavalo"?(w==="2,4"?"4x2":w==="2,4,4"?"6x2":null):cfg.body==="tanque"&&cfg.axes.length===4?"tank":null;
  return {name:s.customer.name,plate:v.plate,vehicle:v.model+" · "+cfg.label,segment:v.segment||cfg.label,version:row.version,layout,tires:tt.map(t=>({id:t.id,code:t.fire,dot:t.dot||"Não informado",position:(()=>{const pos=pp.find(p=>p.id===t.position);return pos?pos.label+(pos.axis>0?" · "+cfg.axes[pos.axis-1].role:""):"Posição não informada";})(),product:[t.brand,t.model,t.life==="1ª recapagem"?"1º RCP":t.life].join(" · "),size:t.size,tread:t.tread})),stages:v.mountingReference?[{label:"Aplicação",date:v.mountingReference.date,km:v.mountingReference.km}]:[],results:[],inventoryNote:`${tt.length} pneus montados · ${s.tires.filter(t=>t.status==="estoque").length} pneus em estoque. Marcação física: ${tt.length&&tt.every(t=>t.marked)?"confirmada":"a confirmar"}.`};
 }
 export function sheetPoint(layout:TireSheetData['layout'],position:string){
  if(layout==="8x2"){const p=rigid8x2TirePoint(position);return p?{x:p.x/887,y:p.y/1774}:null;}
  const p=position.toLowerCase(),a=p.match(/eixo\s*([1-4])\b/)??p.match(/\b([1-4])[º°o]?\s*eixo/),ax=a?Number(a[1]):0;
  const left=/esquer/.test(p),right=/direit/.test(p),inner=/intern|dentro/.test(p);if(!ax||left===right||!layout)return null;
+ if(layout==="6x4")return ax<=3?{x:left?(inner?.28:.21):(inner?.72:.79),y:[.20,.725,.85][ax-1]}:null;
  const ys=layout==="4x2"?[.48,.86]:layout==="6x2"?[.48,.72,.89]:[.39,.50,.62,.74];if(!ys[ax-1])return null;
  return {x:left?(inner?.33:.25):(inner?.67:.75),y:ys[ax-1]};
 }
@@ -45,7 +46,7 @@ export async function tireSheetPdf(s:TireSheetData){
  function next(){page=doc.addPage([595.28,841.89]);header();}
  function room(h:number){if(y-h<52)next();}
  header();
- const assets={"8x2":"scania-p-chassi-8x2-v2.png","6x2":"truck.png","4x2":"truck-4x2.webp",tank:"tanker-mapping.png"};
+ const assets={"6x4":"mercedes-axor-chassi-6x4.png","8x2":"scania-p-chassi-8x2-v2.png","6x2":"truck.png","4x2":"truck-4x2.webp",tank:"tanker-mapping.png"};
  const image=s.layout?await doc.embedPng(await sharp(await readFile(path.join(process.cwd(),'public/images/tire-cases',assets[s.layout]))).resize({height:1000,withoutEnlargement:true}).png().toBuffer()):null;
  for(const stage of s.stages){room(78);box(28,y,539,20,'E7F3F8');text('SITUAÇÃO REGISTRADA · '+stage.label.toUpperCase(),38,y-4,9,true,col('167D98'));y-=20;box(28,y,539,stage.codes?52:32,'FAF7ED');text(`${date(stage.date)}    Odômetro: ${n(stage.km)} km${stage.depth!=null?`    Sulco: ${n(stage.depth,1)} mm`:''}`,38,y-8,10,true);y-=26;if(stage.codes)y=wrap('Pneus: '+stage.codes.join(', '),38,y,515,8)-4;y-=10;}
  const left=s.tires.filter(t=>/esquer/.test(t.position.toLowerCase())),right=s.tires.filter(t=>!/esquer/.test(t.position.toLowerCase()));
@@ -56,7 +57,7 @@ export async function tireSheetPdf(s:TireSheetData){
  for(const [side,list] of [[0,left],[1,right]] as const){for(const [i,t] of list.slice(g*2,g*2+2).entries()){
  const x=side?383:28,cy=top-12-i*118,p=sheetPoint(s.layout,t.position);
  if(p){const sx=side?383:212,sy=cy-49,ex=ix+iw*p.x,ey=iy+ih*(1-p.y),mid=sx+(ex-sx)*.35;page.drawLine({start:{x:sx,y:sy},end:{x:mid,y:sy},color:gold,thickness:1});page.drawLine({start:{x:mid,y:sy},end:{x:ex,y:ey},color:gold,thickness:1});}
- box(x,cy,184,108,'F0F5F8');box(x,cy,3,108,'BA962C');let yy=wrap('Nº '+t.code, x+10,cy-8,164,9,true)-3;yy=wrap('DOT: '+t.dot,x+10,yy,164,8)-3;yy=wrap(t.position,x+10,yy,164,8)-3;yy=wrap(t.product,x+10,yy,164,8,true)-3;if(t.tread)yy=wrap(t.tread,x+10,yy,164,8,true)-2;wrap('Medida: '+t.size,x+10,yy,164,8);
+ box(x,cy,184,108,'F0F5F8');box(x,cy,3,108,'BA962C');let yy=wrap((t.code===t.dot?'DOT ':'Nº ')+t.code, x+10,cy-8,164,9,true)-3;yy=wrap('DOT: '+t.dot,x+10,yy,164,8)-3;yy=wrap(t.position,x+10,yy,164,8)-3;yy=wrap(t.product,x+10,yy,164,8,true)-3;if(t.tread)yy=wrap(t.tread,x+10,yy,164,8,true)-2;wrap('Medida: '+t.size,x+10,yy,164,8);
  }}
  text('Frente acima · desenho ilustrativo',229,iy-6,7,false,muted);y=iy-30;
  }

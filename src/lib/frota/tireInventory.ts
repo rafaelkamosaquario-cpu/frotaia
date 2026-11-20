@@ -79,7 +79,11 @@ export function applyCommand(input:Inventory,raw:unknown,now=new Date().toISOStr
  }
  if(t.status==="baixado")throw Error("Pneu baixado não pode voltar à operação.");
  const latest=s.movements.filter(m=>m.tireId===t.id&&m.reason!=="").filter(m=>m.km!==null||m.from!==m.to).at(-1);
- if(c.date<t.createdDate||(latest&&c.date<latest.date))throw Error("A data não pode anteceder a última movimentação.");
+ // A customer may register an existing application after buying the mapping service.
+ // Only the first mounting can predate entry, and must match the saved vehicle reference.
+ const ref=s.vehicles.find(v=>v.id===c.vehicleId)?.mountingReference;
+ const initialHistoricalMount=c.destination==="montado"&&t.status==="estoque"&&!!ref&&c.date===ref.date&&c.km===ref.km&&!s.movements.some(m=>m.tireId===t.id&&m.from!=="cadastro"&&(m.km!==null||m.from!==m.to));
+ if(!initialHistoricalMount&&(c.date<t.createdDate||(latest&&c.date<latest.date)))throw Error("A data não pode anteceder a última movimentação.");
  if(c.destination==="montado"){
   const v=s.vehicles.find(v=>v.id===c.vehicleId);
   if(!v||!positions(v).some(p=>p.id===c.position))throw Error("Veículo ou posição inválida.");
