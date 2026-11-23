@@ -63,12 +63,13 @@ export async function tireSheetPdf(s:TireSheetData){
  }
  if(!s.results.length){room(86);box(28,y,539,80,'EBF5F0');box(28,y,3,80,'3C816B');text('Aplicação registrada · aguardando primeira inspeção',40,y-10,11,true);wrap(s.inventoryNote||`${s.tires.length} pneus cadastrados. Sulco inicial conforme registro de aplicação.`,40,y-30,510,9);wrap('Rodagem, rendimento por milímetro, média mensal e projeção serão calculados após a inspeção com data, odômetro e sulco medido.',40,y-51,510,9,false,muted);y-=94;}
  for(const r of s.results){room(240);text('RESULTADO REGISTRADO · INSPEÇÃO '+date(r.date),28,y,11,true);y-=19;y=wrap('Pneus: '+r.codes,28,y,539,8,false,muted)-6;
- box(28,y,539,46,'F0F5F8');text('Rodagem registrada',40,y-6,9);text(n(r.distance)+' km',40,y-21,19,true,col('167D98'));text('Sulco inicial / atual',240,y-6,9);text(`${n(r.initial,1)} / ${n(r.depth,1)} mm`,240,y-23,13,true);text('Período acompanhado',410,y-6,9);text(n(r.days)+' dias',410,y-23,13,true);y-=52;
- box(28,y,539,49,'E7F3F8');text('Rendimento por milímetro de borracha',40,y-6,9,true);text(n(r.kmPerMm)+' km/mm',40,y-22,16,true,col('167D98'));text('Rodagem média por mês',320,y-6,9,true);text(n(r.monthly)+' km/mês',320,y-22,16,true,col('167D98'));y-=56;
- y=wrap(`Desgaste: ${n(r.wear,1)} mm · Compra por pneu: ${r.cost==null?'não informada':'R$ '+n(r.cost,2)} · Custo parcial: ${r.cost!=null&&r.distance? 'R$ '+n(r.cost/r.distance,4)+'/km':'sem base'} · ${r.basis}. Mês de 30 dias.`,28,y,539,8,false,muted)-5;
+ box(28,y,539,46,'F0F5F8');text('Rodagem registrada',40,y-6,9);text(n(r.distance)+' km',40,y-21,19,true,col('111111'));text('Sulco inicial / atual',240,y-6,9);text(`${n(r.initial,1)} / ${n(r.depth,1)} mm`,240,y-23,13,true);text('Desgaste: '+n(r.wear,1)+' mm',410,y-4,10,true);text('Período acompanhado',410,y-19,8);text(n(r.days)+' dias',410,y-30,11,true);y-=52;
+ box(28,y,539,49,'E7F3F8');text('Rendimento por mm de borracha',40,y-6,8,true);text(n(r.kmPerMm)+' km/mm',40,y-23,14,true,col('167D98'));text('Custo parcial por km',225,y-6,8,true);text(r.cost!=null&&r.distance&&r.distance>0?'R$ '+n(r.cost/r.distance,4)+'/km':'Sem base',225,y-23,14,true,col('167D98'));text('Por pneu · nesta inspeção',225,y-43,7);text('Rodagem média por mês',414,y-6,8,true);text(n(r.monthly)+' km/mês',414,y-23,14,true,col('167D98'));y-=56;
+ y=wrap(`${r.basis}. Mês de 30 dias.`,28,y,539,8,false,muted)-5;
  box(28,y,539,64,'EBF5F0');text('PROJEÇÃO · RODAGEM TOTAL ESTIMADA',40,y-5,9,true);text(r.total==null?'Sem base para estimar':n(r.total)+' km',40,y-19,18,true);text(`Restante: ${n(r.remaining)} km · ${n(r.months,2)} meses`,285,y-24,11,true);text(`Referência comercial: ${n(r.reference)} km · Retirada de referência: ${n(r.limit,1)} mm`,40,y-46,8);y-=74;
  room(30);y=wrap('Projeção referente à inspeção visual e à medição de sulco na data acima. Ainda não é o resultado final. Mantendo o ritmo observado de desgaste e uso, o pneu poderá atingir o total estimado. Atualizar nas próximas inspeções.',28,y,539,8,false,muted)-12;
  }
  doc.getPages().forEach((p,i)=>{p.drawLine({start:{x:28,y:38},end:{x:567,y:38},color:col('DCE5E9')});p.drawText(`RodoCore Consultoria · Revisão ${s.version} · ${i+1} / ${doc.getPageCount()}`,{x:28,y:24,font,size:8,color:muted});});
  return doc.save();
 }
+
