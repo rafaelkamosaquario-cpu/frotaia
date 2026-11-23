@@ -66,7 +66,7 @@ export function CompactTirePreview(){
  </section>;})}</div></>}
  <footer>{applicationOnly?"Somente aplicação registrada. Ainda não há inspeção ou resultado de desempenho. ":""}{!applicationOnly&&<>Projeção referente à inspeção visual e à medição de sulco na data da inspeção indicada acima. O rendimento observado mostra quantos quilômetros o pneu rodou por milímetro de borracha consumido. Ainda não é o resultado final: mantendo esse ritmo de desgaste e de uso, o pneu poderá atingir o total estimado. A estimativa deve ser atualizada nas próximas inspeções.</>} Revisão {row.version} · Ficha {page+1}/{pages}. {group.some(t=>/provisório/i.test(t.code))&&"Códigos provisórios não substituem números de fogo. "}{group.some(t=>t.life==="Outra")&&"Histórico de recapagem a confirmar. "} Confira autorização do cliente antes de publicar.</footer>
  </div></article></FittedTireSheet>
- <p>O PDF da ficha está disponível nos botões acima. Os campos completos continuam em “Cadastro e edição”. A ficha usa as medições registradas de cada pneu; dados ausentes aparecem como “—”.</p></>}
+ </>}
  </div>;
 }
 
