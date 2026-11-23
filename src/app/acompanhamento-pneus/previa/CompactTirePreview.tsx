@@ -1,4 +1,5 @@
 "use client";
+import {FittedTireSheet} from "./FittedTireSheet";
 import {TirePdfActions} from "./TirePdfActions";
 import {rigid8x2TirePoint} from "@/lib/frota/rigid8x2TireLayout";
 import {TireSheetTimeline} from "./TireSheetTimeline";
@@ -10,28 +11,27 @@ import styles from "./preview.module.css";
 const number=(v:number|null|undefined,d=0)=>v==null?"—":v.toLocaleString("pt-BR",{maximumFractionDigits:d});
 const date=(v:string|undefined)=>v?v.split("-").reverse().join("/"):"Sem leitura";
 export function CompactTirePreview(){
- const [rows,setRows]=useState<TireCaseRow[]>([]),[id,setId]=useState(""),[error,setError]=useState(""),[loaded,setLoaded]=useState(false),[page,setPage]=useState(0),[focus,setFocus]=useState(false);
+ const [rows,setRows]=useState<TireCaseRow[]>([]),[id,setId]=useState(""),[error,setError]=useState(""),[loaded,setLoaded]=useState(false),[page,setPage]=useState(0);
  useEffect(()=>{const controller=new AbortController();fetch("/api/frota/pneus/cases",{cache:"no-store",signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);setRows(d.cases);setId((d.cases as TireCaseRow[]).find(r=>r.id===new URLSearchParams(window.location.search).get("cliente"))?.id??(d.cases as TireCaseRow[]).find(r=>r.data.client.name.toUpperCase().includes("HMYL"))?.id??d.cases[0]?.id??"");setLoaded(true);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});return()=>controller.abort();},[]);
- useEffect(()=>{if(!focus)return;const close=(e:KeyboardEvent)=>{if(e.key==="Escape")setFocus(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[focus]);
  const mapRef=useRef<HTMLDivElement>(null);
  const [links,setLinks]=useState<{id:string;x1:number;y1:number;x2:number;y2:number}[]>([]);
  useEffect(()=>{
   const map=mapRef.current;if(!map)return;
   const update=()=>{
-   const bounds=map.getBoundingClientRect();
+   const bounds=map.getBoundingClientRect(),scale=bounds.width/map.offsetWidth||1;
    const cards=Array.from(map.querySelectorAll<HTMLElement>("[data-tire-card]"));
    const next=Array.from(map.querySelectorAll<SVGGraphicsElement>("[data-tire-point]")).flatMap(point=>{
     const card=cards.find(card=>card.dataset.tireCard===point.dataset.tirePoint);if(!card)return [];
     const a=card.getBoundingClientRect(),b=point.getBoundingClientRect();
     const left=a.left<b.left;
-    return [{id:point.dataset.tirePoint!,x1:(left?a.right:a.left)-bounds.left,y1:a.top+a.height/2-bounds.top,x2:b.left+b.width/2-bounds.left,y2:b.top+b.height/2-bounds.top}];
+    return [{id:point.dataset.tirePoint!,x1:((left?a.right:a.left)-bounds.left)/scale,y1:(a.top+a.height/2-bounds.top)/scale,x2:(b.left+b.width/2-bounds.left)/scale,y2:(b.top+b.height/2-bounds.top)/scale}];
    });
    setLinks(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);
   };
   update();const observer=new ResizeObserver(update);observer.observe(map);
   map.querySelectorAll("[data-tire-card],figure").forEach(el=>observer.observe(el));
   return()=>observer.disconnect();
- },[rows,id,page,focus]);
+ },[rows,id,page]);
  const row=rows.find(r=>r.id===id),c=row?.data;
  const group=c?.tires.slice(page*4,page*4+4)??[];
  const vehicle=c?.vehicle.toLowerCase()??"";
@@ -45,11 +45,11 @@ export function CompactTirePreview(){
  return <div className={styles.page}>
  <h1>Prévia · ficha compacta de acompanhamento</h1><p>Exemplo com dados salvos. Esta tela não altera o cadastro.</p>
  {error&&<p role="alert">{error}</p>}{!loaded&&!error&&<p>Carregando clientes…</p>}
- <div className={styles.actions}><label>Cliente <select value={id} onChange={e=>{setId(e.target.value);setPage(0);}}>{rows.map(r=><option key={r.id} value={r.id}>{r.data.client.name} · {r.data.plate}</option>)}</select></label><a href="/acompanhamento-pneus">Cadastro e edição</a><a href="/acompanhamento-pneus/mapeamento">Pré-cadastro e mapeamento</a><a href="/acompanhamento-pneus/previa/mapeamento">Fichas dos clientes de mapeamento</a>{c&&<button onClick={()=>setFocus(true)}>Abrir só a ficha para print</button>}</div>
+ <div className={styles.actions}><label>Cliente <select value={id} onChange={e=>{setId(e.target.value);setPage(0);}}>{rows.map(r=><option key={r.id} value={r.id}>{r.data.client.name} · {r.data.plate}</option>)}</select></label><a href="/acompanhamento-pneus">Cadastro e edição</a><a href="/acompanhamento-pneus/mapeamento">Pré-cadastro e mapeamento</a><a href="/acompanhamento-pneus/previa/mapeamento">Fichas dos clientes de mapeamento</a></div>
  {loaded&&!c&&<p>Nenhum acompanhamento salvo.</p>}
  {c&&row&&<><TirePdfActions url={`/api/frota/pneus/cases/pdf?id=${row.id}`} plate={c.plate}/><div className={styles.actions}>{pages>1&&<><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Ficha {page+1} de {pages}</span><button disabled={page===pages-1} onClick={()=>setPage(p=>p+1)}>Próxima</button></>}</div>
- <div className={focus?styles.overlay:undefined} role={focus?"dialog":undefined} aria-modal={focus||undefined} aria-label={focus?"Ficha para captura de tela":undefined}>
- {focus&&<button className={styles.close} onClick={()=>setFocus(false)}>Voltar · Esc</button>}
+ <FittedTireSheet>
+ 
  <article className={styles.sheet}>
  <TireSheetBrand/>
  <div className={styles.content}>
@@ -65,7 +65,7 @@ export function CompactTirePreview(){
  <div className={styles.projection}><span>PROJEÇÃO · RODAGEM TOTAL ESTIMADA</span><strong className={styles.projectedTotal}>{number(r.total)} km</strong><b>Restante estimado: mais {number(r.remaining)} km · aproximadamente {number(r.months,2)} meses</b><span>Referência comercial: {number(t.projectedLifeKm)} km · Retirada de referência: {number(r.limit,1)} mm</span></div>
  </section>;})}</div></>}
  <footer>{applicationOnly?"Somente aplicação registrada. Ainda não há inspeção ou resultado de desempenho. ":""}{!applicationOnly&&<>Projeção referente à inspeção visual e à medição de sulco na data da inspeção indicada acima. O rendimento observado mostra quantos quilômetros o pneu rodou por milímetro de borracha consumido. Ainda não é o resultado final: mantendo esse ritmo de desgaste e de uso, o pneu poderá atingir o total estimado. A estimativa deve ser atualizada nas próximas inspeções.</>} Revisão {row.version} · Ficha {page+1}/{pages}. {group.some(t=>/provisório/i.test(t.code))&&"Códigos provisórios não substituem números de fogo. "}{group.some(t=>t.life==="Outra")&&"Histórico de recapagem a confirmar. "} Confira autorização do cliente antes de publicar.</footer>
- </div></article></div>
+ </div></article></FittedTireSheet>
  <p>O PDF da ficha está disponível nos botões acima. Os campos completos continuam em “Cadastro e edição”. A ficha usa as medições registradas de cada pneu; dados ausentes aparecem como “—”.</p></>}
  </div>;
 }

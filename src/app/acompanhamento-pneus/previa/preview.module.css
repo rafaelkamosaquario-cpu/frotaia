@@ -22,4 +22,45 @@
 
 /* Shared inspection metrics: distance, wear and cost per tire. */
 .metrics .distanceMetric strong{color:#111}.yieldMetric{grid-template-columns:repeat(3,minmax(0,1fr))}.yieldMetric strong{font-size:17px}.yieldMetric span{font-size:10px}@media(max-width:600px){.yieldMetric{gap:5px}.yieldMetric strong{font-size:13px}.yieldMetric span{font-size:9px}.yieldMetric>div+div{padding-left:5px}}
-
+/* Complete sheet fitted inside the panel, below the RodoCore navigation. */
+.fitFrame{position:relative;width:100%;max-width:720px;margin:8px 0;scroll-margin-top:8px}
+.fitCanvas{width:100%;transform-origin:top center}
+@media(max-width:600px){
+ .page{padding:8px}
+ .fitFrame .brand{padding:7px 10px}
+ .fitFrame .brand b{font-size:16px}
+ .fitFrame .brand div{gap:1px}
+ .fitFrame .content{padding:8px}
+ .fitFrame .content h2{font-size:14px;line-height:1.2}
+ .fitFrame .clientName span{font-size:9px}
+ .fitFrame .vehicleIdentity{font-size:9px;margin-top:4px;gap:3px 10px}
+ .fitFrame .operation{font-size:9px;line-height:1.25;margin:3px 0 5px}
+ .fitFrame .ribbon{padding:5px;font-size:8px}
+ .fitFrame .timeline{margin-bottom:4px}
+ .fitFrame .timeline li{font-size:8px;padding:3px 5px;line-height:1.25}
+ .fitFrame .timeline p{margin-top:2px}
+ .fitFrame .timeline li>div>b{min-width:65px}
+ .fitFrame .map{gap:5px;margin:5px 0}
+ .fitFrame .map img,.fitFrame .map svg,.fitFrame .configuredCompact{height:145px}
+ .fitFrame .map .connectors{height:100%}
+ .fitFrame .tire{font-size:8px;line-height:1.25;padding:5px;margin:4px 0;gap:2px;border-left-width:3px}
+ .fitFrame .tire strong{font-size:8px}
+ .fitFrame .map figcaption{font-size:7px;line-height:1.2}
+ .fitFrame .content h3{font-size:10px;margin:5px 0 3px}
+ .fitFrame .results section{padding:5px}
+ .fitFrame .shared .metrics{grid-template-columns:1.1fr 1fr 1.15fr;gap:5px;margin:4px 0}
+ .fitFrame .metrics .distanceMetric{grid-column:auto}
+ .fitFrame .metrics .distanceMetric strong{font-size:17px}
+ .fitFrame .metrics strong{font-size:10px}
+ .fitFrame .metrics span,.fitFrame .resultDate{font-size:8px}
+ .fitFrame .yieldMetric{padding:5px;margin:5px 0;gap:4px}
+ .fitFrame .yieldMetric span{font-size:8px;line-height:1.2}
+ .fitFrame .yieldMetric strong{font-size:11px}
+ .fitFrame .yieldMetric small{font-size:7px;line-height:1.2}
+ .fitFrame .yieldMetric>div{gap:2px}
+ .fitFrame .projection{padding:5px;margin-top:4px;gap:2px}
+ .fitFrame .shared .projection{font-size:9px}
+ .fitFrame .shared .projection span,.fitFrame .shared .projection>span:first-child{font-size:8px;letter-spacing:0}
+ .fitFrame .projectedTotal{font-size:20px}
+ .fitFrame .content footer{font-size:7px;line-height:1.25;margin-top:5px;padding-top:5px}
+}
