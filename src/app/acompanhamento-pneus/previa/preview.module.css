@@ -64,3 +64,5 @@
  .fitFrame .projectedTotal{font-size:20px}
  .fitFrame .content footer{font-size:7px;line-height:1.25;margin-top:5px;padding-top:5px}
 }
+
+@media(max-width:600px){.fitFrame .brand{line-height:1.15}.fitFrame .shared .metrics strong{font-size:10px;line-height:1.2}.fitFrame .metrics .distanceMetric strong{font-size:17px;line-height:1.2}.fitFrame .yieldMetric strong{line-height:1.2}.fitFrame .projection{line-height:1.2}.fitFrame .shared .projection{padding:5px}.fitFrame .content{line-height:1.25}}
