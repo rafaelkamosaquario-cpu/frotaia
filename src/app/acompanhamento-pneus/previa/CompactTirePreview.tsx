@@ -1,5 +1,6 @@
 "use client";
 import {FittedTireSheet} from "./FittedTireSheet";
+import {tireCustomerMessage} from "@/lib/frota/tireCustomerMessage";
 import {TirePdfActions} from "./TirePdfActions";
 import {rigid8x2TirePoint} from "@/lib/frota/rigid8x2TireLayout";
 import {TireSheetTimeline} from "./TireSheetTimeline";
@@ -47,7 +48,7 @@ export function CompactTirePreview(){
  {error&&<p role="alert">{error}</p>}{!loaded&&!error&&<p>Carregando clientes…</p>}
  <div className={styles.actions}><label>Cliente <select value={id} onChange={e=>{setId(e.target.value);setPage(0);}}>{rows.map(r=><option key={r.id} value={r.id}>{r.data.client.name} · {r.data.plate}</option>)}</select></label><a href="/acompanhamento-pneus">Cadastro e edição</a><a href="/acompanhamento-pneus/mapeamento">Pré-cadastro e mapeamento</a><a href="/acompanhamento-pneus/previa/mapeamento">Fichas dos clientes de mapeamento</a></div>
  {loaded&&!c&&<p>Nenhum acompanhamento salvo.</p>}
- {c&&row&&<><TirePdfActions url={`/api/frota/pneus/cases/pdf?id=${row.id}`} plate={c.plate}/><div className={styles.actions}>{pages>1&&<><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Ficha {page+1} de {pages}</span><button disabled={page===pages-1} onClick={()=>setPage(p=>p+1)}>Próxima</button></>}</div>
+ {c&&row&&<><TirePdfActions url={`/api/frota/pneus/cases/pdf?id=${row.id}`} plate={c.plate} message={tireCustomerMessage({name:c.client.name,plate:c.plate,vehicle:c.vehicle,stages:tireSheetTimeline(c.tires,c.events),traction:c.tires.length>0&&c.tires.every(t=>/tra[çc][aã]o/i.test(t.position))})}/><div className={styles.actions}>{pages>1&&<><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Ficha {page+1} de {pages}</span><button disabled={page===pages-1} onClick={()=>setPage(p=>p+1)}>Próxima</button></>}</div>
  <FittedTireSheet>
  
  <article className={styles.sheet}>
