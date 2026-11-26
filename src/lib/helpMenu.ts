@@ -18,6 +18,30 @@
  * no webhook (servidor) quanto em componentes client do painel web.
  */
 
+export type PersonaId = "pistao" | "frete" | "piso" | "frota";
+
+export interface Persona {
+  id: PersonaId;
+  emoji: string;
+  titulo: string;
+  /** Frase curta de posicionamento (igual à usada na assinatura do system prompt e no onboarding). */
+  tagline: string;
+}
+
+/**
+ * Apresentação em "equipe de especialistas" (proposta 11/2026, documento
+ * 02-Frota-IA-Proposta-Personas) — camada de rótulo sobre as mesmas
+ * CATEGORIAS_AJUDA de sempre, nenhuma categoria/id/exemplo foi removido
+ * ou fundido (ver decisão abaixo). Ordem fixa de apresentação, independente
+ * da ordem de CATEGORIAS_AJUDA.
+ */
+export const PERSONAS: Persona[] = [
+  { id: "pistao", emoji: "⛽", titulo: "Pistão", tagline: "combustível e pneus" },
+  { id: "frete", emoji: "💰", titulo: "Frete", tagline: "ganhos e custos" },
+  { id: "piso", emoji: "🛡️", titulo: "Piso", tagline: "proteção contra multa da ANTT" },
+  { id: "frota", emoji: "🔧", titulo: "Frota", tagline: "seu caminhão e sua operação" },
+];
+
 export interface CategoriaAjuda {
   id: string;
   emoji: string;
@@ -26,6 +50,18 @@ export interface CategoriaAjuda {
   descricao: string;
   /** 2-4 frases de exemplo, sempre mensagens reais que o cliente mandaria. */
   exemplos: string[];
+  /**
+   * Persona (acima) sob a qual esta categoria aparece agrupada na
+   * apresentação em equipe — rótulo editorial por TEMA predominante do
+   * ponto de vista do cliente, não um espelho 1:1 da ferramenta interna
+   * que acaba sendo chamada (ex.: "pneus_manutencao" agrupa em Pistão pelo
+   * tema "pneu", mesmo citando manutenção preventiva, que tecnicamente é
+   * outra ferramenta). Decisão deliberada 11/2026: manter id/titulo/
+   * descricao/exemplos desta categoria intocados (não fundir as 9 em 4) —
+   * ver regressão de 07/08/2026 registrada em helpMenu.test.ts, onde
+   * resumir/fundir categoria já fez a IA esquecer uma área inteira.
+   */
+  persona: PersonaId;
 }
 
 export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
@@ -40,6 +76,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
       "Tenho duas propostas de frete, compare pra mim",
       "Quero encontrar carga voltando pra Curitiba",
     ],
+    persona: "frete",
   },
   {
     id: "combustivel_custos",
@@ -52,6 +89,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
       "Quanto custa meu caminhão parado por 3 dias?",
       "Qual minha margem nesse frete?",
     ],
+    persona: "frete",
   },
   {
     id: "pneus_manutencao",
@@ -59,6 +97,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     titulo: "Manutenção e pneus",
     descricao: "Comparo pneu novo com pneu recapado, calculo o custo por quilômetro rodado e ajudo a organizar sua manutenção preventiva.",
     exemplos: ["Vale mais a pena recapar ou comprar pneu novo?", "De quanto em quanto tempo faço manutenção preventiva?"],
+    persona: "pistao",
   },
   {
     id: "documentos",
@@ -66,6 +105,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     titulo: "Documentos e vencimentos",
     descricao: "Leio fotos, PDFs e planilhas compatíveis enviados pelo WhatsApp. A geração e consulta de relatórios são funções do adicional do aplicativo. No aplicativo, converse por texto ou voz compatível; arquivos são enviados pelo WhatsApp.",
     exemplos: ["Manda foto de nota fiscal, CRLV, CT-e ou comprovante de seguro", "Gera o relatório dessa análise em PDF", "Quais documentos eu já gerei?"],
+    persona: "frota",
   },
   {
     id: "alertas_agenda",
@@ -73,6 +113,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     titulo: "Agenda e lembretes",
     descricao: "No adicional do aplicativo, crio lembretes de vencimento, cobrança e manutenção por data e horário, com confirmação do agendamento. A conexão da Agenda Google depende da sua autorização.",
     exemplos: ["Me avise 15 dias antes de vencer o seguro", "Me lembra de cobrar esse frete daqui a 30 dias", "Marca a revisão do caminhão pra semana que vem"],
+    persona: "frota",
   },
   {
     id: "jornada",
@@ -80,6 +121,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     titulo: "Jornada",
     descricao: "Ajudo a planejar sua jornada de viagem, considerando horário de saída, tempo de direção, pausas e períodos de descanso.",
     exemplos: ["Vou sair amanhã às 5h de Curitiba pra São Paulo, organize minha jornada", "Dá tempo de fazer essa viagem sozinho, sem parar?"],
+    persona: "frota",
   },
   {
     id: "rotas",
@@ -87,6 +129,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     titulo: "Rotas e viagens",
     descricao: "Calculo a distância e a duração estimada dos trajetos e guardo as rotas que você roda com frequência.",
     exemplos: ["Salva essa rota", "Quais rotas eu tenho salvas?"],
+    persona: "frota",
   },
   {
     id: "historico_legislacao",
@@ -94,6 +137,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     titulo: "Análises e histórico",
     descricao: "Guardo suas análises pra você consultar depois, e busco informação atualizada sobre piso mínimo, preço de combustível e legislação de trânsito.",
     exemplos: ["Traga a análise que eu fiz semana passada", "Esse valor está acima do piso mínimo da ANTT?", "Qual o preço do diesel essa semana?"],
+    persona: "piso",
   },
   {
     id: "noticias",
@@ -101,6 +145,7 @@ export const CATEGORIAS_AJUDA: CategoriaAjuda[] = [
     titulo: "Notícias do transporte",
     descricao: "No adicional do aplicativo, consulte notícias e informações do setor em fontes como ANTT, ANP, PRF e imprensa especializada. O resumo disponível informa a data; você também pode pedir uma busca atualizada.",
     exemplos: ["Quero receber notícias do setor todo dia", "Pode desativar as notícias diárias"],
+    persona: "frota",
   },
 ];
 
@@ -186,12 +231,21 @@ export function ehPedidoDeGuia(texto: string | undefined | null): boolean {
  * de lista nativa do WhatsApp. Apresentação por área, sem ícones,
  * numeração ou exemplos, para leitura natural no aplicativo e WhatsApp.
  * Os exemplos permanecem nos dados de referência, não nesta apresentação.
+ *
+ * Agrupada por persona (11/2026) — o cabeçalho de cada persona usa só
+ * `*negrito*` e o nome (sem emoji): os emojis de PERSONAS coincidem com
+ * emojis já usados por CATEGORIAS_AJUDA (ex.: 💰 e 🔧), e o teste de
+ * leitura por voz (speechText.test.ts) exige que nenhum desses emojis
+ * apareça neste texto — por isso o asterisco (removido na preparação
+ * pra voz), nunca o emoji, carrega a ênfase aqui.
  */
 export function construirTextoAjudaCompleto(): string {
-  const intro = "Sou o Frota IA, seu assistente na estrada. Posso ajudar você nestas áreas:";
-  const categorias = CATEGORIAS_AJUDA.map((categoria) =>
-    `${categoria.titulo}\n${categoria.descricao}`
-  ).join("\n\n");
-  return `${intro}\n\n${categorias}\n\nO plano WhatsApp e o adicional do aplicativo são contratados separadamente. Adicional: R$ 9,90 por um mês, sem renovação automática; requer plano WhatsApp ativo. Clientes com acesso já incluído mantêm sua condição. Instalar o aplicativo não ativa as funções pagas. Conheça: https://frotaia.up.railway.app/adicional-aplicativo`;
+  const intro = "Sou o Frota IA, seu assistente na estrada. Você tem 4 especialistas aqui dentro:";
+  const grupos = PERSONAS.map((persona) => {
+    const categoriasDaPersona = CATEGORIAS_AJUDA.filter((categoria) => categoria.persona === persona.id);
+    const corpo = categoriasDaPersona.map((categoria) => `${categoria.titulo}\n${categoria.descricao}`).join("\n\n");
+    return `*${persona.titulo} — ${persona.tagline}*\n${corpo}`;
+  }).join("\n\n");
+  return `${intro}\n\n${grupos}\n\nO plano WhatsApp e o adicional do aplicativo são contratados separadamente. Adicional: R$ 9,90 por um mês, sem renovação automática; requer plano WhatsApp ativo. Clientes com acesso já incluído mantêm sua condição. Instalar o aplicativo não ativa as funções pagas. Conheça: https://frotaia.up.railway.app/adicional-aplicativo`;
 }
 
