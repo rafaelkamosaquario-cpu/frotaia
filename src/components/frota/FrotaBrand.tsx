@@ -12,7 +12,7 @@ export function FrotaBrand({ compact = false, className, master = false }: { com
       </span>
       <div className="flex flex-col">
       <span className="text-base font-bold tracking-tight text-foreground">
-        {master ? <>Rodo<span className="text-primary">Core</span></> : <>Frota <span className="text-primary">IA</span></>}
+        {master ? <>Painel Rodo<span className="text-primary">Core</span></> : <>Frota <span className="text-primary">IA</span></>}
       </span>
       {!compact && (
         <span className="mt-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">{master ? "Sistemas · painel mestre" : "Painel"}</span>

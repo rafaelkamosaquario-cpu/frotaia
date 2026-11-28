@@ -368,3 +368,78 @@ body {
     scroll-behavior: auto !important;
   }
 }
+/* Approved RodoCore panel presentation. Light/dark preference keys are retained;
+   these tokens never affect the Individual chat or its subscription/access rules. */
+.frota-panel.frota-refined {
+  --background: #bec1c5;
+  --foreground: #202833;
+  --surface: #dedfe1;
+  --surface-muted: #ced0d3;
+  --border: #939aa4;
+  --muted-foreground: #46515e;
+  --radius: 0;
+  --panel-shadow: none;
+  --panel-hover: #d7e9fc;
+  --panel-hover-text: #202833;
+  --panel-hover-border: #759fc7;
+  --panel-selected: #175bb5;
+  --panel-selected-border: #08458e;
+}
+.dark .frota-panel.frota-refined {
+  --background: #081629;
+  --foreground: #edf5ff;
+  --surface: #102640;
+  --surface-muted: #15304e;
+  --border: #28425f;
+  --muted-foreground: #a4b7cf;
+  --panel-hover: #244a71;
+  --panel-hover-text: #edf5ff;
+  --panel-hover-border: #78b7f5;
+  --panel-selected: #2167d1;
+  --panel-selected-border: #91c5ff;
+}
+/* Square controls and card containers; vehicle artwork, plates and tire reports
+   are deliberately not targeted by generic descendant/universal selectors. */
+.frota-panel.frota-refined :is(.ui-card, button, input:not([type="radio"]):not([type="checkbox"]), select, textarea, details),
+.frota-panel.frota-refined :is(article, section, div, a).border.border-border,
+.frota-panel.frota-refined .frota-menu a,
+.frota-panel.frota-refined [role="group"][aria-label="Tema do painel"] {
+  border-radius: 0;
+  box-shadow: none;
+}
+.frota-panel.frota-refined article.border-border,
+.frota-panel.frota-refined .ui-card { background-color: var(--surface); }
+.frota-panel.frota-refined .frota-menu a { border: 1px solid transparent; }
+.frota-panel.frota-refined .frota-menu :is(section > p, div > p),
+.frota-panel.frota-refined .ui-card > header,
+.frota-panel.frota-refined .ui-card > .border-b,
+.frota-panel.frota-refined thead {
+  background-color: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+}
+.frota-panel.frota-refined > header { background-color: var(--surface); }
+@media (hover: hover) {
+  .frota-panel.frota-refined :where(button:not(:disabled), .frota-menu a, a.ui-card, .ui-card):not([aria-current="page"]):not([aria-pressed="true"]):not([aria-selected="true"]):hover {
+    background-color: var(--panel-hover);
+    color: var(--panel-hover-text);
+    border-color: var(--panel-hover-border);
+    box-shadow: none;
+    transform: none;
+  }
+}
+.frota-panel.frota-refined :is([aria-current="page"], button[aria-pressed="true"], [role="tab"][aria-selected="true"]) {
+  background-color: var(--panel-selected);
+  color: #fff;
+  border-color: var(--panel-selected-border);
+  box-shadow: inset 0 0 0 1px var(--panel-selected-border);
+}
+.frota-panel.frota-refined :is(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (max-width: 479px) {
+  .frota-panel.frota-refined > header { padding-inline: .5rem; gap: .25rem; }
+  .frota-panel.frota-refined > header > div:first-child { gap: .35rem; }
+  .frota-panel.frota-refined > header > div:first-child .text-base { font-size: .8125rem; }
+}
